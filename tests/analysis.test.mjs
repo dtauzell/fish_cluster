@@ -1,6 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeFrame, cropFitsFrame, mapCanvasPoint, sampleTimes, summarizeFrames, normalizePredictions } from '../dist/analysis.mjs';
+import { analyzeFrame, cropFitsFrame, inchesToPixels, mapCanvasPoint, matchPointsWithin, nearestNeighborLinks, sampleTimes, summarizeFrames, normalizePredictions, randomSpacingReference, spacingPercentile } from '../dist/analysis.mjs';
+
+test('nearest links include each fish and draw mutual nearest pairs once', () => {
+  const points = [{ x: 0, y: 0 }, { x: 3, y: 4 }, { x: 3, y: 14 }];
+  assert.deepEqual(nearestNeighborLinks(points), [
+    { from: 0, to: 1, distancePx: 5 },
+    { from: 1, to: 2, distancePx: 10 }
+  ]);
+  assert.deepEqual(nearestNeighborLinks([]), []);
+  assert.deepEqual(nearestNeighborLinks([{ x: 0, y: 0 }]), []);
+  assert.deepEqual(nearestNeighborLinks([{ x: 1, y: 1 }, { x: 1, y: 1 }]), [{ from: 0, to: 1, distancePx: 0 }]);
+});
 
 test('portrait preview maps its right edge to the full video width', () => {
   const rect = { left: 100, top: 50, width: 405, height: 720 };
@@ -21,6 +32,38 @@ test('clusters count connected groups of two or more fish', () => {
   assert.equal(metrics.isolatedCount, 1);
   assert.equal(metrics.closeFishFraction, .75);
   assert.equal(metrics.pairCount, 6);
+  assert.deepEqual(metrics.groupSizes, [3, 1]);
+  assert.deepEqual(metrics.groupIds, [0, 0, 0, 1]);
+});
+
+test('group sizes change when the distance threshold joins groups', () => {
+  const fish = [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 20, y: 0 }, { x: 22, y: 0 }];
+  assert.deepEqual(analyzeFrame(fish, 3).groupSizes, [2, 2]);
+  assert.deepEqual(analyzeFrame(fish, 18).groupSizes, [4]);
+});
+
+test('inch threshold uses the entered half-inch grid calibration', () => {
+  const fish = [{ x: 0, y: 0 }, { x: 31, y: 0 }];
+  assert.equal(inchesToPixels(1, 15.3), 30.6);
+  assert.equal(analyzeFrame(fish, inchesToPixels(1, 15.3)).clusterCount, 0);
+  assert.equal(analyzeFrame(fish, inchesToPixels(1.02, 15.3)).clusterCount, 1);
+});
+
+test('manual center matching is one-to-one and finds the best assignment', () => {
+  const manual = [{ x: 0, y: 0 }, { x: 4, y: 0 }];
+  const automatic = [{ x: 2, y: 0 }, { x: -2, y: 0 }];
+  assert.equal(matchPointsWithin(manual, automatic, 3), 2);
+  assert.equal(matchPointsWithin(manual, automatic, 1), 0);
+});
+
+test('random spacing comparison is reproducible and recognizes tight spacing', () => {
+  const crop = { width: 100, height: 100 };
+  const reference = randomSpacingReference(5, crop);
+  assert.deepEqual(reference, randomSpacingReference(5, crop));
+  assert.equal(reference.length, 399);
+  assert.ok(spacingPercentile(0, reference) <= .05);
+  assert.ok(spacingPercentile(200, reference) > .95);
+  assert.equal(randomSpacingReference(1, crop), null);
 });
 
 test('empty and single-fish frames do not invent distances', () => {

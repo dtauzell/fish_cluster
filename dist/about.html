@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071a22">
+  <meta name="description" content="How Fish Cluster detects fish, measures positions, and counts groups.">
+  <title>About the analysis — Fish Cluster</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css?v=13">
+  <link rel="stylesheet" href="./about.css?v=1">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand about-brand" href="./index.html"><span class="brand-mark" aria-hidden="true">◌</span><span>FISH<span class="brand-light">CLUSTER</span></span></a>
+      <nav class="about-nav" aria-label="Main navigation"><a href="./index.html">Analyze a video</a><span aria-current="page">About</span></nav>
+    </header>
+    <main class="about-main">
+      <div class="about-hero">
+        <div class="eyebrow">METHOD GUIDE</div>
+        <h1>How the analysis works</h1>
+        <p>The app samples frames from a tank video, finds candidate fish centers, measures distances between those centers, and connects nearby detections into groups. Every result depends on what the detector found in that frame.</p>
+        <a class="about-cta" href="./index.html">Back to the analyzer <span aria-hidden="true">↗</span></a>
+      </div>
+
+      <nav class="about-toc" aria-label="On this page">
+        <a href="#sampling">Sampling</a><a href="#background">Background detection</a><a href="#model">Roboflow detection</a><a href="#positions">Positions and inches</a><a href="#groups">Clusters</a><a href="#validation">Checking results</a>
+      </nav>
+
+      <section id="sampling" class="about-section">
+        <div class="about-number">01 / FRAMES</div>
+        <div><h2>Which frames are analyzed?</h2><p>The browser reads the selected video at the chosen interval, 200 milliseconds by default. That gives about five sampled frames per second. A crop restricts detection to the selected tank area; exported coordinates still refer to the original video frame. You can draw a crop on the preview or enter its coordinates. The app analyzes each sampled frame on its own. It does not follow individual fish across time.</p></div>
+      </section>
+
+      <section id="background" class="about-section">
+        <div class="about-number">02 / DETECTION</div>
+        <div><h2>Background subtraction</h2><p>This is the default method for a fixed camera and a relatively stable tank background.</p>
+          <ol class="about-steps">
+            <li><strong>Build a reference.</strong> Sample up to 25 moments across the video and take the median grayscale value at each pixel. Moving fish usually disappear from this median image.</li>
+            <li><strong>Find dark changes.</strong> In each analyzed frame, mark pixels at least 24 grayscale levels darker than the reference. Small erosion and dilation passes remove specks and join nearby marked pixels. Strips near crop edges are excluded to reduce tank-wall detections.</li>
+            <li><strong>Keep plausible regions.</strong> Connected marked pixels become candidate regions. The detector keeps regions with an area of 45–2,500 pixels and a span of at least 10 pixels. The reported position is the mean X and Y of the region’s marked pixels.</li>
+            <li><strong>Try to recover missed fish.</strong> When fewer candidates than the entered known fish count are found, the detector checks closer to the crop edges. It may also split a large region into two if fish appear joined. These attempts are flagged in the export; the known count does not force a correct result.</li>
+          </ol>
+          <p class="about-note">Best suited to stationary footage. Reflections can look like fish, while overlapping fish can merge into one region. The median reference can also be inaccurate if a fish stays in one place for much of the video.</p>
+        </div>
+      </section>
+
+      <section id="model" class="about-section">
+        <div class="about-number">03 / DETECTION</div>
+        <div><h2>Roboflow model</h2><p>The optional method runs a trained Roboflow model in the browser on the selected crop. The app keeps predictions labeled as fish (or predictions without a label), requires a valid position inside the crop, and applies the chosen minimum confidence. The reported position is the center coordinate provided for the model’s bounding box. The app then adds the crop offset so it matches the original video frame.</p><p>The default project setting points to <a href="https://universe.roboflow.com/zebrafish-zxjvh/zebrafish_in_aquarium" target="_blank" rel="noopener">zebrafish_in_aquarium/9</a>. This option needs the model assets and a publishable key. Its missed boxes and false boxes affect all later measurements. The known fish count is only used by background subtraction.</p></div>
+      </section>
+
+      <section id="positions" class="about-section">
+        <div class="about-number">04 / MEASUREMENT</div>
+        <div><h2>From pixels to inches</h2><p>All spacing uses straight-line distance between detection centers: horizontal and vertical pixel differences are combined with the Pythagorean formula. To express that distance in inches, enter how many pixels span one 0.5-inch square of the paper grid.</p>
+          <div class="formula"><span>pixels per inch</span><strong>= 2 × pixels per 0.5-inch square</strong><span>distance in inches</span><strong>= center distance in pixels ÷ pixels per inch</strong></div>
+          <p>For the prefilled 15.3 pixels per half-inch square, one inch is about 30.6 pixels. A 1.5-inch close distance therefore links centers up to 45.9 pixels apart. Recalibrate for other footage or camera views. Perspective makes a single scale approximate when fish appear at different depths.</p>
+        </div>
+      </section>
+
+      <section id="groups" class="about-section">
+        <div class="about-number">05 / CLUSTERING</div>
+        <div><h2>How groups are counted</h2><p>For one frame, the app checks every pair of detection centers. It draws a link when their distance is at or below the chosen close distance. Fish connected directly <em>or through other fish</em> belong to one group. A group of two or more counts as a cluster; a single unlinked detection counts as isolated.</p>
+          <div class="group-example" role="img" aria-label="Three fish form one group because each neighboring pair is linked, even though the outer fish are not directly linked"><span class="fish-dot">A</span><span class="fish-link"></span><span class="fish-dot">B</span><span class="fish-link"></span><span class="fish-dot">C</span></div>
+          <p>In this example, A and C can be farther apart than the close distance and still be in the same group through B. The smallest distance that makes every detected fish one group is the longest link needed to connect them all, not the largest pair distance.</p>
+          <h3>What the displays mean</h3>
+          <ul class="about-list"><li><strong>Colored dots and numbers:</strong> group membership within the selected frame. Group numbers do not identify the same fish or group in later frames.</li><li><strong>Group sizes:</strong> a pattern such as <code>3+2</code> means two groups containing three and two detections.</li><li><strong>Timeline marks:</strong> a mark appears when the sorted group-size pattern changes between sampled frames. A mark can also reflect a missed or extra detection.</li><li><strong>Distance chart:</strong> shows how the selected frame’s cluster and isolated counts change as the link distance changes. Moving its slider recalculates grouping without running detection again.</li></ul>
+        </div>
+      </section>
+
+      <section id="validation" class="about-section">
+        <div class="about-number">06 / INTERPRETATION</div>
+        <div><h2>How to check a result</h2><p>First inspect the colored centers on the video. Count visible fish and check whether each center lands on one fish. Then inspect frames around timeline changes; a brief count change may be a merged fish or reflection. Finally, move the close-distance slider slightly. If the group count changes with a tiny adjustment, that frame sits near the chosen boundary.</p><p>After analysis, open <strong>Human analysis</strong> to click fish centers in sampled frames yourself. You can show the automatic centers for comparison, mark frames reviewed, and export your marks and frame-level counts. The full-frame toggle lets you mark fish outside the analyzed crop; these are exported separately and excluded from the cluster comparison. Include crowded, isolated, reflection, and crop-edge cases. A matching fish count alone can hide a misplaced detection.</p><p>“Average pair distance” is the mean of all center-to-center pairs in each frame, averaged over frames with at least two detections. “Detections near another” is the share whose nearest detected neighbor is within the close distance. The random-spacing comparison places the same number of points uniformly inside the crop 399 times and compares each frame’s mean nearest-neighbor distance with those simulations. It is a per-frame reference, not proof that the whole video is statistically clustered; adjacent frames are related, and the random placements ignore fish size and tank behavior.</p><p class="about-note">For a stronger validation, label a representative set of frames by hand. Compare detected counts, centers, and cluster assignments with those labels before interpreting the whole video.</p></div>
+      </section>
+    </main>
+    <footer><span>FISHCLUSTER / LOCAL VIDEO ANALYSIS</span><span><a href="./index.html">Analyze a video</a> · <a href="./background-test.html">Background subtraction test</a></span></footer>
+  </div>
+</body>
+</html>

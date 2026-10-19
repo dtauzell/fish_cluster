@@ -7,17 +7,19 @@
   <meta name="description" content="Analyze zebrafish spacing and clustering in a tank video, entirely in your browser.">
   <title>Fish Cluster — zebrafish video analysis</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=11">
-  <script type="module" src="./app.mjs?v=10"></script>
+  <link rel="stylesheet" href="./style.css?v=15">
+  <link rel="stylesheet" href="./about.css?v=1">
+  <script type="module" src="./app.mjs?v=19"></script>
 </head>
 <body>
   <div class="shell">
+    <video id="source-video" class="source-video" playsinline preload="auto" muted aria-hidden="true"></video>
     <header class="topbar">
       <div class="brand"><span class="brand-mark" aria-hidden="true">◌</span><span>FISH<span class="brand-light">CLUSTER</span></span></div>
-      <span class="top-note"><span class="status-dot"></span> Browser-based analysis</span>
+      <div class="top-links"><a href="#about">About the analysis</a><span class="top-note"><span class="status-dot"></span> Browser-based analysis</span></div>
     </header>
     <main>
-      <div class="workspace">
+      <div id="workspace" class="workspace">
         <section class="panel setup" aria-labelledby="setup-title">
           <div class="section-heading"><span class="step">01</span><div><h2 id="setup-title">Set up analysis</h2><p>Choose footage and sampling settings.</p></div></div>
           <label class="dropzone" id="dropzone" for="video-file">
@@ -29,14 +31,12 @@
           <div id="video-meta" class="video-meta" hidden></div>
           <div class="fields two">
             <label>Frame interval <span class="help">milliseconds</span><input id="interval" type="number" min="1" step="1" value="200"></label>
-            <label>Close distance <span class="help">% of image diagonal</span><input id="threshold" type="number" min="0.1" max="100" step="0.5" value="10"></label>
+            <label>Close distance <span class="help">inches</span><input id="threshold" type="number" min="0.01" step="0.01" value="1.5"></label>
           </div>
+          <div class="fields method-settings"><label>Pixels per 0.5-inch square <span class="help">distance calibration for either method</span><input id="grid-pixels" type="number" min="0.1" step="0.1" value="15.3"></label></div>
           <div class="fields method-choice"><label>Detection method<select id="method"><option value="background" selected>Background subtraction · fixed tank</option><option value="roboflow">Roboflow model</option></select></label></div>
           <div id="background-settings" class="fields method-settings">
-            <div class="two fields">
-              <label>Known fish count<input id="expected-fish" type="number" min="1" step="1" value="5"></label>
-              <label>Pixels per 0.5-inch square<input id="grid-pixels" type="number" min="1" step="0.1" value="15.3"></label>
-            </div>
+            <label>Known fish count<input id="expected-fish" type="number" min="1" step="1" value="5"></label>
             <p class="fine-print">Works best with a fixed camera. Draw a crop around the tank floor. Fewer than five blobs may mean fish overlap; extra blobs may come from tank edges or reflections.</p>
           </div>
           <details class="model-settings" id="model-settings" open hidden>
@@ -57,25 +57,48 @@
           <progress id="progress" max="100" value="0" hidden></progress>
         </section>
         <section class="panel preview" aria-labelledby="preview-title">
-          <div class="section-heading"><span class="step">02</span><div><h2 id="preview-title">Frame preview</h2><p>Detected fish centers and nearby links.</p></div></div>
-          <div class="canvas-wrap" id="canvas-wrap"><video id="source-video" class="source-video" playsinline preload="auto" muted aria-hidden="true"></video><canvas id="frame-canvas" aria-label="Analyzed video frame"></canvas><div id="empty-preview" class="empty-preview"><span>◎</span><strong>Waiting for footage</strong><small>Your analyzed frames will appear here.</small></div></div>
+          <div class="section-heading"><span class="step">02</span><div><h2 id="preview-title">Frame preview</h2><p>Colored groups and nearby links.</p></div></div>
+          <div id="timeline" class="timeline" hidden><div class="timeline-head"><strong>Group changes</strong><span id="change-count">—</span></div><canvas id="change-timeline" width="1200" height="26" aria-label="Timeline of changes in group sizes; click to jump to a change"></canvas><div class="timeline-controls"><button id="previous-change" class="secondary" type="button">← Previous change</button><button id="next-change" class="secondary" type="button">Next change →</button></div></div>
+          <div class="frame-controls"><label for="frame-slider">Frame <span id="frame-position">—</span></label><input id="frame-slider" type="range" min="0" max="0" value="0" disabled><span id="frame-time">—</span></div>
+          <div class="canvas-wrap" id="canvas-wrap"><canvas id="frame-canvas" aria-label="Analyzed video frame"></canvas><div id="empty-preview" class="empty-preview"><span>◎</span><strong>Waiting for footage</strong><small>Your analyzed frames will appear here.</small></div></div>
           <div class="crop-controls"><span id="crop-label">Drag on the preview to select the tank area.</span><button id="clear-crop" class="secondary" type="button" disabled>Use full frame</button></div>
           <fieldset class="crop-fields" id="crop-fields" disabled><legend>Or enter a precise crop in video pixels</legend><label>X<input id="crop-x" type="number" min="0" step="1"></label><label>Y<input id="crop-y" type="number" min="0" step="1"></label><label>Width<input id="crop-width" type="number" min="30" step="1"></label><label>Height<input id="crop-height" type="number" min="30" step="1"></label><button id="apply-crop" class="secondary" type="button">Apply crop</button></fieldset>
-          <div class="frame-controls"><label for="frame-slider">Frame <span id="frame-position">—</span></label><input id="frame-slider" type="range" min="0" max="0" value="0" disabled><span id="frame-time">—</span></div>
+          <div id="frame-groups" class="frame-groups" hidden></div>
         </section>
       </div>
       <section id="results" class="results" hidden>
-        <div class="results-head"><div><div class="eyebrow">ANALYSIS COMPLETE</div><h2>What the frames show</h2></div><div class="downloads"><button id="download-csv" class="secondary">Export detections CSV ↓</button><button id="download-frames" class="secondary">Export frames CSV ↓</button><button id="download-json" class="secondary">Export all JSON ↓</button></div></div>
+        <div class="results-head"><div><div class="eyebrow">ANALYSIS COMPLETE</div><h2>What the frames show</h2><a id="human-link" class="human-link" href="#human-analysis" hidden>Open human analysis ↗</a></div><div class="downloads"><button id="download-csv" class="secondary">Export detections CSV ↓</button><button id="download-frames" class="secondary">Export frames CSV ↓</button><button id="download-json" class="secondary">Export all JSON ↓</button></div></div>
         <div class="stat-grid">
           <article class="stat"><span>Average detections / frame</span><strong id="stat-fish">—</strong></article>
-          <article class="stat"><span>Average pair distance</span><strong id="stat-distance">—</strong><small id="distance-note">center to center · pixels</small></article>
+          <article class="stat"><span>Average pair distance</span><strong id="stat-distance">—</strong><small id="distance-note">center to center · approximate inches</small></article>
           <article class="stat"><span>Detections near another</span><strong id="stat-close">—</strong><small>within chosen distance</small></article>
           <article class="stat"><span>Average clusters / frame</span><strong id="stat-clusters">—</strong><small>groups of at least 2</small></article>
         </div>
-        <div class="method"><strong>How metrics work</strong><p>Each detection center is a candidate fish position. Pair distance is the mean of all detection pairs within a frame, then averaged over frames with at least two detections. “Near another” is the share whose nearest neighbor is within the chosen distance. Connected detections form a cluster; single detections are excluded. Inch estimates use the paper-grid calibration and are approximate. When the detected count is low, the detector checks close to the crop edge, then may split a large joined region. These estimates are marked in the raw export. Reflections can create extras, and fish are not tracked between frames.</p></div>
+        <div class="cluster-explorer">
+          <div><h3>Explore the groups</h3><p>Adjust the distance to see when groups join. The chart shows the selected frame.</p></div>
+          <label for="cluster-distance">Link distance <strong id="cluster-distance-label">—</strong></label>
+          <input id="cluster-distance" type="range" min="0.01" max="5" step="0.01" value="1.5">
+          <svg id="cluster-chart" viewBox="0 0 600 160" role="img" aria-label="Group count across distance thresholds"></svg>
+          <div class="chart-legend"><span><i class="legend-clusters"></i>Groups of 2+</span><span><i class="legend-singles"></i>Single fish</span><span class="legend-current">│ Selected distance</span></div>
+          <p id="random-summary" class="random-summary"></p>
+        </div>
+        <div class="method"><strong>How metrics work</strong><p>Each detection center is a candidate fish position. Centers within the link distance form connected groups; a chain of links can join fish farther apart. Single fish are shown separately. The random comparison places the same number of points uniformly inside the selected tank crop 399 times and compares mean nearest-neighbor distance. A low percentile means tighter spacing than those random placements in that frame; adjacent video frames are not independent tests. Inch estimates use the paper-grid calibration and are approximate. When the detected count is low, the detector checks close to the crop edge, then may split a large joined region. These estimates are marked in the raw export. Reflections can create extras, and fish are not tracked between frames. <a href="#about">Read the full method</a>.</p></div>
       </section>
+      <section id="human-page" class="human-page" hidden aria-labelledby="human-title">
+        <div class="human-head"><div><div class="eyebrow">HUMAN ANALYSIS</div><h1 id="human-title">Review sampled frames</h1><p>Click the center of each visible fish inside the crop. Click one of your numbered marks to remove it. Review labels belong to each frame; they do not track individual fish across time.</p></div><a class="secondary human-back" href="#analysis">← Back to analysis</a></div>
+        <div class="human-layout">
+          <div class="human-review-panel">
+            <div class="human-controls"><button id="human-prev" class="secondary" type="button">← Previous</button><label for="human-frame-number">Frame <input id="human-frame-number" type="number" min="1" step="1" value="1"></label><span id="human-frame-time">—</span><button id="human-next" class="secondary" type="button">Next →</button></div>
+            <input id="human-slider" type="range" min="0" max="0" value="0" aria-label="Sampled frame">
+            <div class="human-canvas-wrap"><canvas id="human-canvas" aria-label="Click fish centers in the selected sampled frame"></canvas></div>
+            <div class="human-frame-actions"><label><input id="human-show-full" type="checkbox"> Show full frame</label><label><input id="human-show-auto" type="checkbox"> Show automatic centers</label><label><input id="human-show-nearest" type="checkbox"> Show nearest detected fish distances (inches)</label><label><input id="human-reviewed" type="checkbox"> Mark this frame reviewed</label><button id="human-clear" class="secondary" type="button">Clear my marks</button></div>
+          </div>
+          <aside class="human-sidebar"><h2>Selected frame</h2><div id="human-frame-details" class="human-frame-details">—</div><div class="human-legend"><span><i class="human-manual-dot"></i>Your centers</span><span><i class="human-auto-dot"></i>Automatic centers</span></div><p id="human-progress">0 frames reviewed</p><p id="human-validation-summary" class="human-validation-summary">—</p><p class="human-help">Centers are matched one-to-one within 0.5 inch. Use the full-frame view to spot fish outside the analyzed crop. Those marks are exported, but excluded from the comparison. Mark reviewed even when no fish are visible.</p><button id="human-export" class="secondary" type="button">Export human analysis CSV ↓</button><p class="human-help">Manual marks stay in this browser tab until you reload it. Export them before leaving.</p></aside>
+        </div>
+      </section>
+      <section id="about-page" hidden aria-label="About the analysis"><div id="about-content" class="about-main">Loading the method guide…</div></section>
     </main>
-    <footer><span>FISHCLUSTER / LOCAL VIDEO ANALYSIS</span><span><a href="./background-test.html">View background subtraction test</a> · Optional model: <a href="https://roboflow.com/" target="_blank" rel="noopener">Roboflow InferenceJS</a></span></footer>
+    <footer><span>FISHCLUSTER / LOCAL VIDEO ANALYSIS</span><span><a href="#about">About the analysis</a> · <a href="./background-test.html">Background subtraction test</a> · Optional model: <a href="https://roboflow.com/" target="_blank" rel="noopener">Roboflow InferenceJS</a></span></footer>
   </div>
 </body>
 </html>
