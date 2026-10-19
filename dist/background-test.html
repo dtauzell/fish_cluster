@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Background subtraction test · Fish Cluster</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; background: #071a22; color: #eaf5f3; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 1260px; margin: auto; padding: clamp(20px, 4vw, 52px); }
+    a { color: #a2f2d3; }
+    .back { text-decoration: none; font-size: 14px; }
+    .eyebrow { color: #8ee4c5; font-size: 12px; font-weight: 700; letter-spacing: .16em; margin-top: 40px; }
+    h1 { font-size: clamp(32px, 5vw, 58px); line-height: 1.05; letter-spacing: -.04em; margin: 12px 0 16px; }
+    .intro { color: #b7c9c8; line-height: 1.6; max-width: 760px; margin: 0 0 30px; }
+    .legend { display: flex; gap: 20px; flex-wrap: wrap; color: #cadbd7; font-size: 14px; margin-bottom: 25px; }
+    .swatch { display: inline-block; width: 13px; height: 13px; margin-right: 7px; vertical-align: -1px; }
+    .red { background: #ff2d2d; } .green { background: #1ef028; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr)); gap: 18px; }
+    .frame-card { background: #102b33; border: 1px solid #24505a; border-radius: 14px; overflow: hidden; }
+    .image-wrap { background: #15262a; }
+    img { display: block; width: 100%; height: auto; }
+    .card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 18px; }
+    .card-footer span { color: #a9c1bd; }
+    .card-footer strong { color: #a2f2d3; font-size: 20px; }
+    .comparison { padding: 0 18px 17px; color: #c9dcda; font-size: 13px; }
+    .comparison.mismatch { color: #e8d38c; }
+    .note { margin-top: 28px; padding: 18px 22px; border-left: 3px solid #e4c772; background: #163038; color: #d6e3df; line-height: 1.55; }
+  </style>
+</head>
+<body>
+<main>
+  <a class="back" href="./index.html">← Fish Cluster app</a>
+  <div class="eyebrow">EXPERIMENTAL DETECTION / FISH.MOV</div>
+  <h1>Ten frames, counted</h1>
+  <p class="intro">Background subtraction sampled the video every 200 ms. These ten frames span the clip. This tank contains five fish. Each card compares its detected dark blobs with that known count.</p>
+  <div class="legend"><span><i class="swatch red"></i>Detected region</span><span><i class="swatch green"></i>Exported center position</span></div>
+  <section class="grid" aria-label="Ten annotated video frames">
+<article class="frame-card">
+          <div class="image-wrap"><img src="./background-test/frame_000.png" width="420" height="290" alt="Tank at 0 seconds with 5 detected blobs outlined in red" loading="lazy"></div>
+          <div class="card-footer"><span>0 seconds</span><strong>5 detected</strong></div>
+          <div class="comparison match">Matches known count</div>
+        </article>
+<article class="frame-card">
+          <div class="image-wrap"><img src="./background-test/frame_025.png" width="420" height="290" alt="Tank at 5 seconds with 5 detected blobs outlined in red" loading="lazy"></div>
+          <div class="card-footer"><span>5 seconds</span><strong>5 detected</strong></div>
+          <div class="comparison match">Matches known count</div>
+        </article>
+<article class="frame-card">
+          <div class="image-wrap"><img src="./background-test/frame_050.png" width="420" height="290" alt="Tank at 10 seconds with 6 detected blobs outlined in red" loading="lazy"></div>
+          <div class="card-footer"><span>10 seconds</span><strong>6 detected</strong></div>
+          <div class="comparison mismatch">1 above known count</div>
+        </article>
+<article class="frame-card">
+          <div class="image-wrap"><img src="./background-test/frame_100.png" width="420" height="290" alt="Tank at 20 seconds with 6 detected blobs outlined in red" loading="lazy"></div>
+          <div class="card-footer"><span>20 seconds</span><strong>6 detected</strong></div>
+          <div class="comparison mismatch">1 above known count</div>
+        </article>
+<article class="frame-card">
+          <div class="image-wrap"><img src="./background-test/frame_150.png" width="420" height="290" alt="Tank at 30 seconds with 6 detected blobs outlined in red" loading="lazy"></div>
+          <div class="card-footer"><span>30 seconds</span><strong>6 detected</strong></div>
+          <div class="comparison mismatch">1 above known count</div>
+        </article>
+<article class="frame-card">
+          <div class="image-wrap"><img src="./background-test/frame_250.png" width="420" height="290" alt="Tank at 50 seconds with 4 detected blobs outlined in red" loading="lazy"></div>
+          <div class="card-footer"><span>50 seconds</span><strong>4 detected</strong></div>
+          <div class="comparison mismatch">1 below known count</div>
+        </article>
+<article class="frame-card">
+          <div class="image-wrap"><img src="./background-test/frame_300.png" width="420" height="290" alt="Tank at 60 seconds with 5 detected blobs outlined in red" loading="lazy"></div>
+          <div class="card-footer"><span>60 seconds</span><strong>5 detected</strong></div>
+          <div class="comparison match">Matches known count</div>
+        </article>
+<article class="frame-card">
+          <div class="image-wrap"><img src="./background-test/frame_350.png" width="420" height="290" alt="Tank at 70 seconds with 7 detected blobs outlined in red" loading="lazy"></div>
+          <div class="card-footer"><span>70 seconds</span><strong>7 detected</strong></div>
+          <div class="comparison mismatch">2 above known count</div>
+        </article>
+<article class="frame-card">
+          <div class="image-wrap"><img src="./background-test/frame_450.png" width="420" height="290" alt="Tank at 90 seconds with 4 detected blobs outlined in red" loading="lazy"></div>
+          <div class="card-footer"><span>90 seconds</span><strong>4 detected</strong></div>
+          <div class="comparison mismatch">1 below known count</div>
+        </article>
+<article class="frame-card">
+          <div class="image-wrap"><img src="./background-test/frame_550.png" width="420" height="290" alt="Tank at 110 seconds with 5 detected blobs outlined in red" loading="lazy"></div>
+          <div class="card-footer"><span>110 seconds</span><strong>5 detected</strong></div>
+          <div class="comparison match">Matches known count</div>
+        </article>
+  </section>
+  <p class="note">Tank walls and reflections can create false detections. Fish that touch or overlap can appear as one blob. A count of five does not guarantee that all five positions are correct. The 0.5-inch paper grid measures roughly 15–16 pixels per square in the central tank area, or about 30–32 pixels per inch; perspective makes this an approximate distance scale. The page shows the tank crop; exported coordinates refer to the original video.</p>
+</main>
+</body>
+</html>

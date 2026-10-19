@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+._*
+
+# Local dependencies, caches, and logs
+node_modules/
+.wrangler/
+.npm/
+*.log
+
+# Local credentials
+.env
+.env.*
+!.env.example
+.dev.vars*
+
+# Python experiment environment and generated output
+.venv/
+__pycache__/
+*.py[cod]
+experiments/background_results/
+
+# Uploaded tank videos stay local; dist/ remains deployable
+*.mov
+*.mp4
+*.m4v
+*.webm
+*.avi
+*.mkv
