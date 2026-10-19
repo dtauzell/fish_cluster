@@ -32,4 +32,33 @@ The static [ten-frame report](dist/background-test.html) shows detected counts f
 
 ## Cloudflare Pages
 
-Deploy the repository as a static Pages project with no build command and `dist` as the output directory. The page uses no server routes or storage. Background mode runs locally without model assets; a live network connection is needed for Roboflow mode and optional web fonts. Do not put a private Roboflow API key in the site source or browser form.
+The app deploys as a static Cloudflare Pages site. The deployable files are already in `dist/`; no build step, server routes, or storage are required. You need Node.js/npm and a Cloudflare account.
+
+Run these commands from the repository root. First, sign in (Wrangler opens a browser):
+
+```sh
+npx wrangler login
+```
+
+Create the Pages project once. Skip this command if `fish-cluster` already exists in your Cloudflare account:
+
+```sh
+npx wrangler pages project create fish-cluster --production-branch main
+```
+
+Test and deploy the current `dist/` directory to production:
+
+```sh
+npm test
+npx wrangler pages deploy dist --project-name fish-cluster --branch main
+```
+
+Wrangler prints the deployment URL. Open it to check the site; deployments are also listed under **Workers & Pages → fish-cluster** in the Cloudflare dashboard. For later updates, rerun the test and deploy commands. If you choose a different project name, use it in every command.
+
+To publish a preview without updating production, use a branch name other than `main`:
+
+```sh
+npx wrangler pages deploy dist --project-name fish-cluster --branch preview
+```
+
+These commands use Cloudflare's [Direct Upload workflow](https://developers.cloudflare.com/pages/get-started/direct-upload/) and [Wrangler Pages commands](https://developers.cloudflare.com/workers/wrangler/commands/pages/). Only `dist/` is uploaded, so the local `fish.mov` stays on your computer. Background mode runs locally without model assets; a live network connection is needed for Roboflow mode and optional web fonts. The prefilled Roboflow publishable key is visible in the deployed source; never put a private API key there.
