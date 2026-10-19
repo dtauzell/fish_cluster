@@ -1,3 +1,6 @@
+// Geometry and statistics on point coordinates. These functions never read image pixels.
+// Distances ending in Px are in original-video pixels; absent distances are null.
+
 export function mapCanvasPoint(clientX, clientY, rect, frameWidth, frameHeight) {
   return {
     x: Math.round(Math.max(0, Math.min(frameWidth, (clientX - rect.left) * frameWidth / rect.width))),
@@ -48,6 +51,7 @@ export function matchPointsWithin(manual, automatic, tolerancePx) {
   return matches;
 }
 
+/** Keep fish boxes above the confidence cutoff and give both model response formats one shape. */
 export function normalizePredictions(predictions, width, height, minConfidence = 0) {
   const list = Array.isArray(predictions) ? predictions : predictions?.predictions;
   if (!Array.isArray(list)) throw new Error('The model returned an unexpected prediction format.');
@@ -65,35 +69,61 @@ export function normalizePredictions(predictions, width, height, minConfidence =
     Number.isFinite(p.confidence) && p.confidence >= minConfidence);
 }
 
+/**
+ * Measure distances and connected groups from detected centers, without image processing.
+ * A chain A—B—C is one group when A is close to B and B is close to C,
+ * even if A and C are farther apart than the threshold. Single fish have groups too.
+ * groupIds[i] indexes groupSizes for detections[i]; these IDs apply to this frame only.
+ */
 export function analyzeFrame(detections, thresholdPx) {
-  const n = detections.length;
-  const parent = Array.from({ length: n }, (_, i) => i);
-  const nearest = Array(n).fill(Infinity);
-  const find = i => parent[i] === i ? i : (parent[i] = find(parent[i]));
-  const join = (a, b) => { parent[find(a)] = find(b); };
-  let pairSum = 0, pairCount = 0;
-  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
-    const d = Math.hypot(detections[i].x - detections[j].x, detections[i].y - detections[j].y);
-    pairSum += d; pairCount++;
-    nearest[i] = Math.min(nearest[i], d);
-    nearest[j] = Math.min(nearest[j], d);
-    if (d <= thresholdPx) join(i, j);
+  const fishCount = detections.length;
+  const nearestDistances = Array(fishCount).fill(Infinity);
+
+  // Union-find: each fish starts in its own group. Joining a close pair merges
+  // their groups; following parent pointers finds the group's representative.
+  const parent = Array.from({ length: fishCount }, (_, index) => index);
+  function findGroup(index) {
+    if (parent[index] !== index) parent[index] = findGroup(parent[index]);
+    return parent[index];
   }
-  const groups = new Map();
-  const groupIds = [];
-  for (let i = 0; i < n; i++) {
-    const root = find(i);
-    if (!groups.has(root)) groups.set(root, groups.size);
-    groupIds.push(groups.get(root));
+  function joinGroups(first, second) {
+    parent[findGroup(first)] = findGroup(second);
   }
-  const groupSizes = Array(groups.size).fill(0);
+
+  let pairDistanceSum = 0;
+  let pairCount = 0;
+  for (let first = 0; first < fishCount; first++) {
+    for (let second = first + 1; second < fishCount; second++) {
+      const distance = Math.hypot(
+        detections[first].x - detections[second].x,
+        detections[first].y - detections[second].y
+      );
+      pairDistanceSum += distance;
+      pairCount++;
+      nearestDistances[first] = Math.min(nearestDistances[first], distance);
+      nearestDistances[second] = Math.min(nearestDistances[second], distance);
+      if (distance <= thresholdPx) joinGroups(first, second);
+    }
+  }
+
+  // Replace internal representatives with consecutive IDs, in detection order.
+  const groupNumbers = new Map();
+  const groupIds = detections.map((_, index) => {
+    const representative = findGroup(index);
+    if (!groupNumbers.has(representative)) groupNumbers.set(representative, groupNumbers.size);
+    return groupNumbers.get(representative);
+  });
+  const groupSizes = Array(groupNumbers.size).fill(0);
   for (const id of groupIds) groupSizes[id]++;
+
   return {
-    fishCount: n,
+    fishCount,
     pairCount,
-    meanPairDistancePx: pairCount ? pairSum / pairCount : null,
-    meanNearestDistancePx: n > 1 ? nearest.reduce((a, b) => a + b, 0) / n : null,
-    closeFishFraction: n ? nearest.filter(d => d <= thresholdPx).length / n : null,
+    meanPairDistancePx: pairCount ? pairDistanceSum / pairCount : null,
+    meanNearestDistancePx: fishCount > 1
+      ? nearestDistances.reduce((sum, distance) => sum + distance, 0) / fishCount : null,
+    closeFishFraction: fishCount
+      ? nearestDistances.filter(distance => distance <= thresholdPx).length / fishCount : null,
     clusterCount: groupSizes.filter(size => size >= 2).length,
     isolatedCount: groupSizes.filter(size => size === 1).length,
     groupSizes,

@@ -26,6 +26,40 @@ The default confidence cutoff is 0.15 to help detect small fish. The progress li
 
 When Roboflow mode is selected, the app begins preparing the model after a video is selected and keeps the browser worker alive for later analyses on the same page. Reloading the page still requires model initialization. Browser caching of downloaded assets depends on the browser and Roboflow response headers. Background mode needs no model download or key.
 
+## Developer
+
+`dist/` contains the application source and is also the deployable site; no build
+step is needed. Run `npm run dev` to serve it locally and `npm test` to run the
+automated checks.
+
+The GUI handles controls and drawing. Separate modules decode video, detect fish,
+calculate measurements, compare manual annotations, and format exports.
+
+| File | Responsibility |
+| --- | --- |
+| [dist/index.html](dist/index.html), [dist/style.css](dist/style.css) | Page structure and appearance. |
+| [dist/app.mjs](dist/app.mjs) | Main entry point: connects controls to analysis, manages page state, and updates results, charts, and navigation. |
+| [dist/preview.mjs](dist/preview.mjs) | Draws the video preview, detection centers, group links, and crop outline. |
+| [dist/human-ui.mjs](dist/human-ui.mjs) | Handles manual annotation controls and draws human-review overlays. |
+| [dist/video.mjs](dist/video.mjs) | Seeks and decodes video frames, then reads cropped pixels using a private canvas. |
+| [dist/pipeline.mjs](dist/pipeline.mjs) | Coordinates background preparation, frame sampling, detection, and measurement; reports progress and completed frames. |
+| [dist/background.mjs](dist/background.mjs) | Estimates the stationary tank background and finds dark moving regions that may be fish. |
+| [dist/model.mjs](dist/model.mjs) | Loads and reuses the optional Roboflow model worker and explains model errors. |
+| [dist/settings.mjs](dist/settings.mjs) | Validates settings, copies the selected crop, and converts calibrated inches to pixels. |
+| [dist/analysis.mjs](dist/analysis.mjs) | Calculates distances and connected groups from centers, normalizes model predictions, and supplies geometry and statistics helpers. |
+| [dist/measurements.mjs](dist/measurements.mjs) | Adds calibrated distances and random-spacing comparisons to frame metrics; identifies group-size changes. |
+| [dist/review.mjs](dist/review.mjs) | Compares manual marks with automatic centers and summarizes reviewed frames. |
+| [dist/exports.mjs](dist/exports.mjs) | Formats detection, frame, and manual-review CSV data and prepares settings for export. |
+| [dist/download.mjs](dist/download.mjs), [dist/format.mjs](dist/format.mjs) | Save files in the browser and format displayed numbers and times. |
+| [dev-server.mjs](dev-server.mjs) | Serves `dist/` locally for development. |
+| [tests/](tests/) | Node tests for detection, measurements, pipeline behavior, manual comparisons, and exports. |
+| [experiments/background_subtraction.py](experiments/background_subtraction.py) | Separate Python experiment that generates the background-subtraction report. |
+
+Start with `app.mjs` to understand user interactions or `pipeline.mjs` to follow
+an analysis run. See the [code guide](docs/code-guide.md) for a walkthrough from
+video pixels to exported measurements, coordinate conventions, and explanations
+of the vision algorithms.
+
 ## Background subtraction experiment
 
 The static [ten-frame report](dist/background-test.html) shows detected counts from a separate background subtraction trial on `fish.mov`. It is also linked from the app footer and is included in the Cloudflare Pages output. The [experiment instructions](experiments/README.md) explain the method and how to regenerate the page. These blob counts have not been manually validated as fish counts.

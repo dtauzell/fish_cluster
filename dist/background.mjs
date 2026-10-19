@@ -24,6 +24,7 @@ export function medianBackground(samples) {
   return result;
 }
 
+// Erosion shrinks the mask: keep a pixel only when its four neighbors are also set.
 function erode3(mask, width, height) {
   const result = new Uint8Array(mask.length);
   for (let y = 1; y < height - 1; y++) {
@@ -35,6 +36,7 @@ function erode3(mask, width, height) {
   return result;
 }
 
+// Dilation grows the mask by setting the four neighbors of each foreground pixel.
 function dilate3(mask, width, height) {
   const result = new Uint8Array(mask.length);
   for (let y = 0; y < height; y++) {
@@ -51,15 +53,23 @@ function dilate3(mask, width, height) {
   return result;
 }
 
+/**
+ * Estimate two centers inside an unusually large blob, which may contain touching fish.
+ * Start along its longest axis (from the pixel covariance), then repeatedly assign
+ * pixels to the nearest center and average them: two-cluster k-means.
+ */
 function splitJoinedBlob(blob, frameWidth, minArea) {
   const pixels = blob.pixels;
-  let xx = 0, xy = 0, yy = 0;
+  let varianceX = 0, covarianceXY = 0, varianceY = 0;
   for (const index of pixels) {
     const x = index % frameWidth - blob.x;
     const y = Math.floor(index / frameWidth) - blob.y;
-    xx += x * x; xy += x * y; yy += y * y;
+    varianceX += x * x;
+    covarianceXY += x * y;
+    varianceY += y * y;
   }
-  const angle = Math.atan2(2 * xy, xx - yy) / 2;
+  // The eigenvector of this 2D covariance points along the blob's longest axis.
+  const angle = Math.atan2(2 * covarianceXY, varianceX - varianceY) / 2;
   const axisX = Math.cos(angle), axisY = Math.sin(angle);
   let low = Infinity, high = -Infinity;
   for (const index of pixels) {
@@ -78,9 +88,9 @@ function splitJoinedBlob(blob, frameWidth, minArea) {
     const sums = [{ x: 0, y: 0, area: 0 }, { x: 0, y: 0, area: 0 }];
     for (const index of pixels) {
       const x = index % frameWidth, y = Math.floor(index / frameWidth);
-      const a = (x - centers[0].x) ** 2 + (y - centers[0].y) ** 2;
-      const b = (x - centers[1].x) ** 2 + (y - centers[1].y) ** 2;
-      const group = sums[a <= b ? 0 : 1];
+      const distanceToFirst = (x - centers[0].x) ** 2 + (y - centers[0].y) ** 2;
+      const distanceToSecond = (x - centers[1].x) ** 2 + (y - centers[1].y) ** 2;
+      const group = sums[distanceToFirst <= distanceToSecond ? 0 : 1];
       group.x += x; group.y += y; group.area++;
     }
     if (sums.some(group => group.area < minArea)) return null;
@@ -93,9 +103,9 @@ function splitJoinedBlob(blob, frameWidth, minArea) {
   ];
   for (const index of pixels) {
     const x = index % frameWidth, y = Math.floor(index / frameWidth);
-    const a = (x - centers[0].x) ** 2 + (y - centers[0].y) ** 2;
-    const b = (x - centers[1].x) ** 2 + (y - centers[1].y) ** 2;
-    const group = groups[a <= b ? 0 : 1];
+    const distanceToFirst = (x - centers[0].x) ** 2 + (y - centers[0].y) ** 2;
+    const distanceToSecond = (x - centers[1].x) ** 2 + (y - centers[1].y) ** 2;
+    const group = groups[distanceToFirst <= distanceToSecond ? 0 : 1];
     group.area++;
     group.minX = Math.min(group.minX, x); group.maxX = Math.max(group.maxX, x);
     group.minY = Math.min(group.minY, y); group.maxY = Math.max(group.maxY, y);
@@ -105,15 +115,8 @@ function splitJoinedBlob(blob, frameWidth, minArea) {
     height: groups[index].maxY - groups[index].minY + 1, splitFromBlob: true }));
 }
 
-/** Connected dark regions in one frame, with centers in crop coordinates. */
-export function detectBackgroundFish(frame, background, width, height, options = {}) {
-  if (frame.length !== width * height || background.length !== frame.length) throw new Error('Background frame dimensions do not match.');
-  const threshold = options.threshold ?? 24;
-  const minArea = options.minArea ?? 45;
-  const maxArea = options.maxArea ?? 2500;
-  const edgeX = options.edgeX ?? Math.round(width * 12 / 420);
-  const edgeTop = options.edgeTop ?? options.edgeY ?? Math.round(height * 10 / 290);
-  const edgeBottom = options.edgeBottom ?? options.edgeY ?? Math.round(height * 20 / 290);
+// A mask is one byte per pixel: 1 means a possible fish, 0 means background.
+function darkPixelMask(frame, background, width, height, threshold) {
   let mask = new Uint8Array(frame.length);
   for (let y = 0; y < height; y++) {
     const row = y * width;
@@ -122,17 +125,28 @@ export function detectBackgroundFish(frame, background, width, height, options =
       if (background[index] - frame[index] >= threshold) mask[index] = 1;
     }
   }
-  // Match the experimental cleanup: opening once, then closing twice.
+  // Opening (shrink then grow) removes isolated specks. Closing (grow then
+  // shrink) fills small gaps. The two growth steps preserve the trial's tuning.
   mask = dilate3(erode3(mask, width, height), width, height);
   mask = dilate3(dilate3(mask, width, height), width, height);
   mask = erode3(erode3(mask, width, height), width, height);
+  return mask;
+}
+
+// Ignore tank borders where reflections and fixed hardware often look like fish.
+function excludeBorders(mask, width, height, edgeX, edgeTop, edgeBottom) {
   for (let y = 0; y < edgeTop; y++) mask.fill(0, y * width, (y + 1) * width);
   for (let y = height - edgeBottom; y < height; y++) mask.fill(0, y * width, (y + 1) * width);
   for (let y = edgeTop; y < height - edgeBottom; y++) {
     mask.fill(0, y * width, y * width + edgeX);
     mask.fill(0, (y + 1) * width - edgeX, (y + 1) * width);
   }
-  const stack = new Int32Array(frame.length);
+}
+
+// Flood-fill neighboring foreground pixels into blobs (connected regions).
+// Centers are the average pixel positions, not the centers of the rectangles.
+function collectBlobs(mask, width, height, minArea, maxArea) {
+  const stack = new Int32Array(mask.length);
   const blobs = [];
   for (let start = 0; start < mask.length; start++) {
     if (!mask[start]) continue;
@@ -146,7 +160,10 @@ export function detectBackgroundFish(frame, background, width, height, options =
       const index = stack[--top];
       const x = index % width;
       const y = (index - x) / width;
-      area++; sumX += x; sumY += y; pixels.push(index);
+      area++;
+      sumX += x;
+      sumY += y;
+      pixels.push(index);
       if (x < minX) minX = x;
       if (x > maxX) maxX = x;
       if (y < minY) minY = y;
@@ -164,6 +181,12 @@ export function detectBackgroundFish(frame, background, width, height, options =
       blobs.push({ x: sumX / area, y: sumY / area, width: maxX - minX + 1, height: maxY - minY + 1, area, pixels });
     }
   }
+  return blobs;
+}
+
+// The known count guides recovery; it does not guarantee that every fish is found.
+function recoverEdgeFish(blobs, frame, background, width, height, options, edges, minArea) {
+  const { edgeX, edgeTop, edgeBottom } = edges;
   const expectedFish = options.expectedFish;
   if (Number.isInteger(expectedFish) && blobs.length < expectedFish && options.recoverEdges !== false) {
     const relaxed = detectBackgroundFish(frame, background, width, height, {
@@ -186,6 +209,9 @@ export function detectBackgroundFish(frame, background, width, height, options =
       if (!duplicate) blobs.push({ ...candidate, edgeRecovered: true });
     }
   }
+}
+
+function splitLargeBlobs(blobs, width, minArea, expectedFish) {
   if (Number.isInteger(expectedFish) && blobs.length < expectedFish && blobs.length >= 2) {
     while (blobs.length < expectedFish) {
       const areas = blobs.map(blob => blob.area).sort((a, b) => a - b);
@@ -198,5 +224,27 @@ export function detectBackgroundFish(frame, background, width, height, options =
       blobs.splice(blobs.indexOf(candidate), 1, ...halves);
     }
   }
+}
+
+/**
+ * Find dark moving regions in a cropped grayscale frame.
+ * Input arrays are row-major: pixel (x, y) is at y * width + x, brightness 0–255.
+ * Returned centers and bounding-box sizes are in crop pixels. These are candidate
+ * fish, not tracked identities. Defaults reproduce the original tank experiment.
+ */
+export function detectBackgroundFish(frame, background, width, height, options = {}) {
+  if (frame.length !== width * height || background.length !== frame.length) throw new Error('Background frame dimensions do not match.');
+  const threshold = options.threshold ?? 24;
+  const minArea = options.minArea ?? 45;
+  const maxArea = options.maxArea ?? 2500;
+  const edgeX = options.edgeX ?? Math.round(width * 12 / 420);
+  const edgeTop = options.edgeTop ?? options.edgeY ?? Math.round(height * 10 / 290);
+  const edgeBottom = options.edgeBottom ?? options.edgeY ?? Math.round(height * 20 / 290);
+  const mask = darkPixelMask(frame, background, width, height, threshold);
+  excludeBorders(mask, width, height, edgeX, edgeTop, edgeBottom);
+  const blobs = collectBlobs(mask, width, height, minArea, maxArea);
+  recoverEdgeFish(blobs, frame, background, width, height, options, { edgeX, edgeTop, edgeBottom }, minArea);
+  splitLargeBlobs(blobs, width, minArea, options.expectedFish);
+  // Pixel membership is needed only during splitting, so omit it from the result.
   return blobs.map(({ pixels, ...blob }) => blob);
 }
