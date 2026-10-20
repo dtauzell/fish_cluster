@@ -61,3 +61,24 @@ test('a fish against the top of the crop can be recovered', () => {
   assert.equal(detections.length, 5);
   assert.ok(detections.some(d => d.edgeRecovered && d.y < 20));
 });
+
+test('a joined pair is split before center selection even when a reflection fills the known count', () => {
+  const width = 180, height = 120;
+  const background = new Uint8Array(width * height).fill(200);
+  const frame = background.slice();
+  const paint = (x0, y0, w, h) => {
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) frame[y * width + x] = 60;
+  };
+  paint(40, 25, 16, 10);
+  paint(40, 85, 16, 10);
+  paint(110, 90, 16, 10);
+  paint(75, 40, 12, 22);
+  paint(85, 55, 12, 22); // These two touch and become one region.
+  paint(155, 65, 12, 14); // Reflection makes the unsplit count look complete.
+  const options = { expectedFish: 5, edgeX: 0, edgeY: 0 };
+  assert.equal(detectBackgroundFish(frame, background, width, height, options).length, 5);
+  const candidates = detectBackgroundFish(frame, background, width, height, { ...options, preferCenter: true });
+  assert.equal(candidates.length, 6);
+  assert.equal(candidates.filter(point => point.splitFromBlob).length, 2);
+  assert.ok(candidates.filter(point => point.splitFromBlob).every(point => point.x > 70 && point.x < 100));
+});

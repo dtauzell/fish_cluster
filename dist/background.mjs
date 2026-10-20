@@ -1,3 +1,7 @@
+import { connectedRegions } from './connected-regions.mjs';
+import { splitLargeBlobs } from './blob-splitting.mjs';
+import { maskExcludedPixels } from './region.mjs';
+
 /** Convert browser ImageData to the grayscale pixels used by the detector. */
 export function grayscale(imageData) {
   const rgba = imageData.data;
@@ -53,70 +57,8 @@ function dilate3(mask, width, height) {
   return result;
 }
 
-/**
- * Estimate two centers inside an unusually large blob, which may contain touching fish.
- * Start along its longest axis (from the pixel covariance), then repeatedly assign
- * pixels to the nearest center and average them: two-cluster k-means.
- */
-function splitJoinedBlob(blob, frameWidth, minArea) {
-  const pixels = blob.pixels;
-  let varianceX = 0, covarianceXY = 0, varianceY = 0;
-  for (const index of pixels) {
-    const x = index % frameWidth - blob.x;
-    const y = Math.floor(index / frameWidth) - blob.y;
-    varianceX += x * x;
-    covarianceXY += x * y;
-    varianceY += y * y;
-  }
-  // The eigenvector of this 2D covariance points along the blob's longest axis.
-  const angle = Math.atan2(2 * covarianceXY, varianceX - varianceY) / 2;
-  const axisX = Math.cos(angle), axisY = Math.sin(angle);
-  let low = Infinity, high = -Infinity;
-  for (const index of pixels) {
-    const projection = (index % frameWidth) * axisX + Math.floor(index / frameWidth) * axisY;
-    low = Math.min(low, projection);
-    high = Math.max(high, projection);
-  }
-  const centerProjection = blob.x * axisX + blob.y * axisY;
-  const firstOffset = low + (high - low) / 4 - centerProjection;
-  const secondOffset = low + 3 * (high - low) / 4 - centerProjection;
-  let centers = [
-    { x: blob.x + axisX * firstOffset, y: blob.y + axisY * firstOffset },
-    { x: blob.x + axisX * secondOffset, y: blob.y + axisY * secondOffset }
-  ];
-  for (let step = 0; step < 8; step++) {
-    const sums = [{ x: 0, y: 0, area: 0 }, { x: 0, y: 0, area: 0 }];
-    for (const index of pixels) {
-      const x = index % frameWidth, y = Math.floor(index / frameWidth);
-      const distanceToFirst = (x - centers[0].x) ** 2 + (y - centers[0].y) ** 2;
-      const distanceToSecond = (x - centers[1].x) ** 2 + (y - centers[1].y) ** 2;
-      const group = sums[distanceToFirst <= distanceToSecond ? 0 : 1];
-      group.x += x; group.y += y; group.area++;
-    }
-    if (sums.some(group => group.area < minArea)) return null;
-    centers = sums.map(group => ({ x: group.x / group.area, y: group.y / group.area, area: group.area }));
-  }
-  if (Math.hypot(centers[0].x - centers[1].x, centers[0].y - centers[1].y) < 10) return null;
-  const groups = [
-    { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity, area: 0 },
-    { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity, area: 0 }
-  ];
-  for (const index of pixels) {
-    const x = index % frameWidth, y = Math.floor(index / frameWidth);
-    const distanceToFirst = (x - centers[0].x) ** 2 + (y - centers[0].y) ** 2;
-    const distanceToSecond = (x - centers[1].x) ** 2 + (y - centers[1].y) ** 2;
-    const group = groups[distanceToFirst <= distanceToSecond ? 0 : 1];
-    group.area++;
-    group.minX = Math.min(group.minX, x); group.maxX = Math.max(group.maxX, x);
-    group.minY = Math.min(group.minY, y); group.maxY = Math.max(group.maxY, y);
-  }
-  return centers.map((center, index) => ({ ...center, area: groups[index].area,
-    width: groups[index].maxX - groups[index].minX + 1,
-    height: groups[index].maxY - groups[index].minY + 1, splitFromBlob: true }));
-}
-
 // A mask is one byte per pixel: 1 means a possible fish, 0 means background.
-function darkPixelMask(frame, background, width, height, threshold) {
+function darkPixelMask(frame, background, width, height, threshold, exclusions) {
   let mask = new Uint8Array(frame.length);
   for (let y = 0; y < height; y++) {
     const row = y * width;
@@ -125,11 +67,13 @@ function darkPixelMask(frame, background, width, height, threshold) {
       if (background[index] - frame[index] >= threshold) mask[index] = 1;
     }
   }
+  maskExcludedPixels(mask, width, height, exclusions);
   // Opening (shrink then grow) removes isolated specks. Closing (grow then
   // shrink) fills small gaps. The two growth steps preserve the trial's tuning.
   mask = dilate3(erode3(mask, width, height), width, height);
   mask = dilate3(dilate3(mask, width, height), width, height);
   mask = erode3(erode3(mask, width, height), width, height);
+  maskExcludedPixels(mask, width, height, exclusions);
   return mask;
 }
 
@@ -141,47 +85,6 @@ function excludeBorders(mask, width, height, edgeX, edgeTop, edgeBottom) {
     mask.fill(0, y * width, y * width + edgeX);
     mask.fill(0, (y + 1) * width - edgeX, (y + 1) * width);
   }
-}
-
-// Flood-fill neighboring foreground pixels into blobs (connected regions).
-// Centers are the average pixel positions, not the centers of the rectangles.
-function collectBlobs(mask, width, height, minArea, maxArea) {
-  const stack = new Int32Array(mask.length);
-  const blobs = [];
-  for (let start = 0; start < mask.length; start++) {
-    if (!mask[start]) continue;
-    let top = 0;
-    stack[top++] = start;
-    mask[start] = 0;
-    let area = 0, sumX = 0, sumY = 0;
-    const pixels = [];
-    let minX = width, minY = height, maxX = 0, maxY = 0;
-    while (top) {
-      const index = stack[--top];
-      const x = index % width;
-      const y = (index - x) / width;
-      area++;
-      sumX += x;
-      sumY += y;
-      pixels.push(index);
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
-      let next = index - width;
-      if (y > 0 && mask[next]) { mask[next] = 0; stack[top++] = next; }
-      next = index + width;
-      if (y < height - 1 && mask[next]) { mask[next] = 0; stack[top++] = next; }
-      next = index - 1;
-      if (x > 0 && mask[next]) { mask[next] = 0; stack[top++] = next; }
-      next = index + 1;
-      if (x < width - 1 && mask[next]) { mask[next] = 0; stack[top++] = next; }
-    }
-    if (area >= minArea && area <= maxArea && Math.max(maxX - minX + 1, maxY - minY + 1) >= 10) {
-      blobs.push({ x: sumX / area, y: sumY / area, width: maxX - minX + 1, height: maxY - minY + 1, area, pixels });
-    }
-  }
-  return blobs;
 }
 
 // The known count guides recovery; it does not guarantee that every fish is found.
@@ -211,21 +114,6 @@ function recoverEdgeFish(blobs, frame, background, width, height, options, edges
   }
 }
 
-function splitLargeBlobs(blobs, width, minArea, expectedFish) {
-  if (Number.isInteger(expectedFish) && blobs.length < expectedFish && blobs.length >= 2) {
-    while (blobs.length < expectedFish) {
-      const areas = blobs.map(blob => blob.area).sort((a, b) => a - b);
-      const middle = areas.length / 2;
-      const median = areas.length % 2 ? areas[Math.floor(middle)] : (areas[middle - 1] + areas[middle]) / 2;
-      const candidate = blobs.filter(blob => blob.pixels && blob.area >= Math.max(400, median * 1.5)).sort((a, b) => b.area - a.area)[0];
-      if (!candidate) break;
-      const halves = splitJoinedBlob(candidate, width, minArea);
-      if (!halves) { candidate.pixels = null; continue; }
-      blobs.splice(blobs.indexOf(candidate), 1, ...halves);
-    }
-  }
-}
-
 /**
  * Find dark moving regions in a cropped grayscale frame.
  * Input arrays are row-major: pixel (x, y) is at y * width + x, brightness 0–255.
@@ -240,11 +128,15 @@ export function detectBackgroundFish(frame, background, width, height, options =
   const edgeX = options.edgeX ?? Math.round(width * 12 / 420);
   const edgeTop = options.edgeTop ?? options.edgeY ?? Math.round(height * 10 / 290);
   const edgeBottom = options.edgeBottom ?? options.edgeY ?? Math.round(height * 20 / 290);
-  const mask = darkPixelMask(frame, background, width, height, threshold);
+  const mask = darkPixelMask(frame, background, width, height, threshold, options.exclusions);
   excludeBorders(mask, width, height, edgeX, edgeTop, edgeBottom);
-  const blobs = collectBlobs(mask, width, height, minArea, maxArea);
+  const blobs = connectedRegions(mask, width, height, { minArea, maxArea, minLength: 10 });
   recoverEdgeFish(blobs, frame, background, width, height, options, { edgeX, edgeTop, edgeBottom }, minArea);
-  splitLargeBlobs(blobs, width, minArea, options.expectedFish);
+  const trackingSeeds = options.overlapSeedsFor?.(blobs) ?? new Map();
+  splitLargeBlobs(blobs, width, height, { minArea, expectedFish: options.expectedFish, preferCenter: options.preferCenter,
+    frame, background, threshold, previousDetections: options.previousDetections,
+    previousTimestampMs: options.previousTimestampMs, trackingSeeds,
+    observedSizeReference: options.observedSizeReference });
   // Pixel membership is needed only during splitting, so omit it from the result.
   return blobs.map(({ pixels, ...blob }) => blob);
 }

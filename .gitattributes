@@ -1,0 +1,2 @@
+# Preserve grayscale regression images as binary pixel data.
+*.pgm binary

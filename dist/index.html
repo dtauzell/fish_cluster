@@ -7,9 +7,10 @@
   <meta name="description" content="Analyze zebrafish spacing and clustering in a tank video, entirely in your browser.">
   <title>Fish Cluster — zebrafish video analysis</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=15">
+  <link rel="stylesheet" href="./style.css?v=19">
   <link rel="stylesheet" href="./about.css?v=1">
-  <script type="module" src="./app.mjs?v=20"></script>
+  <link rel="stylesheet" href="./labeling.css?v=1">
+  <script type="module" src="./app.mjs?v=28"></script>
 </head>
 <body>
   <div class="shell">
@@ -37,7 +38,11 @@
           <div class="fields method-choice"><label>Detection method<select id="method"><option value="background" selected>Background subtraction · fixed tank</option><option value="roboflow">Roboflow model</option></select></label></div>
           <div id="background-settings" class="fields method-settings">
             <label>Known fish count<input id="expected-fish" type="number" min="1" step="1" value="5"></label>
-            <p class="fine-print">Works best with a fixed camera. Draw a crop around the tank floor. Fewer than five blobs may mean fish overlap; extra blobs may come from tank edges or reflections.</p>
+            <label class="center-option"><input id="track-fish" type="checkbox" checked> Track fish across nearby frames</label>
+            <p class="fine-print">Use intervals of 250 ms or less. T numbers follow provisional paths; identities can swap during overlap. Dashed † centers are uncertain estimates. With the center rule below, recent paths can help separate an overlap for up to one second after a clear observation.</p>
+            <label class="center-option"><input id="prefer-center" type="checkbox"> If there are extra candidates, keep those nearest the crop center</label>
+            <p class="fine-print">Optional: only discard candidates when the count exceeds the known fish count. Pink × marks show excluded candidates. A real fish at the edge can also be excluded; review the choices in Human analysis. Touching fish are checked before this rule chooses the nearest candidates. Splits can use two visible dark bodies or the preceding observed sample (up to 250 ms apart); † centers remain estimates. The center is the middle of the crop rectangle.</p>
+            <p class="fine-print">Works best with a fixed camera. Include the fish’s swimming area, then mask wall reflections. Fewer than five blobs may mean fish overlap; extra blobs may come from tank edges or reflections.</p>
           </div>
           <details class="model-settings" id="model-settings" open hidden>
             <summary>Model settings <span>Roboflow InferenceJS</span></summary>
@@ -52,6 +57,8 @@
             </div>
           </details>
           <button id="analyze" class="primary" disabled>Analyze video <span aria-hidden="true">↗</span></button>
+          <button id="open-labeler" class="secondary" type="button" disabled>Label frames for training ↗</button>
+          <p class="fine-print">Labeling uses your crop and frame interval. You can start without running detection.</p>
           <button id="cancel" class="secondary" hidden>Stop analysis</button>
           <div id="status" class="status" role="status" aria-live="polite">Add a video to begin.</div>
           <progress id="progress" max="100" value="0" hidden></progress>
@@ -60,8 +67,17 @@
           <div class="section-heading"><span class="step">02</span><div><h2 id="preview-title">Frame preview</h2><p>Colored groups and nearby links.</p></div></div>
           <div id="timeline" class="timeline" hidden><div class="timeline-head"><strong>Group changes</strong><span id="change-count">—</span></div><canvas id="change-timeline" width="1200" height="26" aria-label="Timeline of changes in group sizes; click to jump to a change"></canvas><div class="timeline-controls"><button id="previous-change" class="secondary" type="button">← Previous change</button><button id="next-change" class="secondary" type="button">Next change →</button></div></div>
           <div class="frame-controls"><label for="frame-slider">Frame <span id="frame-position">—</span></label><input id="frame-slider" type="range" min="0" max="0" value="0" disabled><span id="frame-time">—</span></div>
+          <label class="sharpness-toggle"><input id="show-sharpness" type="checkbox" checked> Show candidate IDs and sharpness (S)</label>
           <div class="canvas-wrap" id="canvas-wrap"><canvas id="frame-canvas" aria-label="Analyzed video frame"></canvas><div id="empty-preview" class="empty-preview"><span>◎</span><strong>Waiting for footage</strong><small>Your analyzed frames will appear here.</small></div></div>
           <div class="crop-controls"><span id="crop-label">Drag on the preview to select the tank area.</span><button id="clear-crop" class="secondary" type="button" disabled>Use full frame</button></div>
+          <fieldset class="crop-fields" id="mask-tools" disabled>
+            <legend>Crop and reflection masks</legend>
+            <label>Drag tool<select id="crop-tool"><option value="crop">Select tank crop</option><option value="exclude">Mask reflection area</option></select></label>
+            <button id="undo-mask" class="secondary" type="button" disabled>Undo last mask</button>
+            <button id="clear-masks" class="secondary" type="button" disabled>Clear masks</button>
+            <span id="mask-count">No reflection masks.</span>
+          </fieldset>
+          <p class="fine-print">Include the space where fish swim, even above the floor. Choose “Mask reflection area” and drag over reflections to exclude them. Red masks apply to every frame and also exclude real fish that enter those areas. Changing a mask requires analyzing again.</p>
           <fieldset class="crop-fields" id="crop-fields" disabled><legend>Or enter a precise crop in video pixels</legend><label>X<input id="crop-x" type="number" min="0" step="1"></label><label>Y<input id="crop-y" type="number" min="0" step="1"></label><label>Width<input id="crop-width" type="number" min="30" step="1"></label><label>Height<input id="crop-height" type="number" min="30" step="1"></label><button id="apply-crop" class="secondary" type="button">Apply crop</button></fieldset>
           <div id="frame-groups" class="frame-groups" hidden></div>
         </section>
@@ -82,18 +98,60 @@
           <div class="chart-legend"><span><i class="legend-clusters"></i>Groups of 2+</span><span><i class="legend-singles"></i>Single fish</span><span class="legend-current">│ Selected distance</span></div>
           <p id="random-summary" class="random-summary"></p>
         </div>
-        <div class="method"><strong>How metrics work</strong><p>Each detection center is a candidate fish position. Centers within the link distance form connected groups; a chain of links can join fish farther apart. Single fish are shown separately. The random comparison places the same number of points uniformly inside the selected tank crop 399 times and compares mean nearest-neighbor distance. A low percentile means tighter spacing than those random placements in that frame; adjacent video frames are not independent tests. Inch estimates use the paper-grid calibration and are approximate. When the detected count is low, the detector checks close to the crop edge, then may split a large joined region. These estimates are marked in the raw export. Reflections can create extras, and fish are not tracked between frames. <a href="#about">Read the full method</a>.</p></div>
+        <div class="method"><strong>How metrics work</strong><p>Each detection center is a candidate fish position. Centers within the link distance form connected groups; a chain of links can join fish farther apart. Single fish are shown separately. The random comparison places the same number of points uniformly inside the selected tank crop, excluding reflection masks, 399 times and compares mean nearest-neighbor distance. A low percentile means tighter spacing than those random placements in that frame; adjacent video frames are not independent tests. Inch estimates use the paper-grid calibration and are approximate. When the detected count is low, the detector checks close to the crop edge, then may split a large joined region. These estimates are marked in the raw export. Reflections can create extras. Background tracking follows provisional paths across nearby frames; dashed † positions are uncertain and need review. <a href="#about">Read the full method</a>.</p></div>
       </section>
       <section id="human-page" class="human-page" hidden aria-labelledby="human-title">
-        <div class="human-head"><div><div class="eyebrow">HUMAN ANALYSIS</div><h1 id="human-title">Review sampled frames</h1><p>Click the center of each visible fish inside the crop. Click one of your numbered marks to remove it. Review labels belong to each frame; they do not track individual fish across time.</p></div><a class="secondary human-back" href="#analysis">← Back to analysis</a></div>
+        <div class="human-head"><div><div class="eyebrow">HUMAN ANALYSIS</div><h1 id="human-title">Review sampled frames</h1><p>Click the center of each visible fish in the usable area. Click one of your numbered marks to remove it. Review labels belong to each frame; they do not track individual fish across time.</p></div><a class="secondary human-back" href="#analysis">← Back to analysis</a></div>
         <div class="human-layout">
           <div class="human-review-panel">
             <div class="human-controls"><button id="human-prev" class="secondary" type="button">← Previous</button><label for="human-frame-number">Frame <input id="human-frame-number" type="number" min="1" step="1" value="1"></label><span id="human-frame-time">—</span><button id="human-next" class="secondary" type="button">Next →</button></div>
             <input id="human-slider" type="range" min="0" max="0" value="0" aria-label="Sampled frame">
             <div class="human-canvas-wrap"><canvas id="human-canvas" aria-label="Click fish centers in the selected sampled frame"></canvas></div>
-            <div class="human-frame-actions"><label><input id="human-show-full" type="checkbox"> Show full frame</label><label><input id="human-show-auto" type="checkbox"> Show automatic centers</label><label><input id="human-show-nearest" type="checkbox"> Show nearest detected fish distances (inches)</label><label><input id="human-reviewed" type="checkbox"> Mark this frame reviewed</label><button id="human-clear" class="secondary" type="button">Clear my marks</button></div>
+            <div class="human-frame-actions"><label><input id="human-show-full" type="checkbox"> Show full frame</label><label><input id="human-show-auto" type="checkbox"> Show automatic centers</label><label><input id="human-show-sharpness" type="checkbox" checked> Show candidate IDs and sharpness (S)</label><label><input id="human-show-nearest" type="checkbox"> Show nearest detected fish distances (inches)</label><label><input id="human-reviewed" type="checkbox"> Mark this frame reviewed</label><button id="human-clear" class="secondary" type="button">Clear my marks</button></div>
+            <div class="human-frame-actions"><button id="human-apply-centers" class="secondary" type="button">Use my centers for this frame</button><button id="human-restore-auto" class="secondary" type="button" disabled>Restore automatic centers</button></div>
+            <p id="human-correction-status" class="human-help" aria-live="polite"></p>
+            <section class="sharpness-panel" aria-labelledby="sharpness-title">
+              <h2 id="sharpness-title">Compare fish and reflections</h2>
+              <p>Higher S usually means sharper edges. Scores are not probabilities or a 0–100 scale. Grid lines, contrast, noise, and motion can affect them. Compare candidates from the same recording.</p>
+              <p><strong>#</strong> is a candidate ID within this frame; group numbers are separate. <strong>*</strong> means the scoring patch was clipped by the crop or a mask. “—” means too few pixels or no usable box. <strong>†</strong> marks an uncertain overlap estimate. T numbers identify provisional paths across frames, not verified fish identities; check estimates against neighboring frames.</p>
+              <div id="sharpness-candidates" class="sharpness-table"></div>
+              <p id="sharpness-comparison" aria-live="polite"></p>
+              <button id="sharpness-export" class="secondary" type="button">Export sharpness comparison CSV ↓</button>
+              <p>Label candidates as fish or reflections to compare their scores across frames. Labels stay in this tab until results are cleared or the tab reloads; export them to keep them. Labels do not filter detections. Pink × marks and “No (outer)” identify candidates excluded by the optional center rule.</p>
+            </section>
           </div>
-          <aside class="human-sidebar"><h2>Selected frame</h2><div id="human-frame-details" class="human-frame-details">—</div><div class="human-legend"><span><i class="human-manual-dot"></i>Your centers</span><span><i class="human-auto-dot"></i>Automatic centers</span></div><p id="human-progress">0 frames reviewed</p><p id="human-validation-summary" class="human-validation-summary">—</p><p class="human-help">Centers are matched one-to-one within 0.5 inch. Use the full-frame view to spot fish outside the analyzed crop. Those marks are exported, but excluded from the comparison. Mark reviewed even when no fish are visible.</p><button id="human-export" class="secondary" type="button">Export human analysis CSV ↓</button><p class="human-help">Manual marks stay in this browser tab until you reload it. Export them before leaving.</p></aside>
+          <aside class="human-sidebar"><h2>Selected frame</h2><div id="human-frame-details" class="human-frame-details">—</div><p id="human-overlap-note" class="human-help" hidden></p><div class="human-legend"><span><i class="human-manual-dot"></i>Your centers</span><span><i class="human-auto-dot"></i>Automatic centers</span></div><p id="human-progress">0 frames reviewed</p><p id="human-validation-summary" class="human-validation-summary">—</p><p class="human-help">Centers are matched one-to-one within 0.5 inch. Use the full-frame view to spot fish outside the analyzed crop. Marks outside the crop or inside red reflection masks are exported, but excluded from the comparison. Mark reviewed even when no fish are visible.</p><button id="human-export" class="secondary" type="button">Export human analysis CSV ↓</button><p class="human-help">Manual marks stay in this browser tab until you reload it. Export them before leaving.</p></aside>
+        </div>
+      </section>
+      <section id="label-page" class="human-page" hidden aria-labelledby="label-title">
+        <div class="human-head"><div><div class="eyebrow">TRAINING DATA</div><h1 id="label-title">Label fish in selected frames</h1><p id="label-source"></p><p>Click to place one box per real fish. Adjust each box to enclose the whole fish, including overlapping fish separately. Leave reflections unlabeled. Reflection masks from analysis do not apply here.</p></div><a class="secondary human-back" href="#analysis">← Back to analysis</a></div>
+        <div class="human-layout">
+          <div class="human-review-panel">
+            <div class="human-controls"><button id="label-prev" class="secondary" type="button">← Previous</button><label>Frame <input id="label-frame-number" type="number" min="1" step="1" value="1"></label><span id="label-frame-time">—</span><button id="label-next" class="secondary" type="button">Next →</button></div>
+            <input id="label-slider" type="range" min="0" max="0" value="0" aria-label="Labeling frame">
+            <div class="human-canvas-wrap"><canvas id="label-canvas" tabindex="0" aria-label="Click to add fish boxes; use Move or resize to adjust them"></canvas></div>
+            <div class="label-toolbar">
+              <label>Tool<select id="label-tool"><option value="add">Click to add fish</option><option value="edit">Move or resize boxes</option></select></label>
+              <label>Box width (px)<input id="label-box-width" type="number" min="1" step="1" value="35"></label>
+              <label>Box height (px)<input id="label-box-height" type="number" min="1" step="1" value="35"></label>
+              <button id="label-delete" class="secondary" type="button" disabled>Delete selected fish</button><button id="label-undo" class="secondary" type="button" disabled>Undo box edit</button><button id="label-clear" class="secondary" type="button" disabled>Clear this frame</button>
+            </div>
+            <div id="label-box-list" class="label-box-list" aria-label="Select a fish to edit"></div>
+            <p class="human-help">Choose a fish button to select an overlapping box. In Move or resize mode, drag inside a box to move it or drag a corner to resize it. Width and height also adjust the selected box. Editing a labeled frame makes it a draft until you mark it labeled again.</p>
+          </div>
+          <aside class="human-sidebar">
+            <h2>Choose training frames</h2><p id="label-progress"></p><p id="label-frame-state" aria-live="polite"></p>
+            <label class="label-complete"><input id="label-complete" type="checkbox"> This frame is labeled</label>
+            <button id="label-and-next" class="primary" type="button">Mark labeled &amp; next →</button>
+            <label class="label-step">Navigation step (frames)<input id="label-step" type="number" min="1" step="1" value="1"></label>
+            <button id="label-next-draft" class="secondary" type="button">Next unlabeled frame →</button>
+            <p class="human-help">You can skip any frames. Only explicitly labeled frames enter the dataset. Label an empty frame only when it contains no real fish. Arrow keys navigate; L toggles labeled status when you are not typing in a control.</p>
+            <button id="label-dataset-export" class="secondary" type="button" disabled>Export labeled dataset ZIP ↓</button>
+            <button id="label-progress-export" class="secondary" type="button">Save progress JSON ↓</button>
+            <label class="label-import">Restore progress JSON<input id="label-progress-import" type="file" accept=".json,application/json"></label>
+            <p class="human-help">Dataset ZIP: clean cropped PNGs, YOLO boxes, and a JSON annotation manifest. Skipped and draft frames are excluded. Save progress JSON includes drafts and images for resuming with this video, crop, and interval; restoring it replaces this labeling project's current marks.</p>
+            <p id="label-save-status" class="human-help" role="status"></p><p id="label-status" class="status" role="status" aria-live="polite"></p>
+          </aside>
         </div>
       </section>
       <section id="about-page" hidden aria-label="About the analysis"><div id="about-content" class="about-main">Loading the method guide…</div></section>
