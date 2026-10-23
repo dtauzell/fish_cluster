@@ -5,9 +5,14 @@ import { drawCandidateSharpness } from './sharpness-ui.mjs';
 export function createPreview(canvas, video) {
   const ctx = canvas.getContext('2d');
   const groupColors = ['#8ce6ce', '#f6d979', '#f4a7b9', '#9ab9ff', '#d3a9f0', '#ffba87'];
-  function drawFrame(frame, threshold, crop, exclusions = [], showSharpness = false) {
+  function drawFrame(frame, threshold, crop, exclusions = [], showSharpness = false,
+    view = { x: 0, y: 0, width: video.videoWidth || canvas.width, height: video.videoHeight || canvas.height }) {
+    if (canvas.width !== view.width) canvas.width = view.width;
+    if (canvas.height !== view.height) canvas.height = view.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (video.readyState >= 2) ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.translate(-view.x, -view.y);
+    if (video.readyState >= 2) ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
     if (!frame) { drawCrop(crop); drawExclusions(ctx, exclusions); return; }
     const dots = frame.detections;
     ctx.lineWidth = Math.max(1, canvas.width / 800);
@@ -45,9 +50,13 @@ export function createPreview(canvas, video) {
     drawExclusions(ctx, exclusions);
     drawRejectedCandidates(ctx, frame.rejectedDetections ?? [], { x: 0, y: 0 }, canvas.width / Math.max(1, canvas.getBoundingClientRect().width));
     drawUncertainCenters(ctx, dots, { x: 0, y: 0 }, canvas.width / Math.max(1, canvas.getBoundingClientRect().width));
-    if (showSharpness) drawCandidateSharpness(ctx, frameCandidates(frame),
-      { x: 0, y: 0, width: canvas.width, height: canvas.height },
-      canvas.width / Math.max(1, canvas.getBoundingClientRect().width));
+    if (showSharpness) {
+      ctx.save();
+      ctx.translate(view.x, view.y);
+      drawCandidateSharpness(ctx, frameCandidates(frame), view,
+        canvas.width / Math.max(1, canvas.getBoundingClientRect().width));
+      ctx.restore();
+    }
   }
 
   function drawCrop(box) {

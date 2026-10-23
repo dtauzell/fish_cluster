@@ -3,10 +3,10 @@ import { usableRectangles } from './region.mjs';
 // Geometry and statistics on point coordinates. These functions never read image pixels.
 // Distances ending in Px are in original-video pixels; absent distances are null.
 
-export function mapCanvasPoint(clientX, clientY, rect, frameWidth, frameHeight) {
+export function mapCanvasPoint(clientX, clientY, rect, frameWidth, frameHeight, origin = { x: 0, y: 0 }) {
   return {
-    x: Math.round(Math.max(0, Math.min(frameWidth, (clientX - rect.left) * frameWidth / rect.width))),
-    y: Math.round(Math.max(0, Math.min(frameHeight, (clientY - rect.top) * frameHeight / rect.height)))
+    x: origin.x + Math.round(Math.max(0, Math.min(frameWidth, (clientX - rect.left) * frameWidth / rect.width))),
+    y: origin.y + Math.round(Math.max(0, Math.min(frameHeight, (clientY - rect.top) * frameHeight / rect.height)))
   };
 }
 

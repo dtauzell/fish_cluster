@@ -21,6 +21,19 @@ test('portrait preview maps its right edge to the full video width', () => {
   assert.equal(cropFitsFrame({ x: 420, y: 270, width: 150, height: 260 }, 540, 960), false);
 });
 
+test('focused and zoomed previews map crop edits and calibration back to original video pixels', () => {
+  const crop = { x: 50, y: 240, width: 420, height: 290 };
+  const fitted = { left: 100, top: 50, width: 840, height: 580 };
+  assert.deepEqual(mapCanvasPoint(520, 340, fitted, crop.width, crop.height, crop), { x: 260, y: 385 });
+  // Zoom and scroll change the displayed bounds, but retain the same video coordinates.
+  const zoomed = { left: -320, top: -240, width: 1680, height: 1160 };
+  assert.deepEqual(mapCanvasPoint(520, 340, zoomed, crop.width, crop.height, crop), { x: 260, y: 385 });
+  assert.deepEqual(mapCanvasPoint(-400, -300, zoomed, crop.width, crop.height, crop), { x: 50, y: 240 });
+  const start = mapCanvasPoint(200, 150, fitted, crop.width, crop.height, crop);
+  const end = mapCanvasPoint(400, 150, fitted, crop.width, crop.height, crop);
+  assert.equal(calibrationFromLine(start, end, 2).pixelsPerInch, 50);
+});
+
 test('sampling stops before the video ends', () => {
   assert.deepEqual(sampleTimes(0.65, 200), [0, 200, 400, 600]);
 });

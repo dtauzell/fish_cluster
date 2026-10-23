@@ -7,22 +7,31 @@
   <meta name="description" content="Analyze zebrafish spacing and clustering in a tank video, entirely in your browser.">
   <title>Fish Cluster — zebrafish video analysis</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=27">
+  <link rel="stylesheet" href="./style.css?v=28">
   <link rel="stylesheet" href="./about.css?v=1">
   <link rel="stylesheet" href="./labeling.css?v=1">
-  <script type="module" src="./app.mjs?v=33"></script>
+  <link rel="stylesheet" href="./workspace.css?v=2">
+  <script type="module" src="./app.mjs?v=35"></script>
 </head>
 <body>
   <div class="shell">
     <video id="source-video" class="source-video" playsinline preload="auto" muted aria-hidden="true"></video>
     <header class="topbar">
       <div class="brand"><span class="brand-mark" aria-hidden="true">◌</span><span>FISH<span class="brand-light">CLUSTER</span></span></div>
-      <div class="top-links"><a href="#about">About the analysis</a><a href="https://github.com/dtauzell/fish_cluster" target="_blank" rel="noopener">Source code ↗</a><span class="top-note"><span class="status-dot"></span> Browser-based analysis</span></div>
+      <nav class="workflow-nav" aria-label="Analysis workflow">
+        <a id="nav-setup" href="#analysis" aria-current="page">Setup</a>
+        <a id="nav-results" href="#results" aria-disabled="true">Results</a>
+        <a id="nav-review" href="#human-analysis" aria-disabled="true">Review</a>
+        <span id="workflow-summary">Add a video to begin</span>
+        <details class="tools-menu"><summary>Tools</summary><div><button id="open-labeler" class="secondary" type="button" disabled>Label training frames</button><p class="fine-print">Uses your video, crop, and sampling interval.</p></div></details>
+      </nav>
+      <div class="top-links"><a href="#about">About the analysis</a><a href="https://github.com/dtauzell/fish_cluster" target="_blank" rel="noopener">Source code ↗</a></div>
     </header>
     <main>
       <div id="workspace" class="workspace">
         <section class="panel setup" aria-labelledby="setup-title">
           <div class="section-heading"><span class="step">01</span><div><h2 id="setup-title">Set up analysis</h2><p>Choose footage and sampling settings.</p></div></div>
+          <div class="setup-scroll">
           <label class="dropzone" id="dropzone" for="video-file">
             <input id="video-file" type="file" accept="video/*">
             <span class="upload-icon" aria-hidden="true">↥</span>
@@ -30,18 +39,21 @@
             <span>or click to browse · MP4, WebM, MOV</span>
           </label>
           <div id="video-meta" class="video-meta" hidden></div>
-          <div class="fields two">
-            <label>Frame interval <span class="help">milliseconds</span><input id="interval" type="number" min="1" step="1" value="200"></label>
-            <label>Close distance <span class="help">inches</span><input id="threshold" type="number" min="0.01" step="0.01" value="1.5"></label>
+          <div class="fields basic-settings">
+            <label>Fish in tank<input id="expected-fish" type="number" min="1" step="1" value="5"></label>
+            <label>Sample ms<input id="interval" type="number" min="1" step="1" value="200"></label>
+            <p id="sampling-summary" class="fine-print">Every 0.2 seconds · 5 samples/sec</p>
+            <label>Link distance <span class="help">inches</span><input id="threshold" type="number" min="0.01" step="0.01" value="1.5"></label>
           </div>
+          <button id="open-scale" class="scale-summary secondary" type="button">Set scale <span id="scale-summary">30.6 px/in</span></button>
+          <details class="advanced-settings"><summary>Advanced settings</summary>
           <div class="fields frame-filter">
             <label class="center-option"><input id="filter-exact-count" type="checkbox" checked> Only include frames with exactly</label>
-            <label>Fish per frame<input id="filter-frame-count" type="number" min="1" step="1" value="5"></label>
+            <label>Required count (override)<input id="filter-frame-count" type="number" min="1" step="1" value="5"></label>
           </div>
           <div class="fields method-settings"><label>Pixels per 0.5-inch square <span class="help">distance calibration for either method</span><input id="grid-pixels" type="number" min="0.000001" step="any" value="15.3"></label></div>
           <div class="fields method-choice"><label>Detection method<select id="method"><option value="background" selected>Background subtraction · fixed tank</option><option value="roboflow">Roboflow model</option></select></label></div>
           <div id="background-settings" class="fields method-settings">
-            <label>Known fish count<input id="expected-fish" type="number" min="1" step="1" value="5"></label>
             <label class="center-option"><input id="track-fish" type="checkbox" checked> Track fish across nearby frames</label>
             <p class="fine-print">Use intervals of 250 ms or less. T numbers follow provisional paths; identities can swap during overlap. Dashed † centers are uncertain estimates. With the center rule below, recent paths can help separate an overlap for up to one second after a clear observation.</p>
             <label class="center-option"><input id="prefer-center" type="checkbox"> If there are extra candidates, keep those nearest the crop center</label>
@@ -60,42 +72,16 @@
               <p class="fine-print">Using <a href="https://universe.roboflow.com/zebrafish-zxjvh/zebrafish_in_aquarium" target="_blank" rel="noopener">zebrafish_in_aquarium/9</a>, a trained YOLOv8n model for zebrafish. Enter a Roboflow workspace <strong>publishable key</strong>, never a private API key.</p>
             </div>
           </details>
+          </details>
+          </div>
+          <div class="setup-actions">
           <button id="analyze" class="primary" disabled>Analyze video <span aria-hidden="true">↗</span></button>
-          <button id="open-labeler" class="secondary" type="button" disabled>Label frames for training ↗</button>
-          <p class="fine-print">Labeling uses your crop and frame interval. You can start without running detection.</p>
           <button id="cancel" class="secondary" hidden>Stop analysis</button>
           <div id="status" class="status" role="status" aria-live="polite">Add a video to begin.</div>
           <a id="human-review-link" class="human-link" href="#human-analysis" hidden>Review all sampled frames ↗</a>
           <progress id="progress" max="100" value="0" hidden></progress>
+          </div>
         </section>
-        <section class="panel preview" aria-labelledby="preview-title">
-          <div class="section-heading"><span class="step">02</span><div><h2 id="preview-title">Frame preview</h2><p>Colored groups and nearby links.</p></div></div>
-          <div id="timeline" class="timeline" hidden><div class="timeline-head"><strong>Group changes</strong><span id="change-count">—</span></div><canvas id="change-timeline" width="1200" height="26" aria-label="Timeline of changes in group sizes; click to jump to a change"></canvas><div class="timeline-controls"><button id="previous-change" class="secondary" type="button">← Previous change</button><button id="next-change" class="secondary" type="button">Next change →</button></div></div>
-          <div class="frame-controls"><label for="frame-slider">Frame <span id="frame-position">—</span></label><input id="frame-slider" type="range" min="0" max="0" value="0" disabled><span id="frame-time">—</span></div>
-          <label class="sharpness-toggle"><input id="show-sharpness" type="checkbox" checked> Show candidate IDs and sharpness (S)</label>
-          <div class="canvas-wrap" id="canvas-wrap"><canvas id="frame-canvas" aria-label="Analyzed video frame"></canvas><div id="empty-preview" class="empty-preview"><span>◎</span><strong>Waiting for footage</strong><small>Your analyzed frames will appear here.</small></div></div>
-          <div class="crop-controls"><span id="crop-label">Drag on the preview to select the tank area.</span><button id="clear-crop" class="secondary" type="button" disabled>Use full frame</button></div>
-          <fieldset class="crop-fields" id="mask-tools" disabled>
-            <legend>Crop and reflection masks</legend>
-            <label>Drag tool<select id="crop-tool"><option value="crop">Select tank crop</option><option value="exclude">Mask reflection area</option><option value="calibrate">Draw calibration line</option></select></label>
-            <button id="undo-mask" class="secondary" type="button" disabled>Undo last mask</button>
-            <button id="clear-masks" class="secondary" type="button" disabled>Clear masks</button>
-            <span id="mask-count">No reflection masks.</span>
-          </fieldset>
-          <fieldset id="calibration-tools" class="calibration-tools" disabled>
-            <legend>Calibrate from a known length</legend>
-            <button id="draw-calibration" class="secondary" type="button">Draw calibration line</button>
-            <label>Line length <span class="help">inches</span><input id="calibration-length" type="number" min="0.000001" step="any" value="0.5"></label>
-            <button id="apply-calibration" class="secondary" type="button" disabled>Use this scale</button>
-            <button id="clear-calibration" class="secondary" type="button" disabled>Clear line</button>
-            <p id="calibration-status" class="fine-print" role="status">Draw along a known distance in the preview, enter its length in inches, then use the scale.</p>
-            <p class="fine-print">Measure several grid squares near the swimming area for better accuracy. Perspective makes distances approximate. Clearing the line keeps the applied scale.</p>
-          </fieldset>
-          <p class="fine-print">Include the space where fish swim, even above the floor. Choose “Mask reflection area” and drag over reflections to exclude them. Red masks apply to every frame and also exclude real fish that enter those areas. Changing a mask requires analyzing again.</p>
-          <fieldset class="crop-fields" id="crop-fields" disabled><legend>Or enter a precise crop in video pixels</legend><label>X<input id="crop-x" type="number" min="0" step="1"></label><label>Y<input id="crop-y" type="number" min="0" step="1"></label><label>Width<input id="crop-width" type="number" min="30" step="1"></label><label>Height<input id="crop-height" type="number" min="30" step="1"></label><button id="apply-crop" class="secondary" type="button">Apply crop</button></fieldset>
-          <div id="frame-groups" class="frame-groups" hidden></div>
-        </section>
-      </div>
       <section id="results" class="results" hidden>
         <div class="results-head"><div><div class="eyebrow">ANALYSIS COMPLETE</div><h2>What the frames show</h2><a id="human-link" class="human-link" href="#human-analysis" hidden>Open human analysis ↗</a></div><div class="downloads"><button id="download-csv" class="secondary">Export detections CSV ↓</button><button id="download-frames" class="secondary">Export frames CSV ↓</button><button id="download-json" class="secondary">Export all JSON ↓</button></div></div>
         <div class="stat-grid">
@@ -112,39 +98,80 @@
           <div class="chart-legend"><span><i class="legend-clusters"></i>Groups of 2+</span><span><i class="legend-singles"></i>Single fish</span><span class="legend-current">│ Selected distance</span></div>
           <p id="random-summary" class="random-summary"></p>
         </div>
-        <div class="method"><strong>How metrics work</strong><p>Each detection center is a candidate fish position. Centers within the link distance form connected groups; a chain of links can join fish farther apart. Single fish are shown separately. The random comparison places the same number of points uniformly inside the selected tank crop, excluding reflection masks, 399 times and compares mean nearest-neighbor distance. A low percentile means tighter spacing than those random placements in that frame; adjacent video frames are not independent tests. Inch estimates use the paper-grid calibration and are approximate. When the detected count is low, the detector checks close to the crop edge, then may split a large joined region. These estimates are marked in the raw export. Reflections can create extras. Background tracking follows provisional paths across nearby frames; dashed † positions are uncertain and need review. <a href="#about">Read the full method</a>.</p></div>
+        <details class="method"><summary>How metrics work</summary><p>Each detection center is a candidate fish position. Centers within the link distance form connected groups; a chain of links can join fish farther apart. Single fish are shown separately. The random comparison places the same number of points uniformly inside the selected tank crop, excluding reflection masks, 399 times and compares mean nearest-neighbor distance. A low percentile means tighter spacing than those random placements in that frame; adjacent video frames are not independent tests. Inch estimates use the paper-grid calibration and are approximate. When the detected count is low, the detector checks close to the crop edge, then may split a large joined region. These estimates are marked in the raw export. Reflections can create extras. Background tracking follows provisional paths across nearby frames; dashed † positions are uncertain and need review. <a href="#about">Read the full method</a>.</p></details>
       </section>
+        <section class="panel preview" aria-labelledby="preview-title">
+          <div class="preview-heading"><div><h2 id="preview-title">Tank preview</h2><p id="preview-instruction">Select the swimming area, then check the scale.</p></div><div class="preview-display-controls"><div class="view-mode" aria-label="Preview area"><button id="preview-focus" class="secondary" type="button" aria-pressed="false" disabled>Focus on tank</button><button id="preview-full" class="secondary" type="button" aria-pressed="true">Full frame</button></div><div class="view-controls" aria-label="Preview zoom"><button id="preview-fit" class="secondary" type="button">Fit</button><button id="preview-zoom-out" class="secondary" type="button" aria-label="Zoom out preview">−</button><output id="preview-zoom" aria-live="polite">100%</output><button id="preview-zoom-in" class="secondary" type="button" aria-label="Zoom in preview">+</button></div></div></div>
+          <div id="timeline" class="timeline" hidden><div class="timeline-head"><strong>Group changes</strong><span id="change-count">—</span></div><canvas id="change-timeline" width="1200" height="26" aria-label="Timeline of changes in group sizes; click to jump to a change"></canvas><div class="timeline-controls"><button id="previous-change" class="secondary" type="button" aria-label="Previous group change" title="Previous group change">←</button><button id="next-change" class="secondary" type="button" aria-label="Next group change" title="Next group change">→</button></div></div>
+          <div class="frame-controls"><label for="frame-slider">Frame <span id="frame-position">—</span></label><input id="frame-slider" type="range" min="0" max="0" value="0" disabled><span id="frame-time">—</span></div>
+          <div class="canvas-wrap" id="canvas-wrap"><div class="canvas-surface"><canvas id="frame-canvas" aria-label="Analyzed video frame"></canvas></div><div id="empty-preview" class="empty-preview"><span>◎</span><strong>Waiting for footage</strong><small>Your analyzed frames will appear here.</small></div></div>
+          <details id="preview-tools" class="preview-tools"><summary>Tank area, reflection masks &amp; scale</summary>
+          <div class="crop-controls"><span id="crop-label">Drag on the preview to select the tank area.</span><button id="clear-crop" class="secondary" type="button" disabled>Use full frame</button></div>
+          <fieldset class="crop-fields" id="mask-tools" disabled>
+            <legend>Crop and reflection masks</legend>
+            <label>Drag tool<select id="crop-tool"><option value="crop">Select tank crop</option><option value="exclude">Mask reflection area</option><option value="calibrate">Draw calibration line</option></select></label>
+            <button id="undo-mask" class="secondary" type="button" disabled>Undo last mask</button>
+            <button id="clear-masks" class="secondary" type="button" disabled>Clear masks</button>
+            <span id="mask-count">No reflection masks.</span>
+          </fieldset>
+          <details id="scale-panel" class="preview-detail"><summary>Set scale</summary>
+          <fieldset id="calibration-tools" class="calibration-tools" disabled>
+            <legend>Calibrate from a known length</legend>
+            <button id="draw-calibration" class="secondary" type="button">Draw calibration line</button>
+            <label>Line length <span class="help">inches</span><input id="calibration-length" type="number" min="0.000001" step="any" value="0.5"></label>
+            <button id="apply-calibration" class="secondary" type="button" disabled>Use this scale</button>
+            <button id="clear-calibration" class="secondary" type="button" disabled>Clear line</button>
+            <p id="calibration-status" class="fine-print" role="status">Draw along a known distance in the preview, enter its length in inches, then use the scale.</p>
+            <p class="fine-print">Measure several grid squares near the swimming area for better accuracy. Perspective makes distances approximate. Clearing the line keeps the applied scale.</p>
+          </fieldset>
+          </details>
+          <details class="preview-detail"><summary>Precise crop &amp; display options</summary>
+          <label class="sharpness-toggle"><input id="show-sharpness" type="checkbox"> Show candidate IDs and sharpness (S)</label>
+          <p class="fine-print">Masks exclude reflections and any real fish that enter those areas. Changing the crop or masks requires analyzing again.</p>
+          <fieldset class="crop-fields" id="crop-fields" disabled><legend>Or enter a precise crop in video pixels</legend><label>X<input id="crop-x" type="number" min="0" step="1"></label><label>Y<input id="crop-y" type="number" min="0" step="1"></label><label>Width<input id="crop-width" type="number" min="30" step="1"></label><label>Height<input id="crop-height" type="number" min="30" step="1"></label><button id="apply-crop" class="secondary" type="button">Apply crop</button></fieldset>
+          </details>
+          </details>
+          <div id="frame-groups" class="frame-groups" hidden></div>
+        </section>
+      </div>
       <section id="human-page" class="human-page" hidden aria-labelledby="human-title">
-        <div class="human-head"><div><div class="eyebrow">HUMAN ANALYSIS</div><h1 id="human-title">Review sampled frames</h1><p>Click the center of each visible fish in the usable area. Click one of your numbered marks to remove it. Review labels belong to each frame; they do not track individual fish across time.</p></div><a class="secondary human-back" href="#analysis">← Back to analysis</a></div>
+        <div class="human-head"><div><div class="eyebrow">HUMAN ANALYSIS</div><h1 id="human-title">Review sampled frames</h1><p>Click fish centers to add marks. Click a mark to remove it. Apply corrections to update results.</p></div><a class="secondary human-back" href="#analysis">← Back to analysis</a></div>
         <div class="human-layout">
           <div class="human-review-panel">
-            <div class="human-review-filter">
-              <label>Frames to review<select id="human-frame-filter"><option value="all">All sampled frames</option><option value="mismatches">Count mismatches</option></select></label>
-              <label>Known fish count<input id="human-expected-fish" type="number" min="1" step="1" value="5"></label>
-              <p id="human-filter-summary" class="human-help" role="status"></p>
-            </div>
+
             <p id="human-empty-filter" class="human-help" hidden>No count mismatches. All sampled frames match the known fish count.</p>
             <div id="human-frame-workspace">
-            <div class="human-controls"><button id="human-prev" class="secondary" type="button">← Previous</button><label for="human-frame-number">Frame <input id="human-frame-number" type="number" min="1" step="1" value="1"></label><span id="human-frame-time">—</span><button id="human-next" class="secondary" type="button">Next →</button></div>
+            <div class="human-controls"><button id="human-prev" class="secondary" type="button">← Previous</button><label for="human-frame-number">Item <input id="human-frame-number" type="number" min="1" step="1" value="1"></label><span id="human-frame-time">—</span><button id="human-next" class="secondary" type="button">Next →</button>            <div class="human-view-controls view-controls" aria-label="Review zoom"><button id="human-fit" class="secondary" type="button">Fit</button><button id="human-zoom-out" class="secondary" type="button" aria-label="Zoom out review">−</button><output id="human-zoom" aria-live="polite">100%</output><button id="human-zoom-in" class="secondary" type="button" aria-label="Zoom in review">+</button><span class="fine-print">← → Navigate · R Review &amp; next</span></div></div>
             <input id="human-slider" type="range" min="0" max="0" value="0" aria-label="Sampled frame">
-            <div class="human-canvas-wrap"><canvas id="human-canvas" aria-label="Click fish centers in the selected sampled frame"></canvas></div>
+
+            <div class="human-canvas-wrap" id="human-viewport"><div class="canvas-surface"><canvas id="human-canvas" aria-label="Click fish centers in the selected sampled frame"></canvas></div></div>
+            <div class="review-action-bar">
+              <button id="human-reviewed-next" class="primary" type="button">Mark reviewed &amp; next →</button>
+              <button id="human-apply-next" class="secondary" type="button" hidden>Apply correction &amp; next →</button>
             <button id="human-apply-centers" class="human-mark-apply" type="button" hidden>Use my marks for this frame</button>
             <button id="human-reviewed" class="review-toggle" type="button" aria-pressed="false">Mark frame reviewed</button>
-            <div class="human-frame-actions"><label><input id="human-show-full" type="checkbox"> Show full frame</label><label><input id="human-show-auto" type="checkbox"> Show automatic centers</label><label><input id="human-show-sharpness" type="checkbox" checked> Show candidate IDs and sharpness (S)</label><label><input id="human-show-nearest" type="checkbox"> Show nearest detected fish distances (inches)</label><button id="human-clear" class="secondary" type="button">Clear my marks</button></div>
-            <div class="human-frame-actions"><button id="human-restore-auto" class="secondary" type="button" disabled>Restore automatic centers</button></div>
-            <p id="human-correction-status" class="human-help" aria-live="polite"></p>
-            <section class="sharpness-panel" aria-labelledby="sharpness-title">
-              <h2 id="sharpness-title">Compare fish and reflections</h2>
+            </div>
+
+            <details class="sharpness-panel"><summary id="sharpness-title">Diagnostics: fish &amp; reflections</summary>
               <p>Higher S usually means sharper edges. Scores are not probabilities or a 0–100 scale. Grid lines, contrast, noise, and motion can affect them. Compare candidates from the same recording.</p>
               <p><strong>#</strong> is a candidate ID within this frame; group numbers are separate. <strong>*</strong> means the scoring patch was clipped by the crop or a mask. “—” means too few pixels or no usable box. <strong>†</strong> marks an uncertain overlap estimate. T numbers identify provisional paths across frames, not verified fish identities; check estimates against neighboring frames.</p>
               <div id="sharpness-candidates" class="sharpness-table"></div>
               <p id="sharpness-comparison" aria-live="polite"></p>
               <button id="sharpness-export" class="secondary" type="button">Export sharpness comparison CSV ↓</button>
               <p>Label candidates as fish or reflections to compare their scores across frames. Labels stay in this tab until results are cleared or the tab reloads; export them to keep them. Labels do not filter detections. Pink × marks and “No (outer)” identify candidates excluded by the optional center rule.</p>
-            </section>
+            </details>
             </div>
           </div>
-          <aside class="human-sidebar"><h2>Selected frame</h2><div id="human-frame-details" class="human-frame-details">—</div><p id="human-overlap-note" class="human-help" hidden></p><div class="human-legend"><span><i class="human-manual-dot"></i>Your centers</span><span><i class="human-auto-dot"></i>Automatic centers</span></div><p id="human-progress">0 frames reviewed</p><p id="human-validation-summary" class="human-validation-summary">—</p><p class="human-help">Centers are matched one-to-one within 0.5 inch. Use the full-frame view to spot fish outside the analyzed crop. Marks outside the crop or inside red reflection masks are exported, but excluded from the comparison. Mark reviewed even when no fish are visible.</p><button id="human-export" class="secondary" type="button">Export human analysis CSV ↓</button><p class="human-help">Manual marks stay in this browser tab until you reload it. Export them before leaving.</p></aside>
+          <aside class="human-sidebar">
+            <div class="human-review-filter">
+              <label>Frames to review<select id="human-frame-filter"><option value="all">All sampled frames</option><option value="mismatches">Count mismatches</option></select></label>
+              <label>Review count (override)<input id="human-expected-fish" type="number" min="1" step="1" value="5"></label>
+              <p id="human-filter-summary" class="human-help" role="status"></p>
+            </div>            <details class="review-options"><summary>Display &amp; correction options</summary>
+            <div class="human-frame-actions"><label><input id="human-show-full" type="checkbox"> Show full frame</label><label><input id="human-show-auto" type="checkbox"> Show automatic centers</label><label><input id="human-show-sharpness" type="checkbox"> Show candidate IDs and sharpness (S)</label><label><input id="human-show-nearest" type="checkbox"> Show nearest detected fish distances (inches)</label><button id="human-undo" class="secondary" type="button" disabled>Undo mark</button><button id="human-clear" class="secondary" type="button">Clear my marks</button></div>
+            <div class="human-frame-actions"><button id="human-restore-auto" class="secondary" type="button" disabled>Restore automatic centers</button></div>
+            <p id="human-correction-status" class="human-help" aria-live="polite"></p>
+            </details><p class="human-help">← / → Navigate · R Review &amp; next<br>Cmd/Ctrl+Z Undo mark</p><h2>Selected frame</h2><div id="human-frame-details" class="human-frame-details">—</div><p id="human-overlap-note" class="human-help" hidden></p><div class="human-legend"><span><i class="human-manual-dot"></i>Your centers</span><span><i class="human-auto-dot"></i>Automatic centers</span></div><p id="human-progress">0 frames reviewed</p><p id="human-validation-summary" class="human-validation-summary">—</p><p class="human-help">Centers are matched one-to-one within 0.5 inch. Use the full-frame view to spot fish outside the analyzed crop. Marks outside the crop or inside red reflection masks are exported, but excluded from the comparison. Mark reviewed even when no fish are visible.</p><button id="human-export" class="secondary" type="button">Export human analysis CSV ↓</button><p class="human-help">Manual marks stay in this browser tab until you reload it. Export them before leaving.</p></aside>
         </div>
       </section>
       <section id="label-page" class="human-page" hidden aria-labelledby="label-title">

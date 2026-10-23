@@ -1,3 +1,4 @@
+import { createCanvasViewport } from './canvas-viewport.mjs';
 import { SHARPNESS_METHOD } from './sharpness.mjs';
 import { TRACKING_METHOD } from './tracking.mjs';
 import { analyzeFrame, calibrationFromLine, cropFitsFrame, inchesToPixels, mapCanvasPoint, summarizeFrames } from './analysis.mjs';
@@ -28,6 +29,7 @@ const state = {
   reviewFrames: [],
   settings: null,
   crop: null,
+  focusTank: true,
   exclusions: [],
   drag: null,
   calibrationLine: null,
@@ -43,10 +45,27 @@ const videoSource = createVideoSource(video);
 const { showFirstFrame, seekToDrawableFrame } = videoSource;
 const { prepare: prepareModel } = createModelService();
 const preview = createPreview(canvas, video);
+let lastPreviewFrame = null;
+const previewViewport = createCanvasViewport({ canvas, viewport: $('canvas-wrap'),
+  controls: { fit: $('preview-fit'), in: $('preview-zoom-in'), out: $('preview-zoom-out'), output: $('preview-zoom') },
+  dimensions: previewViewBox,
+  onChange: () => drawFrame(lastPreviewFrame) });
+function previewViewBox() {
+  return state.focusTank && state.crop ? state.crop : { x: 0, y: 0, width: video.videoWidth || 1600, height: video.videoHeight || 1000 };
+}
 function drawFrame(frame) {
+  $('preview-instruction').textContent = $('workspace').dataset.view === 'results'
+    ? 'Explore frames and groups. Open Review to check detections.'
+    : state.crop && state.focusTank ? 'Tank area enlarged. Use Full frame to adjust the crop.'
+    : 'Drag around the swimming area to enlarge it, then check the scale.';
+  $('preview-focus').disabled = !state.crop;
+  $('preview-focus').setAttribute('aria-pressed', String(Boolean(state.focusTank && state.crop)));
+  $('preview-full').setAttribute('aria-pressed', String(!state.focusTank || !state.crop));
+  lastPreviewFrame = frame;
+  previewViewport.resize();
   const crop = state.drag && !state.drag.exclude && !state.drag.calibration ? state.drag.box : state.crop;
   const exclusions = state.drag?.exclude ? [...state.exclusions, state.drag.box] : state.exclusions;
-  preview.drawFrame(frame, state.settings?.thresholdPx, crop, exclusions, $('show-sharpness').checked);
+  preview.drawFrame(frame, state.settings?.thresholdPx, crop, exclusions, $('show-sharpness').checked, previewViewBox());
   preview.drawCalibrationLine(state.drag?.calibration ? state.drag : state.calibrationLine);
 }
 function changeFrames() { return findChangeFrames(state.frames); }
@@ -73,6 +92,7 @@ const labeling = createLabeling({ canvas: $('label-canvas'), source: videoSource
 
 $('open-labeler').addEventListener('click', async () => {
   if (!state.file || state.running || video.readyState < 2) return;
+  document.querySelector('.tools-menu').open = false;
   const file = state.file;
   $('open-labeler').disabled = true;
   try {
@@ -106,6 +126,8 @@ function clearResults() {
   state.resultsReady = false;
   resetHuman();
   $('results').hidden = true;
+  updateWorkflow();
+  if (location.hash === '#results') location.hash = '#analysis';
   $('frame-slider').disabled = true;
   $('frame-position').textContent = 'Frame —';
   $('frame-groups').hidden = true;
@@ -121,6 +143,7 @@ function loadMetadata(file) {
   state.url = URL.createObjectURL(file);
   clearResults();
   state.crop = null;
+  state.focusTank = true;
   state.exclusions = [];
   $('crop-tool').value = 'crop';
   updateMaskControls();
@@ -128,7 +151,7 @@ function loadMetadata(file) {
   state.calibrationLine = null;
   $('calibration-tools').disabled = true;
   updateCalibrationControls();
-  $('canvas-wrap').style.aspectRatio = '16 / 10';
+  previewViewport.reset();
   $('crop-fields').disabled = true;
   $('mask-tools').disabled = true;
   $('clear-crop').disabled = true;
@@ -136,6 +159,7 @@ function loadMetadata(file) {
   video.src = state.url;
   video.load();
   $('file-label').textContent = file.name;
+  $('dropzone').classList.add('has-video');
   $('video-meta').hidden = true;
   $('empty-preview').hidden = false;
   $('empty-preview').querySelector('strong').textContent = 'Loading first frame…';
@@ -165,7 +189,10 @@ video.addEventListener('loadedmetadata', async () => {
   $('video-meta').textContent = `${video.videoWidth} × ${video.videoHeight} px · ${timeLabel(video.duration * 1000)} · ${(state.file.size / 1048576).toFixed(1)} MB`;
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
-  $('canvas-wrap').style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+  previewViewport.reset();
+  updateSamplingSummary();
+  updateWorkflow();
+  $('workspace').dataset.loaded = 'true';
   $('crop-fields').disabled = false;
   $('mask-tools').disabled = false;
   if (state.file?.name.toLowerCase() === 'fish.mov' && video.videoWidth === 540 && video.videoHeight === 960) {
@@ -203,7 +230,8 @@ video.addEventListener('error', () => status('The browser could not decode this 
 
 function pointOnCanvas(event) {
   const rect = canvas.getBoundingClientRect();
-  return mapCanvasPoint(event.clientX, event.clientY, rect, canvas.width, canvas.height);
+  const view = previewViewBox();
+  return mapCanvasPoint(event.clientX, event.clientY, rect, view.width, view.height, view);
 }
 
 function setCropInputs(box) {
@@ -220,6 +248,7 @@ function commitCrop(box) {
   }
   const full = x === 0 && y === 0 && width === video.videoWidth && height === video.videoHeight;
   state.crop = full ? null : { x, y, width, height };
+  state.focusTank = !full;
   clearResults();
   $('clear-crop').disabled = full;
   $('crop-label').textContent = full ? 'Using the full video frame.' : `Tank crop: ${width} × ${height} px at (${x}, ${y}).`;
@@ -351,6 +380,16 @@ function settings() {
   }, state.crop, video.videoWidth, video.videoHeight, state.exclusions);
 }
 
+let filterCountOverridden = false;
+$('expected-fish').addEventListener('change', () => {
+  if (state.running) return;
+  const count = Number($('expected-fish').value);
+  // Keep the default inclusion count in sync, while preserving deliberate overrides.
+  if (!filterCountOverridden) $('filter-frame-count').value = count;
+  clearResults();
+  drawFrame(null);
+  status('Fish count changed. Analyze again to apply it.');
+});
 $('prefer-center').addEventListener('change', () => {
   if (state.running) return;
   clearResults();
@@ -367,6 +406,7 @@ $('filter-exact-count').addEventListener('change', () => {
 });
 $('filter-frame-count').addEventListener('change', () => {
   if (state.running || !$('filter-exact-count').checked) return;
+  filterCountOverridden = Number($('filter-frame-count').value) !== Number($('expected-fish').value);
   clearResults();
   status(`Analysis will keep frames with exactly ${$('filter-frame-count').value} detected fish.`);
 });
@@ -383,6 +423,7 @@ $('analyze').addEventListener('click', async () => {
   try { config = settings(); } catch (error) { status(error.message, true); return; }
   if (Math.ceil(video.duration * 1000 / config.intervalMs) > 10000) { status('This setting would analyze over 10,000 frames. Increase the frame interval.', true); return; }
   state.running = true;
+  updateWorkflow();
   state.stopped = false;
   state.settings = config;
   state.frames = [];
@@ -390,6 +431,7 @@ $('analyze').addEventListener('click', async () => {
   state.resultsReady = false;
   let skippedFrames = 0;
   let totalSamples = 0;
+  let analysisFailed = false;
   resetHuman();
   $('timeline').hidden = true;
   $('frame-groups').hidden = true;
@@ -409,6 +451,7 @@ $('analyze').addEventListener('click', async () => {
   $('progress').hidden = false;
   $('progress').value = 0;
   $('frame-slider').disabled = true;
+  for (const id of ['expected-fish', 'interval', 'threshold', 'grid-pixels', 'model-slug', 'model-version', 'confidence', 'publishable-key']) $(id).disabled = true;
   try {
     const events = analyzeVideo({
       config, duration: video.duration, source: videoSource, prepareModel,
@@ -449,6 +492,7 @@ $('analyze').addEventListener('click', async () => {
       maxRawCount <= 1 ? `Complete: ${state.frames.length} frames. Roboflow returned at most one box per frame; try a tank crop or lower confidence.` :
       `Complete: ${state.frames.length} frames analyzed. Up to ${maxRawCount} model boxes in a frame.`);
   } catch (error) {
+    analysisFailed = true;
     if (state.frames.length) showResults();
     status(config.method === 'background' ? `Analysis stopped: ${error.message}` : modelErrorMessage(error, config), true);
   } finally {
@@ -468,6 +512,9 @@ $('analyze').addEventListener('click', async () => {
     $('crop-fields').disabled = false;
     $('mask-tools').disabled = false;
     $('calibration-tools').disabled = video.readyState < 2;
+    for (const id of ['expected-fish', 'interval', 'threshold', 'grid-pixels', 'model-slug', 'model-version', 'confidence', 'publishable-key']) $(id).disabled = false;
+    updateWorkflow();
+    if (state.resultsReady && !analysisFailed && ['', '#analysis'].includes(location.hash)) location.hash = '#results';
   }
 });
 $('cancel').addEventListener('click', () => { state.stopped = true; status('Stopping after the current frame…'); });
@@ -479,12 +526,14 @@ function showResults(preserveSelection = false) {
     $('frame-slider').disabled = true;
     $('timeline').hidden = true;
     $('frame-groups').hidden = true;
+    updateWorkflow();
     return;
   }
-  const selected = preserveSelection ? Math.max(0, Math.min(Number($('frame-slider').value), state.frames.length - 1)) : state.frames.length - 1;
+  const selected = preserveSelection ? Math.max(0, Math.min(Number($('frame-slider').value), state.frames.length - 1)) : 0;
   const summary = summarizeFrames(state.frames);
   state.resultsReady = true;
-  $('results').hidden = location.hash === '#human-analysis';
+  $('results').hidden = location.hash !== '#results';
+  updateWorkflow();
   $('human-link').hidden = false;
   $('stat-fish').textContent = fmt(summary.meanFishCount);
   $('stat-distance').textContent = Number.isFinite(summary.meanPairDistanceInches) ? `${fmt(summary.meanPairDistanceInches, 2)} in` : '—';
@@ -586,6 +635,15 @@ function selectFrame(index) {
 }
 
 $('frame-slider').addEventListener('input', event => selectFrame(Number(event.target.value)));
+document.addEventListener('keydown', event => {
+  if (activeView !== 'results' || !state.resultsReady || state.running || event.defaultPrevented ||
+      event.metaKey || event.ctrlKey || event.altKey || event.shiftKey ||
+      !['ArrowLeft', 'ArrowRight'].includes(event.key) ||
+      event.target.closest('input,select,textarea,summary,[role="button"],[role="textbox"],[role="slider"],[contenteditable]:not([contenteditable="false"])')) return;
+  event.preventDefault();
+  const next = Number($('frame-slider').value) + (event.key === 'ArrowRight' ? 1 : -1);
+  if (next >= 0 && next < state.frames.length) selectFrame(next);
+});
 $('show-sharpness').addEventListener('change', () => {
   if (!state.running) drawFrame(state.frames[Number($('frame-slider').value)] ?? null);
 });
@@ -663,21 +721,70 @@ function loadAbout() {
   return aboutLoading;
 }
 
+function updateWorkflow() {
+  $('nav-results').setAttribute('aria-disabled', String(!state.resultsReady || state.running));
+  $('nav-review').setAttribute('aria-disabled', String(!state.reviewFrames.length || state.running));
+  $('workflow-summary').textContent = state.running ? 'Analyzing video…'
+    : state.reviewFrames.length ? `${state.frames.length} of ${state.reviewFrames.length} samples included`
+    : state.file?.name ?? 'Add a video to begin';
+}
+for (const id of ['nav-results', 'nav-review']) $(id).addEventListener('click', event => {
+  if ($(id).getAttribute('aria-disabled') === 'true') event.preventDefault();
+});
+function updateSamplingSummary() {
+  const interval = Number($('interval').value);
+  $('sampling-summary').textContent = interval > 0
+    ? `Every ${Number(fmt(interval / 1000, 3))} seconds · ${Number(fmt(1000 / interval, 1))} samples/sec${Number.isFinite(video.duration) ? ` · about ${Math.ceil(video.duration * 1000 / interval)} samples` : ''}`
+    : 'Enter a positive sampling interval.';
+}
+$('interval').addEventListener('input', updateSamplingSummary);
+function updateScaleSummary() {
+  $('scale-summary').textContent = `${fmt(Number($('grid-pixels').value) * 2, 2)} px/in`;
+}
+$('grid-pixels').addEventListener('input', updateScaleSummary);
+$('grid-pixels').addEventListener('change', updateScaleSummary);
+$('apply-calibration').addEventListener('click', updateScaleSummary);
+$('open-scale').addEventListener('click', () => {
+  $('preview-tools').open = true;
+  $('scale-panel').open = true;
+  $('crop-tool').value = 'calibrate';
+  $('calibration-tools').scrollIntoView({ block: 'nearest' });
+  $('draw-calibration').focus({ preventScroll: true });
+});
+$('crop-tool').addEventListener('change', () => {
+  if ($('crop-tool').value === 'calibrate') $('scale-panel').open = true;
+  if ($('crop-tool').value === 'crop') { state.focusTank = false; previewViewport.reset(); }
+});
+$('preview-focus').addEventListener('click', () => { state.focusTank = true; previewViewport.reset(); });
+$('preview-full').addEventListener('click', () => { state.focusTank = false; previewViewport.reset(); });
+
 function showPage() {
-  if (location.hash === '#human-analysis' && (!state.reviewFrames.length || state.running)) history.replaceState(null, '', `${location.pathname}${location.search}#analysis`);
-  if (location.hash === '#labeling' && !labeling.hasProject()) history.replaceState(null, '', `${location.pathname}${location.search}#analysis`);
+  if ((location.hash === '#human-analysis' && (!state.reviewFrames.length || state.running)) ||
+      (location.hash === '#results' && (!state.resultsReady || state.running)) ||
+      (location.hash === '#labeling' && !labeling.hasProject())) {
+    history.replaceState(null, '', `${location.pathname}${location.search}#analysis`);
+  }
   const nextView = location.hash === '#about' ? 'about' : location.hash === '#human-analysis' ? 'human'
-    : location.hash === '#labeling' ? 'label' : 'analysis';
+    : location.hash === '#labeling' ? 'label' : location.hash === '#results' ? 'results' : 'analysis';
   if (activeView === 'label' && nextView !== 'label') labeling.leave();
   if (activeView) viewScroll.set(activeView, window.scrollY);
   activeView = nextView;
   const human = nextView === 'human', about = nextView === 'about', label = nextView === 'label';
   $('workspace').hidden = human || about || label;
-  $('results').hidden = human || about || label || !state.resultsReady;
+  $('workspace').dataset.view = nextView === 'results' ? 'results' : 'setup';
+  document.querySelector('.setup').hidden = nextView !== 'analysis';
+  $('results').hidden = nextView !== 'results' || !state.resultsReady;
   $('human-page').hidden = !human;
   $('about-page').hidden = !about;
   $('label-page').hidden = !label;
-  document.title = label ? 'Label training frames — Fish Cluster' : about ? 'About the analysis — Fish Cluster' : human ? 'Human analysis — Fish Cluster' : 'Fish Cluster — zebrafish video analysis';
+  for (const [id, view] of [['nav-setup', 'analysis'], ['nav-results', 'results'], ['nav-review', 'human']]) {
+    if (nextView === view) $(id).setAttribute('aria-current', 'page');
+    else $(id).removeAttribute('aria-current');
+  }
+  $('preview-title').textContent = nextView === 'results' ? 'Analyzed frames' : 'Tank preview';
+  $('preview-instruction').textContent = nextView === 'results' ? 'Explore frames and groups. Open Review to check detections.' : 'Select the swimming area, then check the scale.';
+  updateWorkflow();
+  document.title = label ? 'Label training frames — Fish Cluster' : about ? 'About the analysis — Fish Cluster' : human ? 'Review — Fish Cluster' : 'Fish Cluster — zebrafish video analysis';
   if (about) loadAbout();
   else if (label) labeling.show();
   else if (human) {
@@ -685,10 +792,10 @@ function showPage() {
     humanCanvas.width = crop.width;
     humanCanvas.height = crop.height;
     const selected = state.frames[Number($('frame-slider').value)];
-    selectHumanFrame(state.human.index ?? selected?.frameIndex ?? 0);
+    selectHumanFrame(state.human.index ?? state.reviewFrames.indexOf(selected));
   } else if (state.resultsReady && !state.running) {
     selectFrame(Number($('frame-slider').value));
-  }
+  } else if (video.readyState >= 2) drawFrame(null);
   requestAnimationFrame(() => window.scrollTo(0, viewScroll.get(nextView) ?? 0));
 }
 window.addEventListener('hashchange', showPage);

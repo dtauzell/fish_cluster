@@ -30,7 +30,6 @@ const helpText = {
   'human-show-auto': 'Overlay automatically detected fish centers to compare them with your own marks.',
   'human-show-sharpness': 'Show frame-local candidate IDs and sharpness scores. Compare scores within the same recording; they are not probabilities.',
   'human-show-nearest': 'Display each detected fish’s distance to its nearest detected neighbor, in approximate inches using your grid calibration.',
-  'human-reviewed': 'Record that you checked this frame, even if no fish are visible. This status belongs to this frame and does not add or change center marks.',
   'label-frame-number': 'Jump to a sampled training frame by number, starting at 1. Only frames marked labeled are included in the dataset.',
   'label-slider': 'Browse the sampled training frames. Navigating past a frame does not mark it labeled.',
   'label-tool': 'Click to add one box per real fish, or choose Move or resize to adjust existing boxes. Label overlapping fish separately and leave reflections unlabeled.',

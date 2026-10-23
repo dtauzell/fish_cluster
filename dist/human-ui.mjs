@@ -1,3 +1,4 @@
+import { createCanvasViewport } from './canvas-viewport.mjs';
 import { frameCandidates } from './candidate-selection.mjs';
 import { createSharpnessReview, drawCandidateSharpness } from './sharpness-ui.mjs';
 import { insideAnalysisArea } from './region.mjs';
@@ -15,6 +16,10 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
   const $ = id => document.getElementById(id);
   const humanCtx = humanCanvas.getContext('2d');
   const sharpnessReview = createSharpnessReview(state);
+  const viewport = createCanvasViewport({ canvas: humanCanvas, viewport: $('human-viewport'),
+    controls: { fit: $('human-fit'), in: $('human-zoom-in'), out: $('human-zoom-out'), output: $('human-zoom') },
+    dimensions: () => state.settings ? humanViewBox() : { width: 1600, height: 1000 },
+    onChange: drawHumanFrame });
   function includedInAnalysis(point) { return insideAnalysisArea(point, state.settings.crop, state.settings.exclusions); }
   function visibleIndices() {
     return reviewFrameIndices(state.reviewFrames, state.human.filter ?? 'all',
@@ -37,7 +42,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     $('human-expected-fish').value = state.human.expectedFish;
     $('human-frame-filter').options[0].textContent = `All sampled frames (${state.reviewFrames.length})`;
     $('human-frame-filter').options[1].textContent = `Count mismatches (${mismatches})`;
-    $('human-filter-summary').textContent = `${indices.length} frames in this view · ${mismatches} original candidate-count mismatches. Includes samples skipped by the analysis count filter. Excluded outer candidates count toward mismatches; applying marks keeps a frame in this review subset.`;
+    $('human-filter-summary').textContent = `${indices.length} samples · ${mismatches} original count mismatches · includes samples excluded from results`;
     $('human-frame-workspace').hidden = !indices.length;
     $('human-empty-filter').hidden = indices.length > 0;
     $('human-slider').max = Math.max(0, indices.length - 1);
@@ -55,6 +60,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
   function drawHumanFrame() {
     const index = state.human.index;
     if (index == null || !state.reviewFrames[index] || state.human.loading || $('human-page').hidden) return;
+    viewport.resize();
     const crop = state.settings.crop;
     const view = humanViewBox();
     const displayWidth = humanCanvas.getBoundingClientRect().width;
@@ -165,7 +171,8 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
       ? 'Dashed † centers use recent fish paths and are uncertain. Check the neighboring frames, then mark all visible fish and apply your centers if needed. A fully hidden position cannot be verified from this image.'
       : 'Centers marked † are estimates inside joined regions. Check each one against the image.';
     const { manual, automatic, outside, matched } = compareFrame(frame, state.human.marks.get(index) ?? [], state.settings);
-    $('human-restore-auto').disabled = !frame.manualCorrectionApplied;
+    $('human-restore-auto').disabled = state.human.loading || !frame.manualCorrectionApplied;
+    $('human-undo').disabled = state.human.loading || !state.human.markHistory?.get(index)?.length;
     $('human-correction-status').textContent = frame.manualCorrectionApplied
       ? 'Your applied centers are used in measurements and exports. Original automatic centers are preserved. Editing marks requires applying them again.'
       : 'Mark every fish in this frame, then apply your centers to replace its automatic result. Applying no marks sets its count to zero. Other frames keep their automatic results.';
@@ -176,13 +183,20 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     const position = indices.indexOf(index);
     $('human-slider').value = position;
     $('human-frame-number').value = position + 1;
-    $('human-frame-time').textContent = `Sample ${frame.frameIndex + 1} · ${timeLabel(frame.timestampMs)}`;
+    $('human-frame-time').textContent = `${position + 1} of ${indices.length} · Sample ${frame.frameIndex + 1} · ${timeLabel(frame.timestampMs)}`;
     const reviewed = state.human.reviewed.has(index);
     $('human-reviewed').setAttribute('aria-pressed', String(reviewed));
     $('human-reviewed').textContent = reviewed ? 'Reviewed ✓ · click to undo' : 'Mark frame reviewed';
-    $('human-apply-centers').hidden = !(state.human.marks.get(index)?.length);
-    $('human-prev').disabled = position <= 0;
-    $('human-next').disabled = position === indices.length - 1;
+    const hasMarks = state.human.marks.has(index);
+    $('human-apply-centers').hidden = !hasMarks;
+    $('human-apply-centers').textContent = state.human.marks.get(index)?.length ? 'Use my marks for this frame' : 'Apply 0 centers (empty frame)';
+    $('human-apply-next').hidden = !hasMarks;
+    const applyLabel = state.human.marks.get(index)?.length ? 'Apply correction' : 'Apply 0 centers';
+    $('human-apply-next').textContent = position === indices.length - 1 ? `${applyLabel} & finish` : `${applyLabel} & next →`;
+    $('human-reviewed-next').textContent = position === indices.length - 1 ? 'Mark reviewed & finish' : 'Mark reviewed & next →';
+    for (const id of ['human-reviewed', 'human-reviewed-next', 'human-apply-centers', 'human-apply-next', 'human-clear']) $(id).disabled = state.human.loading;
+    $('human-prev').disabled = state.human.loading || position <= 0;
+    $('human-next').disabled = state.human.loading || position === indices.length - 1;
     $('human-frame-details').innerHTML = `<div><span>Your fish in usable area</span><strong>${manual.fishCount}</strong></div>
       <div><span>Your fish outside usable area</span><strong>${outside}</strong></div>
       <div><span>Automatic fish</span><strong>${automatic.fishCount}</strong></div>
@@ -217,6 +231,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
       if ($('human-page').hidden) return;
       state.human.loading = false;
       drawHumanFrame();
+      updateHumanDetails();
     });
   }
 
@@ -242,30 +257,74 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
   });
   $('human-prev').addEventListener('click', () => selectHumanPosition(visibleIndices().indexOf(state.human.index) - 1));
   $('human-next').addEventListener('click', () => selectHumanPosition(visibleIndices().indexOf(state.human.index) + 1));
-  $('human-show-full').addEventListener('change', drawHumanFrame);
+  $('human-show-full').addEventListener('change', () => { viewport.reset(); drawHumanFrame(); });
   $('human-show-auto').addEventListener('change', drawHumanFrame);
   $('human-show-sharpness').addEventListener('change', drawHumanFrame);
   $('human-show-nearest').addEventListener('change', drawHumanFrame);
-  new ResizeObserver(() => drawHumanFrame()).observe(humanCanvas.parentElement);
   $('human-reviewed').addEventListener('click', () => {
-    if (state.human.index == null) return;
+    if (state.human.index == null || state.human.loading) return;
     if (state.human.reviewed.has(state.human.index)) state.human.reviewed.delete(state.human.index);
     else state.human.reviewed.add(state.human.index);
     updateHumanDetails();
   });
+  function rememberMarks() {
+    const index = state.human.index;
+    const histories = state.human.markHistory ??= new Map();
+    const history = histories.get(index) ?? [];
+    history.push(state.human.marks.has(index) ? state.human.marks.get(index).map(mark => ({ ...mark })) : null);
+    if (history.length > 30) history.shift();
+    histories.set(index, history);
+  }
+  function undoMarks() {
+    const index = state.human.index;
+    if (index == null || state.human.loading) return;
+    const history = state.human.markHistory?.get(index);
+    if (!history?.length) return;
+    const marks = history.pop();
+    if (marks === null) state.human.marks.delete(index);
+    else state.human.marks.set(index, marks);
+    drawHumanFrame(); updateHumanDetails();
+  }
+  $('human-undo').addEventListener('click', undoMarks);
   $('human-clear').addEventListener('click', () => {
-    state.human.marks.delete(state.human.index);
+    if (state.human.index == null || state.human.loading) return;
+    rememberMarks();
+    state.human.marks.set(state.human.index, []);
     drawHumanFrame(); updateHumanDetails();
   });
-  $('human-apply-centers').addEventListener('click', () => {
+  function applyCenters() {
     const index = state.human.index;
-    if (index == null || state.running || state.human.loading) return;
-    const marks = state.human.marks.get(index) ?? [];
-    if (!marks.length) return;
+    if (index == null || state.running || state.human.loading || !state.human.marks.has(index)) return false;
+    const marks = state.human.marks.get(index);
     state.reviewFrames[index] = applyManualCenters(state.reviewFrames[index], marks, state.settings);
     state.human.reviewed.add(index);
     onFrameCorrected();
     drawHumanFrame(); updateHumanDetails();
+    return true;
+  }
+  $('human-apply-centers').addEventListener('click', applyCenters);
+  function reviewAndNext(apply = false) {
+    const index = state.human.index;
+    if (index == null || state.running || state.human.loading) return;
+    const indices = visibleIndices();
+    const next = indices[indices.indexOf(index) + 1];
+    if (apply && !applyCenters()) return;
+    state.human.reviewed.add(index);
+    if (next != null) selectHumanFrame(next);
+    else updateHumanDetails();
+  }
+  $('human-reviewed-next').addEventListener('click', () => reviewAndNext());
+  $('human-apply-next').addEventListener('click', () => reviewAndNext(true));
+  document.addEventListener('keydown', event => {
+    if ($('human-page').hidden || state.running || state.human.loading || event.defaultPrevented ||
+        event.target.closest('input,select,textarea,button,a,summary,[role="button"],[contenteditable="true"]')) return;
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && !event.shiftKey) {
+      event.preventDefault(); undoMarks(); return;
+    }
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key === 'ArrowLeft') { event.preventDefault(); $('human-prev').click(); }
+    if (event.key === 'ArrowRight') { event.preventDefault(); $('human-next').click(); }
+    if (event.key.toLowerCase() === 'r') { event.preventDefault(); reviewAndNext(); }
   });
   $('human-restore-auto').addEventListener('click', () => {
     const index = state.human.index;
@@ -280,12 +339,12 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     const view = humanViewBox();
     const point = { x: view.x + (event.clientX - rect.left) * view.width / rect.width,
       y: view.y + (event.clientY - rect.top) * view.height / rect.height };
+    rememberMarks();
     const marks = state.human.marks.get(state.human.index) ?? [];
     const hit = marks.findIndex(mark => Math.hypot(mark.x - point.x, mark.y - point.y) <= 10);
     if (hit >= 0) marks.splice(hit, 1);
     else marks.push(point);
     state.human.marks.set(state.human.index, marks);
-    $('human-apply-centers').hidden = marks.length === 0;
     drawHumanFrame(); updateHumanDetails();
   });
   $('human-export').addEventListener('click', () => {
