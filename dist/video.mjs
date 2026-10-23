@@ -4,6 +4,8 @@ import { grayscale } from './background.mjs';
 export function createVideoSource(video) {
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d', { willReadFrequently: true });
+  const grayCanvas = document.createElement('canvas');
+  const grayContext = grayCanvas.getContext('2d', { willReadFrequently: true });
 
   function capture() {
     if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
@@ -14,8 +16,14 @@ export function createVideoSource(video) {
   }
 
   function readGray(crop) {
-    capture();
-    return grayscale(context.getImageData(crop.x, crop.y, crop.width, crop.height));
+    // Read back only the tank crop. Keep a separate buffer so model bitmaps and
+    // labeling PNGs can use the full-frame canvas without resizing it each time.
+    if (grayCanvas.width !== crop.width || grayCanvas.height !== crop.height) {
+      grayCanvas.width = crop.width;
+      grayCanvas.height = crop.height;
+    }
+    grayContext.drawImage(video, crop.x, crop.y, crop.width, crop.height, 0, 0, crop.width, crop.height);
+    return grayscale(grayContext.getImageData(0, 0, crop.width, crop.height));
   }
 
   function readBitmap(crop) {

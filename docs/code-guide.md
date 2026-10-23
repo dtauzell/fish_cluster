@@ -11,9 +11,10 @@ not part of the browser application.
    This validates values, copies the crop, and converts the entered inches into
    pixels. The GUI owns the current file, result list, and selection.
 2. `analyzeVideo()` in `pipeline.mjs` samples timestamps and asks `video.mjs`
-   to seek the video and read the cropped pixels. The video adapter uses a
-   private canvas, so labels and crop outlines painted in the preview do not
-   enter the detector.
+   to seek the video and read the cropped pixels. Grayscale reads draw only the
+   selected crop into a dedicated canvas, reducing pixel readback work. Bitmap
+   and PNG captures use a separate full-frame canvas. Both canvases are private,
+   so labels and crop outlines painted in the preview do not enter the detector.
 3. Background mode calls `background.mjs`. Roboflow mode asks `model.mjs` for
    a reusable inference worker and normalizes its boxes with `analysis.mjs`.
    Both methods initially return centers relative to the crop.
