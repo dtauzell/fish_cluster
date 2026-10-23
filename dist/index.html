@@ -7,10 +7,10 @@
   <meta name="description" content="Analyze zebrafish spacing and clustering in a tank video, entirely in your browser.">
   <title>Fish Cluster — zebrafish video analysis</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=19">
+  <link rel="stylesheet" href="./style.css?v=21">
   <link rel="stylesheet" href="./about.css?v=1">
   <link rel="stylesheet" href="./labeling.css?v=1">
-  <script type="module" src="./app.mjs?v=28"></script>
+  <script type="module" src="./app.mjs?v=30"></script>
 </head>
 <body>
   <div class="shell">
@@ -34,7 +34,7 @@
             <label>Frame interval <span class="help">milliseconds</span><input id="interval" type="number" min="1" step="1" value="200"></label>
             <label>Close distance <span class="help">inches</span><input id="threshold" type="number" min="0.01" step="0.01" value="1.5"></label>
           </div>
-          <div class="fields method-settings"><label>Pixels per 0.5-inch square <span class="help">distance calibration for either method</span><input id="grid-pixels" type="number" min="0.1" step="0.1" value="15.3"></label></div>
+          <div class="fields method-settings"><label>Pixels per 0.5-inch square <span class="help">distance calibration for either method</span><input id="grid-pixels" type="number" min="0.000001" step="any" value="15.3"></label></div>
           <div class="fields method-choice"><label>Detection method<select id="method"><option value="background" selected>Background subtraction · fixed tank</option><option value="roboflow">Roboflow model</option></select></label></div>
           <div id="background-settings" class="fields method-settings">
             <label>Known fish count<input id="expected-fish" type="number" min="1" step="1" value="5"></label>
@@ -72,10 +72,19 @@
           <div class="crop-controls"><span id="crop-label">Drag on the preview to select the tank area.</span><button id="clear-crop" class="secondary" type="button" disabled>Use full frame</button></div>
           <fieldset class="crop-fields" id="mask-tools" disabled>
             <legend>Crop and reflection masks</legend>
-            <label>Drag tool<select id="crop-tool"><option value="crop">Select tank crop</option><option value="exclude">Mask reflection area</option></select></label>
+            <label>Drag tool<select id="crop-tool"><option value="crop">Select tank crop</option><option value="exclude">Mask reflection area</option><option value="calibrate">Draw calibration line</option></select></label>
             <button id="undo-mask" class="secondary" type="button" disabled>Undo last mask</button>
             <button id="clear-masks" class="secondary" type="button" disabled>Clear masks</button>
             <span id="mask-count">No reflection masks.</span>
+          </fieldset>
+          <fieldset id="calibration-tools" class="calibration-tools" disabled>
+            <legend>Calibrate from a known length</legend>
+            <button id="draw-calibration" class="secondary" type="button">Draw calibration line</button>
+            <label>Line length <span class="help">inches</span><input id="calibration-length" type="number" min="0.000001" step="any" value="0.5"></label>
+            <button id="apply-calibration" class="secondary" type="button" disabled>Use this scale</button>
+            <button id="clear-calibration" class="secondary" type="button" disabled>Clear line</button>
+            <p id="calibration-status" class="fine-print" role="status">Draw along a known distance in the preview, enter its length in inches, then use the scale.</p>
+            <p class="fine-print">Measure several grid squares near the swimming area for better accuracy. Perspective makes distances approximate. Clearing the line keeps the applied scale.</p>
           </fieldset>
           <p class="fine-print">Include the space where fish swim, even above the floor. Choose “Mask reflection area” and drag over reflections to exclude them. Red masks apply to every frame and also exclude real fish that enter those areas. Changing a mask requires analyzing again.</p>
           <fieldset class="crop-fields" id="crop-fields" disabled><legend>Or enter a precise crop in video pixels</legend><label>X<input id="crop-x" type="number" min="0" step="1"></label><label>Y<input id="crop-y" type="number" min="0" step="1"></label><label>Width<input id="crop-width" type="number" min="30" step="1"></label><label>Height<input id="crop-height" type="number" min="30" step="1"></label><button id="apply-crop" class="secondary" type="button">Apply crop</button></fieldset>

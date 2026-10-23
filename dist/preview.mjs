@@ -60,7 +60,26 @@ export function createPreview(canvas, video) {
     ctx.restore();
   }
 
-  return { drawFrame };
+  function drawCalibrationLine(line) {
+    if (!line) return;
+    const scale = canvas.width / Math.max(1, canvas.getBoundingClientRect().width);
+    ctx.save();
+    ctx.lineWidth = 3 * scale;
+    ctx.strokeStyle = '#9ab9ff';
+    ctx.fillStyle = '#9ab9ff';
+    ctx.beginPath();
+    ctx.moveTo(line.start.x, line.start.y);
+    ctx.lineTo(line.end.x, line.end.y);
+    ctx.stroke();
+    for (const point of [line.start, line.end]) {
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 5 * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  return { drawFrame, drawCalibrationLine };
 }
 
 /** Dashed rings and a dagger remain visible even with sharpness labels hidden. */

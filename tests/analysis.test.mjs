@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeFrame, cropFitsFrame, inchesToPixels, mapCanvasPoint, matchPointsWithin, nearestNeighborLinks, sampleTimes, summarizeFrames, normalizePredictions, randomSpacingReference, spacingPercentile } from '../dist/analysis.mjs';
+import { calibrationFromLine, analyzeFrame, cropFitsFrame, inchesToPixels, mapCanvasPoint, matchPointsWithin, nearestNeighborLinks, sampleTimes, summarizeFrames, normalizePredictions, randomSpacingReference, spacingPercentile } from '../dist/analysis.mjs';
 
 test('nearest links include each fish and draw mutual nearest pairs once', () => {
   const points = [{ x: 0, y: 0 }, { x: 3, y: 4 }, { x: 3, y: 14 }];
@@ -83,4 +83,24 @@ test('multiple Roboflow boxes remain separate fish', () => {
     { class: 'zebrafish', confidence: .3, bbox: { x: 75, y: 60, width: 13, height: 7 } }
   ];
   assert.deepEqual(normalizePredictions(predictions, 100, 100, .15).map(p => p.x), [25, 75]);
+});
+
+test('line calibration uses video pixels for horizontal, vertical, and reversed diagonal lines', () => {
+  assert.equal(calibrationFromLine({x:0,y:0}, {x:153,y:0}, 5).gridPixels, 15.3);
+  assert.equal(calibrationFromLine({x:10,y:110}, {x:10,y:10}, 2).pixelsPerInch, 50);
+  const rect = {left:10, top:20, width:200, height:200};
+  const start = mapCanvasPoint(110, 120, rect, 400, 400);
+  const end = mapCanvasPoint(50, 40, rect, 400, 400);
+  const scale = calibrationFromLine(start, end, 2);
+  assert.equal(scale.distancePx, 200);
+  assert.equal(scale.gridPixels, 50);
+  assert.equal(inchesToPixels(2, scale.gridPixels), 200);
+});
+
+test('line calibration rejects missing, zero-length, and invalid measurements', () => {
+  const start = {x:0,y:0}, end = {x:100,y:0};
+  for (const length of [0, -1, NaN, Infinity]) assert.throws(() => calibrationFromLine(start, end, length));
+  assert.throws(() => calibrationFromLine(start, start, 1));
+  assert.throws(() => calibrationFromLine(null, end, 1));
+  assert.throws(() => calibrationFromLine(start, {x:Infinity,y:0}, 1));
 });

@@ -3,6 +3,7 @@ import { fmt } from './format.mjs';
 import { summarizeSharpnessLabels } from './sharpness.mjs';
 import { baseName, sharpnessCsv } from './exports.mjs';
 import { download } from './download.mjs';
+import { addInputHelp } from './input-help.mjs';
 
 // Try nearby positions so crowded fish do not get covered by another score.
 function scoreLabelBox(candidate, candidates, placed, view, width, height, scale) {
@@ -96,6 +97,7 @@ export function createSharpnessReview(state) {
       const labels = state.human.candidateLabels.get(frame.frameIndex);
       for (const select of table.querySelectorAll('select')) {
         select.value = labels?.get(candidates[Number(select.dataset.candidateIndex)].detectionId) ?? '';
+        addInputHelp(select, 'Label this candidate as Fish or Reflection to compare sharpness scores. Choose Unsure to remove a label. These labels do not change detections or your manual center marks.');
       }
     }
     updateSummary();

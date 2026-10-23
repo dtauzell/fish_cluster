@@ -20,6 +20,17 @@ export function inchesToPixels(inches, pixelsPerHalfInch) {
   return inches * pixelsPerHalfInch * 2;
 }
 
+/** Calibrate in original-video coordinates, independently of preview size. */
+export function calibrationFromLine(start, end, lengthInches) {
+  if (![start?.x, start?.y, end?.x, end?.y].every(Number.isFinite)) throw new Error('Draw a calibration line on the preview first.');
+  const distancePx = Math.hypot(end.x - start.x, end.y - start.y);
+  if (distancePx < 1) throw new Error('Draw a line at least one video pixel long.');
+  if (!Number.isFinite(lengthInches) || lengthInches <= 0) throw new Error('Enter a line length greater than zero inches.');
+  const pixelsPerInch = distancePx / lengthInches;
+  if (!Number.isFinite(pixelsPerInch) || pixelsPerInch <= 0) throw new Error('Enter a valid line length in inches.');
+  return { distancePx, pixelsPerInch, gridPixels: pixelsPerInch / 2 };
+}
+
 /** Each point chooses its nearest other point; mutual pairs are returned once. */
 export function nearestNeighborLinks(points) {
   const links = new Map();

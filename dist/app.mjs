@@ -1,6 +1,6 @@
 import { SHARPNESS_METHOD } from './sharpness.mjs';
 import { TRACKING_METHOD } from './tracking.mjs';
-import { analyzeFrame, cropFitsFrame, inchesToPixels, mapCanvasPoint, summarizeFrames } from './analysis.mjs';
+import { analyzeFrame, calibrationFromLine, cropFitsFrame, inchesToPixels, mapCanvasPoint, summarizeFrames } from './analysis.mjs';
 import { createSettings } from './settings.mjs';
 import { frameMetrics, groupSignature, changeFrames as findChangeFrames } from './measurements.mjs';
 import { createModelService, modelIdentity, modelErrorMessage } from './model.mjs';
@@ -12,6 +12,9 @@ import { download } from './download.mjs';
 import { createHumanReview } from './human-ui.mjs';
 import { analyzeVideo } from './pipeline.mjs';
 import { createLabeling } from './labeling-ui.mjs';
+import { initializeInputHelp } from './input-help.mjs';
+
+initializeInputHelp();
 
 const $ = id => document.getElementById(id);
 const video = $('source-video');
@@ -25,6 +28,7 @@ const state = {
   crop: null,
   exclusions: [],
   drag: null,
+  calibrationLine: null,
   running: false,
   stopped: false,
   resultsReady: false,
@@ -38,9 +42,10 @@ const { showFirstFrame, seekToDrawableFrame } = videoSource;
 const { prepare: prepareModel } = createModelService();
 const preview = createPreview(canvas, video);
 function drawFrame(frame) {
-  const crop = state.drag && !state.drag.exclude ? state.drag.box : state.crop;
+  const crop = state.drag && !state.drag.exclude && !state.drag.calibration ? state.drag.box : state.crop;
   const exclusions = state.drag?.exclude ? [...state.exclusions, state.drag.box] : state.exclusions;
   preview.drawFrame(frame, state.settings?.thresholdPx, crop, exclusions, $('show-sharpness').checked);
+  preview.drawCalibrationLine(state.drag?.calibration ? state.drag : state.calibrationLine);
 }
 function changeFrames() { return findChangeFrames(state.frames); }
 const { selectHumanFrame } = createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
@@ -108,6 +113,9 @@ function loadMetadata(file) {
   $('crop-tool').value = 'crop';
   updateMaskControls();
   state.drag = null;
+  state.calibrationLine = null;
+  $('calibration-tools').disabled = true;
+  updateCalibrationControls();
   $('canvas-wrap').style.aspectRatio = '16 / 10';
   $('crop-fields').disabled = true;
   $('mask-tools').disabled = true;
@@ -159,6 +167,7 @@ video.addEventListener('loadedmetadata', async () => {
     if (state.file !== selectedFile) return;
     drawFrame(null);
     $('empty-preview').hidden = true;
+    $('calibration-tools').disabled = false;
     $('frame-time').textContent = timeLabel(video.currentTime * 1000);
   } catch (error) {
     if (state.file === selectedFile) status(`Could not show the first frame: ${error.message}`, true);
@@ -209,19 +218,31 @@ function commitCrop(box) {
 
 canvas.addEventListener('pointerdown', event => {
   if (!state.file || state.running || video.readyState < 2 || !canvas.width) return;
+  if (event.button !== 0 || state.drag) return;
   const point = pointOnCanvas(event);
-  state.drag = { start: point, exclude: $('crop-tool').value === 'exclude', box: { x: point.x, y: point.y, width: 0, height: 0 } };
+  state.drag = { start: point, end: point, calibration: $('crop-tool').value === 'calibrate', exclude: $('crop-tool').value === 'exclude', box: { x: point.x, y: point.y, width: 0, height: 0 } };
   canvas.setPointerCapture(event.pointerId);
 });
 canvas.addEventListener('pointermove', event => {
   if (!state.drag) return;
   const point = pointOnCanvas(event);
   const start = state.drag.start;
+  state.drag.end = point;
   state.drag.box = { x: Math.min(start.x, point.x), y: Math.min(start.y, point.y), width: Math.abs(point.x - start.x), height: Math.abs(point.y - start.y) };
   drawFrame(null);
 });
-canvas.addEventListener('pointerup', () => {
+canvas.addEventListener('pointerup', event => {
   if (!state.drag) return;
+  if (state.drag.calibration) {
+    const line = { start: state.drag.start, end: pointOnCanvas(event) };
+    state.drag = null;
+    if (Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y) >= 1) {
+      state.calibrationLine = line;
+      updateCalibrationControls();
+    } else $('calibration-status').textContent = 'Draw a longer line along a known distance.';
+    drawFrame(state.frames[Number($('frame-slider').value)] ?? null);
+    return;
+  }
   const { box, exclude } = state.drag;
   state.drag = null;
   if (exclude && box.width >= 4 && box.height >= 4) {
@@ -239,6 +260,37 @@ canvas.addEventListener('pointerup', () => {
   }
 });
 canvas.addEventListener('pointercancel', () => { state.drag = null; drawFrame(null); });
+
+function updateCalibrationControls() {
+  const line = state.calibrationLine;
+  $('apply-calibration').disabled = !line;
+  $('clear-calibration').disabled = !line;
+  $('calibration-status').textContent = line
+    ? `Line: ${fmt(Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y), 2)} video pixels. Enter its length in inches, then click Use this scale.`
+    : 'Draw along a known distance in the preview, enter its length in inches, then use the scale.';
+}
+$('draw-calibration').addEventListener('click', () => {
+  $('crop-tool').value = 'calibrate';
+  $('calibration-status').textContent = 'Drag from one end of a known distance to the other in the preview.';
+  canvas.scrollIntoView({ block: 'nearest' });
+});
+$('apply-calibration').addEventListener('click', () => {
+  if (state.running || !state.calibrationLine) return;
+  try {
+    const { start, end } = state.calibrationLine;
+    const scale = calibrationFromLine(start, end, Number($('calibration-length').value));
+    $('grid-pixels').value = Number(scale.gridPixels.toPrecision(12));
+    $('grid-pixels').dispatchEvent(new Event('change'));
+    $('calibration-status').textContent = `Scale applied: ${fmt(scale.pixelsPerInch, 3)} pixels/inch (${fmt(scale.gridPixels, 3)} pixels per 0.5-inch square).`;
+  } catch (error) { $('calibration-status').textContent = error.message; }
+});
+$('clear-calibration').addEventListener('click', () => {
+  if (state.running) return;
+  state.calibrationLine = null;
+  updateCalibrationControls();
+  drawFrame(state.frames[Number($('frame-slider').value)] ?? null);
+});
+$('calibration-length').addEventListener('input', updateCalibrationControls);
 $('apply-crop').addEventListener('click', () => {
   if (state.running || !video.videoWidth) return;
   try {
@@ -321,6 +373,7 @@ $('analyze').addEventListener('click', async () => {
   $('track-fish').disabled = true;
   $('crop-fields').disabled = true;
   $('mask-tools').disabled = true;
+  $('calibration-tools').disabled = true;
   $('progress').hidden = false;
   $('progress').value = 0;
   $('frame-slider').disabled = true;
@@ -367,6 +420,7 @@ $('analyze').addEventListener('click', async () => {
     $('track-fish').disabled = false;
     $('crop-fields').disabled = false;
     $('mask-tools').disabled = false;
+    $('calibration-tools').disabled = video.readyState < 2;
   }
 });
 $('cancel').addEventListener('click', () => { state.stopped = true; status('Stopping after the current frame…'); });
