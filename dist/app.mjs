@@ -13,6 +13,7 @@ import { createHumanReview } from './human-ui.mjs';
 import { analyzeVideo } from './pipeline.mjs';
 import { createLabeling } from './labeling-ui.mjs';
 import { initializeInputHelp } from './input-help.mjs';
+import { framePassesCountFilter } from './frame-selection.mjs';
 
 initializeInputHelp();
 
@@ -24,6 +25,7 @@ const state = {
   file: null,
   url: null,
   frames: [],
+  reviewFrames: [],
   settings: null,
   crop: null,
   exclusions: [],
@@ -49,7 +51,15 @@ function drawFrame(frame) {
 }
 function changeFrames() { return findChangeFrames(state.frames); }
 const { selectHumanFrame } = createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
-  onFrameCorrected: () => showResults(true) });
+  onFrameCorrected: () => {
+    const hadResults = state.resultsReady;
+    const selectedFrame = state.frames[Number($('frame-slider').value)];
+    state.frames = state.reviewFrames.filter(frame => framePassesCountFilter(frame, state.settings));
+    const selected = state.frames.findIndex(frame => frame.frameIndex === selectedFrame?.frameIndex);
+    $('frame-slider').value = Math.max(0, selected);
+    showResults(hadResults);
+    status(`Results updated: ${state.frames.length} of ${state.reviewFrames.length} sampled frames included.`);
+  } });
 const labeling = createLabeling({ canvas: $('label-canvas'), source: videoSource, isRunning: () => state.running,
   queueSeek: (timestampMs, capture) => {
     const token = ++state.previewToken;
@@ -86,11 +96,13 @@ window.addEventListener('unhandledrejection', event => {
 function resetHuman() {
   state.human = { marks: new Map(), candidateLabels: new Map(), reviewed: new Set(), index: null, loading: false };
   $('human-link').hidden = true;
+  $('human-review-link').hidden = true;
 }
 
 function clearResults() {
   ++state.previewToken;
   state.frames = [];
+  state.reviewFrames = [];
   state.resultsReady = false;
   resetHuman();
   $('results').hidden = true;
@@ -374,6 +386,7 @@ $('analyze').addEventListener('click', async () => {
   state.stopped = false;
   state.settings = config;
   state.frames = [];
+  state.reviewFrames = [];
   state.resultsReady = false;
   let skippedFrames = 0;
   let totalSamples = 0;
@@ -403,6 +416,7 @@ $('analyze').addEventListener('click', async () => {
     });
     for await (const event of events) {
       $('progress').value = event.progress;
+      if (event.frame) state.reviewFrames.push(event.frame);
       if (event.type === 'skipped') {
         skippedFrames++;
         totalSamples = event.total;
@@ -424,7 +438,6 @@ $('analyze').addEventListener('click', async () => {
         ? `Analyzed ${frame.frameIndex + 1} of ${total} frames · ${frame.detections.length} fish candidates (known count ${config.expectedFish})${frame.rejectedDetections.length ? ` · ${frame.rejectedDetections.length} outer candidates excluded` : ''}`
         : `Analyzed ${frame.frameIndex + 1} of ${total} frames · ${frame.detections.length} fish in current frame (${frame.rawPredictionCount} model boxes)`);
     }
-    if (state.stopped && !state.frames.length) return;
     if (state.frames.length) showResults();
     const maxRawCount = Math.max(0, ...state.frames.map(frame => frame.rawPredictionCount));
     status(state.settings.filterExactCount && !state.frames.length && !state.stopped
@@ -440,6 +453,8 @@ $('analyze').addEventListener('click', async () => {
     status(config.method === 'background' ? `Analysis stopped: ${error.message}` : modelErrorMessage(error, config), true);
   } finally {
     state.running = false;
+    $('human-review-link').hidden = !state.reviewFrames.length;
+    $('human-link').hidden = !state.reviewFrames.length;
     $('analyze').disabled = false;
     $('cancel').hidden = true;
     $('progress').hidden = true;
@@ -458,10 +473,18 @@ $('analyze').addEventListener('click', async () => {
 $('cancel').addEventListener('click', () => { state.stopped = true; status('Stopping after the current frame…'); });
 
 function showResults(preserveSelection = false) {
-  const selected = preserveSelection ? Number($('frame-slider').value) : state.frames.length - 1;
+  if (!state.frames.length) {
+    state.resultsReady = false;
+    $('results').hidden = true;
+    $('frame-slider').disabled = true;
+    $('timeline').hidden = true;
+    $('frame-groups').hidden = true;
+    return;
+  }
+  const selected = preserveSelection ? Math.max(0, Math.min(Number($('frame-slider').value), state.frames.length - 1)) : state.frames.length - 1;
   const summary = summarizeFrames(state.frames);
   state.resultsReady = true;
-  $('results').hidden = false;
+  $('results').hidden = location.hash === '#human-analysis';
   $('human-link').hidden = false;
   $('stat-fish').textContent = fmt(summary.meanFishCount);
   $('stat-distance').textContent = Number.isFinite(summary.meanPairDistanceInches) ? `${fmt(summary.meanPairDistanceInches, 2)} in` : '—';
@@ -567,13 +590,13 @@ $('show-sharpness').addEventListener('change', () => {
   if (!state.running) drawFrame(state.frames[Number($('frame-slider').value)] ?? null);
 });
 function refreshDistanceResults() {
-  if (!state.frames.length || state.running) return;
+  if (!state.reviewFrames.length || state.running) return;
   state.settings.thresholdPx = inchesToPixels(state.settings.thresholdInches, state.settings.gridPixels);
   state.settings.pixelsPerInch = state.settings.gridPixels * 2;
-  for (const frame of state.frames) frame.metrics = frameMetrics(frame.detections, state.settings,
+  for (const frame of state.reviewFrames) frame.metrics = frameMetrics(frame.detections, state.settings,
     frame.manualCorrectionApplied ? 0 : frame.rejectedDetections?.length ?? 0);
   showResults(true);
-  drawFrame(state.frames[Number($('frame-slider').value)]);
+  drawFrame(state.frames[Number($('frame-slider').value)] ?? null);
 }
 $('cluster-distance').addEventListener('input', event => {
   if (!state.settings || state.running || !state.frames.length) return;
@@ -583,14 +606,14 @@ $('cluster-distance').addEventListener('input', event => {
 });
 $('threshold').addEventListener('change', event => {
   const thresholdInches = Number(event.target.value);
-  if (!Number.isFinite(thresholdInches) || thresholdInches < 0.01 || !state.settings || state.running || !state.frames.length) return;
+  if (!Number.isFinite(thresholdInches) || thresholdInches < 0.01 || !state.settings || state.running || !state.reviewFrames.length) return;
   state.settings.thresholdInches = thresholdInches;
   $('cluster-distance').max = Math.max(Number($('cluster-distance').max), thresholdInches);
   refreshDistanceResults();
 });
 $('grid-pixels').addEventListener('change', event => {
   const gridPixels = Number(event.target.value);
-  if (!Number.isFinite(gridPixels) || gridPixels <= 0 || !state.settings || state.running || !state.frames.length) return;
+  if (!Number.isFinite(gridPixels) || gridPixels <= 0 || !state.settings || state.running || !state.reviewFrames.length) return;
   state.settings.gridPixels = gridPixels;
   refreshDistanceResults();
 });
@@ -641,7 +664,7 @@ function loadAbout() {
 }
 
 function showPage() {
-  if (location.hash === '#human-analysis' && !state.resultsReady) history.replaceState(null, '', `${location.pathname}${location.search}#analysis`);
+  if (location.hash === '#human-analysis' && (!state.reviewFrames.length || state.running)) history.replaceState(null, '', `${location.pathname}${location.search}#analysis`);
   if (location.hash === '#labeling' && !labeling.hasProject()) history.replaceState(null, '', `${location.pathname}${location.search}#analysis`);
   const nextView = location.hash === '#about' ? 'about' : location.hash === '#human-analysis' ? 'human'
     : location.hash === '#labeling' ? 'label' : 'analysis';
@@ -658,12 +681,11 @@ function showPage() {
   if (about) loadAbout();
   else if (label) labeling.show();
   else if (human) {
-    $('human-slider').max = state.frames.length - 1;
-    $('human-frame-number').max = state.frames.length;
     const crop = state.settings.crop;
     humanCanvas.width = crop.width;
     humanCanvas.height = crop.height;
-    selectHumanFrame(state.human.index ?? Number($('frame-slider').value));
+    const selected = state.frames[Number($('frame-slider').value)];
+    selectHumanFrame(state.human.index ?? selected?.frameIndex ?? 0);
   } else if (state.resultsReady && !state.running) {
     selectFrame(Number($('frame-slider').value));
   }
@@ -687,7 +709,8 @@ $('download-json').addEventListener('click', () => {
     sharpnessLabels: exportedSharpnessLabels(state.human.candidateLabels),
     settings: exportedSettings(state.settings, video.videoWidth, video.videoHeight),
     summary: summarizeFrames(state.frames),
-    frames: state.frames
+    frames: state.frames,
+    excludedFrames: state.reviewFrames.filter(frame => !framePassesCountFilter(frame, state.settings))
   };
   download(`${baseName(state.file?.name)}-analysis.json`, JSON.stringify(result, null, 2), 'application/json');
 });

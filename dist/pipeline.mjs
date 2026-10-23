@@ -5,6 +5,7 @@ import { normalizePredictions, sampleTimes } from './analysis.mjs';
 import { detectBackgroundFish, medianBackground } from './background.mjs';
 import { frameMetrics } from './measurements.mjs';
 import { createFishTracker } from './tracking.mjs';
+import { framePassesCountFilter } from './frame-selection.mjs';
 
 // Let the browser paint progress and handle Cancel between expensive operations.
 const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -105,8 +106,8 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
     previousFrame = frame;
     const preparationProgress = backgroundMode ? 10 : 0;
     const progress = preparationProgress + (frameIndex + 1) / times.length * (100 - preparationProgress);
-    if (config.filterExactCount && frame.detections.length !== config.filterFrameCount) {
-      yield { type: 'skipped', progress, frameIndex, total: times.length, fishCount: frame.detections.length,
+    if (!framePassesCountFilter(frame, config)) {
+      yield { type: 'skipped', frame, progress, frameIndex, total: times.length, fishCount: frame.detections.length,
         requiredFishCount: config.filterFrameCount };
       await yieldToBrowser();
       continue;

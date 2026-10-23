@@ -34,6 +34,19 @@ async function collect(options) {
   return events;
 }
 
+test('count-filter skips retain complete frames for review with original sample identities', async () => {
+  const counts = [1, 2, 0, 2];
+  const io = modelSource(async () => Array.from({ length: counts.shift() }, (_, i) =>
+    ({ class: 'fish', x: 15 + i * 12, y: 20, width: 8, height: 8, confidence: .8 })));
+  const events = (await collect({ ...io, config: { ...config, method: 'roboflow', confidence: .5,
+    filterExactCount: true, filterFrameCount: 2 }, duration: .65 })).filter(e => e.frame);
+  assert.deepEqual(events.map(e => e.type), ['skipped', 'frame', 'skipped', 'frame']);
+  assert.deepEqual(events.map(e => e.frame.frameIndex), [0, 1, 2, 3]);
+  assert.deepEqual(events.map(e => e.frame.timestampMs), [0, 200, 400, 600]);
+  assert.deepEqual(events.map(e => e.frame.detections.length), [1, 2, 0, 2]);
+  assert.ok(events.every(e => e.frame.metrics && Array.isArray(e.frame.rejectedDetections)));
+});
+
 test('settings validate units and snapshot the selected crop', () => {
   const selected = { ...crop };
   const settings = createSettings(values, selected, 200, 200);

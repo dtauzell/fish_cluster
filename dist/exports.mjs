@@ -4,6 +4,7 @@ import { insideAnalysisArea } from './region.mjs';
 import { csv } from './analysis.mjs';
 import { groupSignature } from './measurements.mjs';
 import { compareFrame, insideCrop } from './review.mjs';
+import { framePassesCountFilter, automaticCandidateCount } from './frame-selection.mjs';
 
 export function baseName(fileName) { return (fileName ?? 'fish-video').replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-') || 'fish-video'; }
 export function exportedSettings(settings, frameWidth, frameHeight) {
@@ -78,7 +79,9 @@ function humanRows(frames, marksByFrame, reviewed, config) {
   return frames.flatMap((frame, index) => {
     const marks = marksByFrame.get(index) ?? [];
     const { within: inCrop, manual: metrics, automatic, matched } = compareFrame(frame, marks, config);
-    const common = { frame_index: index, frame_number: index + 1, timestamp_ms: frame.timestampMs,
+    const common = { frame_index: frame.frameIndex, frame_number: frame.frameIndex + 1, timestamp_ms: frame.timestampMs,
+      included_in_results: framePassesCountFilter(frame, config),
+      automatic_candidate_count: automaticCandidateCount(frame),
       reviewed: reviewed.has(index), manual_fish_count_in_crop: marks.filter(mark => insideCrop(mark, config.crop)).length,
       manual_fish_count_in_analysis: inCrop.length,
       manual_fish_count_outside_crop: marks.filter(mark => !insideCrop(mark, config.crop)).length,
@@ -97,7 +100,7 @@ function humanRows(frames, marksByFrame, reviewed, config) {
 }
 
 export function humanCsv(frames, marksByFrame, reviewed, config) {
-  return csv(humanRows(frames, marksByFrame, reviewed, config), ['frame_index', 'frame_number', 'timestamp_ms', 'reviewed', 'manual_fish_count_in_crop', 'manual_fish_count_outside_crop', 'automatic_fish_count', 'matched_center_count', 'manual_cluster_count', 'automatic_cluster_count', 'manual_group_sizes', 'automatic_group_sizes', 'close_distance_inches', 'mark_number', 'x_px', 'y_px', 'inside_crop', 'included_in_analysis', 'manual_group_id', 'manual_fish_count_in_analysis', 'manual_correction_applied', 'result_fish_count']);
+  return csv(humanRows(frames, marksByFrame, reviewed, config), ['frame_index', 'frame_number', 'timestamp_ms', 'reviewed', 'manual_fish_count_in_crop', 'manual_fish_count_outside_crop', 'automatic_fish_count', 'matched_center_count', 'manual_cluster_count', 'automatic_cluster_count', 'manual_group_sizes', 'automatic_group_sizes', 'close_distance_inches', 'mark_number', 'x_px', 'y_px', 'inside_crop', 'included_in_analysis', 'manual_group_id', 'manual_fish_count_in_analysis', 'manual_correction_applied', 'result_fish_count', 'included_in_results', 'automatic_candidate_count']);
 }
 
 

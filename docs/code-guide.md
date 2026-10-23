@@ -304,6 +304,16 @@ leave that area unmasked for the diagnostic run.
 
 ## Measurements and human review
 
+`state.reviewFrames` retains every completed sample, including count-filter
+skips; `state.frames` contains only samples currently included in analysis.
+`frame-selection.mjs` applies the analysis count filter to current centers and
+builds review view indices from original automatic candidates, including outer
+candidates. Manual corrections rebuild analysis membership without changing
+review identity or the original mismatch subset. Review navigation uses positions
+within that subset while marks remain keyed to the complete review collection.
+Human exports cover that complete collection; analysis JSON separately retains
+excluded samples. The review route also works when no sample passed the filter.
+
 `analyzeFrame()` compares every pair of centers. It merges close pairs into
 connected groups, so a chain A–B–C can form one group even when A and C are
 farther apart than the selected distance. The implementation uses union-find,

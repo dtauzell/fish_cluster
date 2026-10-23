@@ -19,6 +19,22 @@ Open <http://localhost:8000>. No install or build is required. Tests: `npm test`
 4a. By default, analysis keeps only samples with exactly five detected fish. Change the required count or turn off **Only include frames with exactly** to keep every sample. Skipped samples still help tracking across neighboring frames.
 5. Analyze, then use the timeline above the video to skip to sampled frames. Yellow marks show where the detected group-size pattern changes; the previous/next buttons jump between those marks. The link-distance slider updates group colors, the selected-frame chart, timeline marks, and exports without rerunning detection. Export detections CSV, frame metrics CSV, or full JSON. The post-analysis **Human analysis** link opens a review view in the same browser tab: click fish centers, optionally show automatic centers or the full frame, mark frames reviewed, and export manual annotations as CSV. Fish marked outside the crop are kept in the export but excluded from the automatic comparison. The review reports one-to-one center matches within 0.5 inch as well as count and group-size agreement. Manual marks are kept only until the tab reloads.
 
+In **Human analysis**, **Frames to review → Count mismatches** shows samples whose
+original automatic candidate count differs from the known fish count. This
+includes samples skipped by the analysis count filter and candidates excluded
+by the crop-center rule. Previous/Next, the slider, and the frame-position input
+navigate the selected review view; the original sample number appears beside
+the timestamp. Review marks and status stay with their original samples when
+switching views. **Mark frame reviewed** is a large separate button.
+
+Use **Use my marks for this frame** to apply a correction. If the corrected
+count meets the analysis filter, a skipped frame is included in results;
+restoring automatic centers applies the filter again. Corrected frames stay in
+the mismatch view based on their original candidates. The review link remains
+available even when all samples were skipped. Human CSV includes every sampled
+frame, its `automatic_candidate_count`, and an `included_in_results` flag.
+Analysis CSVs contain included frames; the full JSON also saves `excludedFrames`.
+
 To include fish swimming above the tank floor, enlarge the crop to cover their
 swimming area. Under the preview, choose **Mask reflection area** from the drag
 tool and draw rectangles over reflections or fixtures. Red masks apply to every

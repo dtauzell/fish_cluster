@@ -8,6 +8,7 @@ import { applyManualCenters, restoreAutomaticCenters, compareFrame, summarizeRev
 import { baseName, humanCsv } from './exports.mjs';
 import { download } from './download.mjs';
 import { fmt, timeLabel } from './format.mjs';
+import { reviewFrameIndices, automaticCandidateCount, framePassesCountFilter } from './frame-selection.mjs';
 
 /** Human-review controls and overlays. Comparisons live in review.mjs. */
 export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek, onFrameCorrected }) {
@@ -15,6 +16,35 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
   const humanCtx = humanCanvas.getContext('2d');
   const sharpnessReview = createSharpnessReview(state);
   function includedInAnalysis(point) { return insideAnalysisArea(point, state.settings.crop, state.settings.exclusions); }
+  function visibleIndices() {
+    return reviewFrameIndices(state.reviewFrames, state.human.filter ?? 'all',
+      state.human.expectedFish ?? state.settings.expectedFish ?? state.settings.filterFrameCount ?? 5);
+  }
+
+  function updateReviewSummary() {
+    $('human-progress').textContent = `${state.human.reviewed.size} of ${state.reviewFrames.length} frames reviewed`;
+    const { countMatches, centerMatches, groupMatches } = summarizeReview(state.reviewFrames, state.human.marks, state.human.reviewed, state.settings);
+    $('human-validation-summary').textContent = state.human.reviewed.size
+      ? `Of reviewed frames: ${countMatches} count matches, ${centerMatches} complete center matches, ${groupMatches} group-size matches.`
+      : 'Review a few frames to compare counts, centers, and group sizes.';
+  }
+
+  function updateReviewFilter() {
+    state.human.expectedFish ??= state.settings.expectedFish ?? state.settings.filterFrameCount ?? 5;
+    const indices = visibleIndices();
+    const mismatches = reviewFrameIndices(state.reviewFrames, 'mismatches', state.human.expectedFish).length;
+    $('human-frame-filter').value = state.human.filter ?? 'all';
+    $('human-expected-fish').value = state.human.expectedFish;
+    $('human-frame-filter').options[0].textContent = `All sampled frames (${state.reviewFrames.length})`;
+    $('human-frame-filter').options[1].textContent = `Count mismatches (${mismatches})`;
+    $('human-filter-summary').textContent = `${indices.length} frames in this view · ${mismatches} original candidate-count mismatches. Includes samples skipped by the analysis count filter. Excluded outer candidates count toward mismatches; applying marks keeps a frame in this review subset.`;
+    $('human-frame-workspace').hidden = !indices.length;
+    $('human-empty-filter').hidden = indices.length > 0;
+    $('human-slider').max = Math.max(0, indices.length - 1);
+    $('human-frame-number').max = indices.length;
+    updateReviewSummary();
+    return indices;
+  }
 
   function humanViewBox() {
     return $('human-show-full').checked
@@ -24,7 +54,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
 
   function drawHumanFrame() {
     const index = state.human.index;
-    if (index == null || !state.frames[index] || state.human.loading || $('human-page').hidden) return;
+    if (index == null || !state.reviewFrames[index] || state.human.loading || $('human-page').hidden) return;
     const crop = state.settings.crop;
     const view = humanViewBox();
     const displayWidth = humanCanvas.getBoundingClientRect().width;
@@ -47,27 +77,27 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
       humanCtx.strokeRect(crop.x, crop.y, crop.width, crop.height);
       humanCtx.restore();
     }
-    if ($('human-show-nearest').checked) drawHumanNearestLinks(state.frames[index].detections, view);
+    if ($('human-show-nearest').checked) drawHumanNearestLinks(state.reviewFrames[index].detections, view);
     if ($('human-show-auto').checked || $('human-show-nearest').checked || $('human-show-sharpness').checked) {
       humanCtx.save();
       humanCtx.strokeStyle = '#f6d979';
       humanCtx.lineWidth = 2;
-      for (const dot of state.frames[index].automaticDetections ?? state.frames[index].detections) {
+      for (const dot of state.reviewFrames[index].automaticDetections ?? state.reviewFrames[index].detections) {
         humanCtx.setLineDash(dot.positionUncertain || dot.splitFromBlob ? [3, 3] : []);
         humanCtx.beginPath();
         humanCtx.arc(dot.x - view.x, dot.y - view.y, 9, 0, Math.PI * 2);
         humanCtx.stroke();
       }
       humanCtx.restore();
-      drawUncertainCenters(humanCtx, state.frames[index].detections, view,
+      drawUncertainCenters(humanCtx, state.reviewFrames[index].detections, view,
         view.width / Math.max(1, displayWidth));
     }
     if ($('human-show-auto').checked || $('human-show-sharpness').checked) {
-      drawRejectedCandidates(humanCtx, state.frames[index].rejectedDetections ?? [], view,
+      drawRejectedCandidates(humanCtx, state.reviewFrames[index].rejectedDetections ?? [], view,
         view.width / Math.max(1, displayWidth));
     }
     if ($('human-show-sharpness').checked) {
-      drawCandidateSharpness(humanCtx, frameCandidates(state.frames[index]), view,
+      drawCandidateSharpness(humanCtx, frameCandidates(state.reviewFrames[index]), view,
         view.width / Math.max(1, displayWidth));
     }
     const marks = state.human.marks.get(index) ?? [];
@@ -124,8 +154,8 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
 
   function updateHumanDetails() {
     const index = state.human.index;
-    if (index == null || !state.frames[index]) return;
-    const frame = state.frames[index];
+    if (index == null || !state.reviewFrames[index]) return;
+    const frame = state.reviewFrames[index];
     sharpnessReview.update(frame);
     const splitCount = frame.detections.filter(point => point.splitFromBlob).length;
     const previousEstimate = frame.detections.some(point =>
@@ -139,18 +169,24 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     $('human-correction-status').textContent = frame.manualCorrectionApplied
       ? 'Your applied centers are used in measurements and exports. Original automatic centers are preserved. Editing marks requires applying them again.'
       : 'Mark every fish in this frame, then apply your centers to replace its automatic result. Applying no marks sets its count to zero. Other frames keep their automatic results.';
-    $('human-slider').value = index;
-    $('human-frame-number').value = index + 1;
-    $('human-frame-time').textContent = timeLabel(frame.timestampMs);
+    $('human-correction-status').textContent += framePassesCountFilter(frame, state.settings)
+      ? ' This frame is included in analysis results.'
+      : ' This frame is excluded from analysis results by the count filter. Applying the required number of centers includes it.';
+    const indices = visibleIndices();
+    const position = indices.indexOf(index);
+    $('human-slider').value = position;
+    $('human-frame-number').value = position + 1;
+    $('human-frame-time').textContent = `Sample ${frame.frameIndex + 1} · ${timeLabel(frame.timestampMs)}`;
     const reviewed = state.human.reviewed.has(index);
     $('human-reviewed').setAttribute('aria-pressed', String(reviewed));
     $('human-reviewed').textContent = reviewed ? 'Reviewed ✓ · click to undo' : 'Mark frame reviewed';
     $('human-apply-centers').hidden = !(state.human.marks.get(index)?.length);
-    $('human-prev').disabled = index === 0;
-    $('human-next').disabled = index === state.frames.length - 1;
+    $('human-prev').disabled = position <= 0;
+    $('human-next').disabled = position === indices.length - 1;
     $('human-frame-details').innerHTML = `<div><span>Your fish in usable area</span><strong>${manual.fishCount}</strong></div>
       <div><span>Your fish outside usable area</span><strong>${outside}</strong></div>
       <div><span>Automatic fish</span><strong>${automatic.fishCount}</strong></div>
+      <div><span>Original candidates (all)</span><strong>${automaticCandidateCount(frame)}</strong></div>
       <div><span>Centers used in results</span><strong>${frame.detections.length}${frame.manualCorrectionApplied ? ' (manual)' : ''}</strong></div>
       <div><span>Split estimates kept</span><strong>${frame.detections.filter(point => point.splitFromBlob).length}</strong></div>
       <div><span>Excluded outer candidates</span><strong>${frame.rejectedDetections?.length ?? 0}</strong></div>
@@ -158,34 +194,54 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
       <div><span>Your groups of 2+</span><strong>${manual.clusterCount}</strong></div>
       <div><span>Automatic groups of 2+</span><strong>${automatic.clusterCount}</strong></div>
       <p>Your group sizes: ${[...manual.groupSizes].sort((a, b) => b - a).join('+') || 'none'}<br>Automatic group sizes: ${groupSignature({ metrics: automatic }) || 'none'}</p>`;
-    $('human-progress').textContent = `${state.human.reviewed.size} of ${state.frames.length} frames reviewed`;
-    const { countMatches, centerMatches, groupMatches } = summarizeReview(state.frames, state.human.marks, state.human.reviewed, state.settings);
-    $('human-validation-summary').textContent = state.human.reviewed.size
-      ? `Of reviewed frames: ${countMatches} count matches, ${centerMatches} complete center matches, ${groupMatches} group-size matches.`
-      : 'Review a few frames to compare counts, centers, and group sizes.';
+    updateReviewSummary();
   }
 
   function selectHumanFrame(index) {
-    if (!state.frames[index] || state.running) return;
+    if (state.running) return;
+    const indices = updateReviewFilter();
+    if (!indices.length) {
+      ++state.previewToken;
+      state.human.index = null;
+      state.human.loading = false;
+      $('human-frame-details').textContent = 'No frames in this view.';
+      $('human-overlap-note').hidden = true;
+      return;
+    }
+    if (!indices.includes(index)) index = indices[0];
     state.human.index = index;
     state.human.loading = true;
     updateHumanDetails();
     const token = ++state.previewToken;
-    return queuePreviewSeek(token, state.frames[index].timestampMs, () => {
+    return queuePreviewSeek(token, state.reviewFrames[index].timestampMs, () => {
       if ($('human-page').hidden) return;
       state.human.loading = false;
       drawHumanFrame();
     });
   }
 
-  $('human-slider').addEventListener('input', event => selectHumanFrame(Number(event.target.value)));
+  function selectHumanPosition(position) { selectHumanFrame(visibleIndices()[position]); }
+  $('human-frame-filter').addEventListener('change', event => {
+    state.human.filter = event.target.value;
+    selectHumanFrame(state.human.index);
+  });
+  $('human-expected-fish').addEventListener('change', event => {
+    const count = Number(event.target.value);
+    if (!Number.isInteger(count) || count < 1) {
+      event.target.value = state.human.expectedFish;
+      return;
+    }
+    state.human.expectedFish = count;
+    selectHumanFrame(state.human.index);
+  });
+  $('human-slider').addEventListener('input', event => selectHumanPosition(Number(event.target.value)));
   $('human-frame-number').addEventListener('change', event => {
     const number = Number(event.target.value);
-    if (Number.isInteger(number) && number >= 1 && number <= state.frames.length) selectHumanFrame(number - 1);
-    else event.target.value = (state.human.index ?? 0) + 1;
+    if (Number.isInteger(number) && number >= 1 && number <= visibleIndices().length) selectHumanPosition(number - 1);
+    else event.target.value = visibleIndices().indexOf(state.human.index) + 1;
   });
-  $('human-prev').addEventListener('click', () => selectHumanFrame(state.human.index - 1));
-  $('human-next').addEventListener('click', () => selectHumanFrame(state.human.index + 1));
+  $('human-prev').addEventListener('click', () => selectHumanPosition(visibleIndices().indexOf(state.human.index) - 1));
+  $('human-next').addEventListener('click', () => selectHumanPosition(visibleIndices().indexOf(state.human.index) + 1));
   $('human-show-full').addEventListener('change', drawHumanFrame);
   $('human-show-auto').addEventListener('change', drawHumanFrame);
   $('human-show-sharpness').addEventListener('change', drawHumanFrame);
@@ -206,7 +262,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     if (index == null || state.running || state.human.loading) return;
     const marks = state.human.marks.get(index) ?? [];
     if (!marks.length) return;
-    state.frames[index] = applyManualCenters(state.frames[index], marks, state.settings);
+    state.reviewFrames[index] = applyManualCenters(state.reviewFrames[index], marks, state.settings);
     state.human.reviewed.add(index);
     onFrameCorrected();
     drawHumanFrame(); updateHumanDetails();
@@ -214,7 +270,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
   $('human-restore-auto').addEventListener('click', () => {
     const index = state.human.index;
     if (index == null || state.running || state.human.loading) return;
-    state.frames[index] = restoreAutomaticCenters(state.frames[index], state.settings);
+    state.reviewFrames[index] = restoreAutomaticCenters(state.reviewFrames[index], state.settings);
     onFrameCorrected();
     drawHumanFrame(); updateHumanDetails();
   });
@@ -234,7 +290,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
   });
   $('human-export').addEventListener('click', () => {
     download(`${baseName(state.file?.name)}-human-analysis.csv`,
-      humanCsv(state.frames, state.human.marks, state.human.reviewed, state.settings), 'text/csv');
+      humanCsv(state.reviewFrames, state.human.marks, state.human.reviewed, state.settings), 'text/csv');
   });
   return { selectHumanFrame };
 }

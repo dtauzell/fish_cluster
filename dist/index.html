@@ -7,10 +7,10 @@
   <meta name="description" content="Analyze zebrafish spacing and clustering in a tank video, entirely in your browser.">
   <title>Fish Cluster — zebrafish video analysis</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=26">
+  <link rel="stylesheet" href="./style.css?v=27">
   <link rel="stylesheet" href="./about.css?v=1">
   <link rel="stylesheet" href="./labeling.css?v=1">
-  <script type="module" src="./app.mjs?v=32"></script>
+  <script type="module" src="./app.mjs?v=33"></script>
 </head>
 <body>
   <div class="shell">
@@ -65,6 +65,7 @@
           <p class="fine-print">Labeling uses your crop and frame interval. You can start without running detection.</p>
           <button id="cancel" class="secondary" hidden>Stop analysis</button>
           <div id="status" class="status" role="status" aria-live="polite">Add a video to begin.</div>
+          <a id="human-review-link" class="human-link" href="#human-analysis" hidden>Review all sampled frames ↗</a>
           <progress id="progress" max="100" value="0" hidden></progress>
         </section>
         <section class="panel preview" aria-labelledby="preview-title">
@@ -117,6 +118,13 @@
         <div class="human-head"><div><div class="eyebrow">HUMAN ANALYSIS</div><h1 id="human-title">Review sampled frames</h1><p>Click the center of each visible fish in the usable area. Click one of your numbered marks to remove it. Review labels belong to each frame; they do not track individual fish across time.</p></div><a class="secondary human-back" href="#analysis">← Back to analysis</a></div>
         <div class="human-layout">
           <div class="human-review-panel">
+            <div class="human-review-filter">
+              <label>Frames to review<select id="human-frame-filter"><option value="all">All sampled frames</option><option value="mismatches">Count mismatches</option></select></label>
+              <label>Known fish count<input id="human-expected-fish" type="number" min="1" step="1" value="5"></label>
+              <p id="human-filter-summary" class="human-help" role="status"></p>
+            </div>
+            <p id="human-empty-filter" class="human-help" hidden>No count mismatches. All sampled frames match the known fish count.</p>
+            <div id="human-frame-workspace">
             <div class="human-controls"><button id="human-prev" class="secondary" type="button">← Previous</button><label for="human-frame-number">Frame <input id="human-frame-number" type="number" min="1" step="1" value="1"></label><span id="human-frame-time">—</span><button id="human-next" class="secondary" type="button">Next →</button></div>
             <input id="human-slider" type="range" min="0" max="0" value="0" aria-label="Sampled frame">
             <div class="human-canvas-wrap"><canvas id="human-canvas" aria-label="Click fish centers in the selected sampled frame"></canvas></div>
@@ -134,6 +142,7 @@
               <button id="sharpness-export" class="secondary" type="button">Export sharpness comparison CSV ↓</button>
               <p>Label candidates as fish or reflections to compare their scores across frames. Labels stay in this tab until results are cleared or the tab reloads; export them to keep them. Labels do not filter detections. Pink × marks and “No (outer)” identify candidates excluded by the optional center rule.</p>
             </section>
+            </div>
           </div>
           <aside class="human-sidebar"><h2>Selected frame</h2><div id="human-frame-details" class="human-frame-details">—</div><p id="human-overlap-note" class="human-help" hidden></p><div class="human-legend"><span><i class="human-manual-dot"></i>Your centers</span><span><i class="human-auto-dot"></i>Automatic centers</span></div><p id="human-progress">0 frames reviewed</p><p id="human-validation-summary" class="human-validation-summary">—</p><p class="human-help">Centers are matched one-to-one within 0.5 inch. Use the full-frame view to spot fish outside the analyzed crop. Marks outside the crop or inside red reflection masks are exported, but excluded from the comparison. Mark reviewed even when no fish are visible.</p><button id="human-export" class="secondary" type="button">Export human analysis CSV ↓</button><p class="human-help">Manual marks stay in this browser tab until you reload it. Export them before leaving.</p></aside>
         </div>

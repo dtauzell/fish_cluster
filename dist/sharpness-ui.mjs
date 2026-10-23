@@ -70,7 +70,7 @@ export function createSharpnessReview(state) {
   const summary = document.getElementById('sharpness-comparison');
 
   function updateSummary() {
-    const { fish, reflection } = summarizeSharpnessLabels(state.frames, state.human.candidateLabels);
+    const { fish, reflection } = summarizeSharpnessLabels(state.reviewFrames, state.human.candidateLabels);
     summary.textContent = `Median sharpness across labeled candidates: fish ${fmt(fish.median)} (n=${fish.count}); ` +
       `reflections ${fmt(reflection.median)} (n=${reflection.count}). Counts include only candidates with scores. ` +
       'Labels are for comparison only and never change which candidates are used.';
@@ -105,7 +105,7 @@ export function createSharpnessReview(state) {
 
   table.addEventListener('change', event => {
     const select = event.target.closest('select[data-candidate-index]');
-    const frame = state.frames[state.human.index];
+    const frame = state.reviewFrames[state.human.index];
     if (!select || !frame || !['', 'fish', 'reflection'].includes(select.value)) return;
     const candidate = frameCandidates(frame)[Number(select.dataset.candidateIndex)];
     if (!candidate) return;
@@ -119,7 +119,7 @@ export function createSharpnessReview(state) {
 
   document.getElementById('sharpness-export').addEventListener('click', () => {
     download(`${baseName(state.file?.name)}-sharpness-comparison.csv`,
-      sharpnessCsv(state.frames, state.human.candidateLabels), 'text/csv');
+      sharpnessCsv(state.reviewFrames, state.human.candidateLabels), 'text/csv');
   });
   return { update };
 }
