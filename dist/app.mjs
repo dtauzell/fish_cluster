@@ -324,6 +324,8 @@ for (const id of ['undo-mask', 'clear-masks']) {
 function settings() {
   return createSettings({
     intervalMs: Number($('interval').value),
+    filterExactCount: $('filter-exact-count').checked,
+    filterFrameCount: Number($('filter-frame-count').value),
     thresholdInches: Number($('threshold').value),
     gridPixels: Number($('grid-pixels').value),
     method: $('method').value,
@@ -343,6 +345,19 @@ $('prefer-center').addEventListener('change', () => {
   drawFrame(null);
   status('Candidate selection changed. Analyze again to apply it.');
 });
+$('filter-exact-count').addEventListener('change', () => {
+  $('filter-frame-count').disabled = !$('filter-exact-count').checked;
+  if (state.running) return;
+  clearResults();
+  status($('filter-exact-count').checked
+    ? `Analysis will keep frames with exactly ${$('filter-frame-count').value} detected fish.`
+    : 'Frame filtering is off. Analysis will keep every sampled frame.');
+});
+$('filter-frame-count').addEventListener('change', () => {
+  if (state.running || !$('filter-exact-count').checked) return;
+  clearResults();
+  status(`Analysis will keep frames with exactly ${$('filter-frame-count').value} detected fish.`);
+});
 $('track-fish').addEventListener('change', () => {
   if (state.running) return;
   clearResults();
@@ -360,6 +375,8 @@ $('analyze').addEventListener('click', async () => {
   state.settings = config;
   state.frames = [];
   state.resultsReady = false;
+  let skippedFrames = 0;
+  let totalSamples = 0;
   resetHuman();
   $('timeline').hidden = true;
   $('frame-groups').hidden = true;
@@ -371,6 +388,8 @@ $('analyze').addEventListener('click', async () => {
   $('method').disabled = true;
   $('prefer-center').disabled = true;
   $('track-fish').disabled = true;
+  $('filter-exact-count').disabled = true;
+  $('filter-frame-count').disabled = true;
   $('crop-fields').disabled = true;
   $('mask-tools').disabled = true;
   $('calibration-tools').disabled = true;
@@ -384,11 +403,18 @@ $('analyze').addEventListener('click', async () => {
     });
     for await (const event of events) {
       $('progress').value = event.progress;
+      if (event.type === 'skipped') {
+        skippedFrames++;
+        totalSamples = event.total;
+        status(`Skipped sample ${event.frameIndex + 1} of ${event.total} · found ${event.fishCount}, required ${event.requiredFishCount}.`);
+        continue;
+      }
       if (event.type === 'status') {
         status(event.message);
         continue;
       }
       const { frame, total } = event;
+      totalSamples = total;
       state.frames.push(frame);
       drawFrame(frame);
       $('empty-preview').hidden = true;
@@ -401,7 +427,11 @@ $('analyze').addEventListener('click', async () => {
     if (state.stopped && !state.frames.length) return;
     if (state.frames.length) showResults();
     const maxRawCount = Math.max(0, ...state.frames.map(frame => frame.rawPredictionCount));
-    status(state.stopped ? `Stopped after ${state.frames.length} frames. Partial results are available.` :
+    status(state.settings.filterExactCount && !state.frames.length && !state.stopped
+      ? `No frames matched exactly ${state.settings.filterFrameCount} fish. Skipped all ${totalSamples} sampled frames.`
+      : state.settings.filterExactCount && !state.stopped
+        ? `Complete: kept ${state.frames.length} frames with exactly ${state.settings.filterFrameCount} fish; skipped ${skippedFrames} of ${totalSamples} samples.`
+        : state.stopped ? `Stopped after ${state.frames.length} frames. Partial results are available.` :
       config.method === 'background' ? `Complete: ${state.frames.length} frames analyzed with background subtraction.` :
       maxRawCount <= 1 ? `Complete: ${state.frames.length} frames. Roboflow returned at most one box per frame; try a tank crop or lower confidence.` :
       `Complete: ${state.frames.length} frames analyzed. Up to ${maxRawCount} model boxes in a frame.`);
@@ -418,6 +448,8 @@ $('analyze').addEventListener('click', async () => {
     $('method').disabled = false;
     $('prefer-center').disabled = false;
     $('track-fish').disabled = false;
+    $('filter-exact-count').disabled = false;
+    $('filter-frame-count').disabled = !$('filter-exact-count').checked;
     $('crop-fields').disabled = false;
     $('mask-tools').disabled = false;
     $('calibration-tools').disabled = video.readyState < 2;
@@ -522,9 +554,10 @@ function selectFrame(index) {
   const token = ++state.previewToken;
   return queuePreviewSeek(token, frame.timestampMs, () => {
     drawFrame(frame);
+    const frameNumber = `${index + 1} / ${state.frames.length}${frame.frameIndex !== index ? ` · sample ${frame.frameIndex + 1}` : ''}`;
     $('frame-position').textContent = state.settings.method === 'background'
-      ? `${frame.frameIndex + 1} / ${state.frames.length} · ${frame.detections.length} kept / ${state.settings.expectedFish} expected${frame.rejectedDetections?.length ? ` · ${frame.rejectedDetections.length} outer candidates excluded` : ''}`
-      : `${frame.frameIndex + 1} / ${state.frames.length} · ${frame.detections.length} fish / ${frame.rawPredictionCount} boxes`;
+      ? `${frameNumber} · ${frame.detections.length} kept / ${state.settings.expectedFish} expected${frame.rejectedDetections?.length ? ` · ${frame.rejectedDetections.length} outer candidates excluded` : ''}`
+      : `${frameNumber} · ${frame.detections.length} fish / ${frame.rawPredictionCount} boxes`;
     $('frame-time').textContent = timeLabel(frame.timestampMs);
   });
 }

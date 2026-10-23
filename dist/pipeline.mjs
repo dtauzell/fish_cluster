@@ -104,8 +104,15 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
       metrics: frameMetrics(selected.detections, config, selected.rejectedDetections.length) };
     previousFrame = frame;
     const preparationProgress = backgroundMode ? 10 : 0;
+    const progress = preparationProgress + (frameIndex + 1) / times.length * (100 - preparationProgress);
+    if (config.filterExactCount && frame.detections.length !== config.filterFrameCount) {
+      yield { type: 'skipped', progress, frameIndex, total: times.length, fishCount: frame.detections.length,
+        requiredFishCount: config.filterFrameCount };
+      await yieldToBrowser();
+      continue;
+    }
     yield { type: 'frame', frame, total: times.length,
-      progress: preparationProgress + (frameIndex + 1) / times.length * (100 - preparationProgress) };
+      progress };
     await yieldToBrowser();
   }
 }

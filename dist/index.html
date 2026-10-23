@@ -7,17 +7,17 @@
   <meta name="description" content="Analyze zebrafish spacing and clustering in a tank video, entirely in your browser.">
   <title>Fish Cluster — zebrafish video analysis</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=21">
+  <link rel="stylesheet" href="./style.css?v=26">
   <link rel="stylesheet" href="./about.css?v=1">
   <link rel="stylesheet" href="./labeling.css?v=1">
-  <script type="module" src="./app.mjs?v=30"></script>
+  <script type="module" src="./app.mjs?v=31"></script>
 </head>
 <body>
   <div class="shell">
     <video id="source-video" class="source-video" playsinline preload="auto" muted aria-hidden="true"></video>
     <header class="topbar">
       <div class="brand"><span class="brand-mark" aria-hidden="true">◌</span><span>FISH<span class="brand-light">CLUSTER</span></span></div>
-      <div class="top-links"><a href="#about">About the analysis</a><span class="top-note"><span class="status-dot"></span> Browser-based analysis</span></div>
+      <div class="top-links"><a href="#about">About the analysis</a><a href="https://github.com/dtauzell/fish_cluster" target="_blank" rel="noopener">Source code ↗</a><span class="top-note"><span class="status-dot"></span> Browser-based analysis</span></div>
     </header>
     <main>
       <div id="workspace" class="workspace">
@@ -33,6 +33,10 @@
           <div class="fields two">
             <label>Frame interval <span class="help">milliseconds</span><input id="interval" type="number" min="1" step="1" value="200"></label>
             <label>Close distance <span class="help">inches</span><input id="threshold" type="number" min="0.01" step="0.01" value="1.5"></label>
+          </div>
+          <div class="fields frame-filter">
+            <label class="center-option"><input id="filter-exact-count" type="checkbox" checked> Only include frames with exactly</label>
+            <label>Fish per frame<input id="filter-frame-count" type="number" min="1" step="1" value="5"></label>
           </div>
           <div class="fields method-settings"><label>Pixels per 0.5-inch square <span class="help">distance calibration for either method</span><input id="grid-pixels" type="number" min="0.000001" step="any" value="15.3"></label></div>
           <div class="fields method-choice"><label>Detection method<select id="method"><option value="background" selected>Background subtraction · fixed tank</option><option value="roboflow">Roboflow model</option></select></label></div>
@@ -116,8 +120,10 @@
             <div class="human-controls"><button id="human-prev" class="secondary" type="button">← Previous</button><label for="human-frame-number">Frame <input id="human-frame-number" type="number" min="1" step="1" value="1"></label><span id="human-frame-time">—</span><button id="human-next" class="secondary" type="button">Next →</button></div>
             <input id="human-slider" type="range" min="0" max="0" value="0" aria-label="Sampled frame">
             <div class="human-canvas-wrap"><canvas id="human-canvas" aria-label="Click fish centers in the selected sampled frame"></canvas></div>
-            <div class="human-frame-actions"><label><input id="human-show-full" type="checkbox"> Show full frame</label><label><input id="human-show-auto" type="checkbox"> Show automatic centers</label><label><input id="human-show-sharpness" type="checkbox" checked> Show candidate IDs and sharpness (S)</label><label><input id="human-show-nearest" type="checkbox"> Show nearest detected fish distances (inches)</label><label><input id="human-reviewed" type="checkbox"> Mark this frame reviewed</label><button id="human-clear" class="secondary" type="button">Clear my marks</button></div>
-            <div class="human-frame-actions"><button id="human-apply-centers" class="secondary" type="button">Use my centers for this frame</button><button id="human-restore-auto" class="secondary" type="button" disabled>Restore automatic centers</button></div>
+            <button id="human-apply-centers" class="human-mark-apply" type="button" hidden>Use my marks for this frame</button>
+            <button id="human-reviewed" class="review-toggle" type="button" aria-pressed="false">Mark frame reviewed</button>
+            <div class="human-frame-actions"><label><input id="human-show-full" type="checkbox"> Show full frame</label><label><input id="human-show-auto" type="checkbox"> Show automatic centers</label><label><input id="human-show-sharpness" type="checkbox" checked> Show candidate IDs and sharpness (S)</label><label><input id="human-show-nearest" type="checkbox"> Show nearest detected fish distances (inches)</label><button id="human-clear" class="secondary" type="button">Clear my marks</button></div>
+            <div class="human-frame-actions"><button id="human-restore-auto" class="secondary" type="button" disabled>Restore automatic centers</button></div>
             <p id="human-correction-status" class="human-help" aria-live="polite"></p>
             <section class="sharpness-panel" aria-labelledby="sharpness-title">
               <h2 id="sharpness-title">Compare fish and reflections</h2>
@@ -165,7 +171,7 @@
       </section>
       <section id="about-page" hidden aria-label="About the analysis"><div id="about-content" class="about-main">Loading the method guide…</div></section>
     </main>
-    <footer><span>FISHCLUSTER / LOCAL VIDEO ANALYSIS</span><span><a href="#about">About the analysis</a> · <a href="./background-test.html">Background subtraction test</a> · Optional model: <a href="https://roboflow.com/" target="_blank" rel="noopener">Roboflow InferenceJS</a></span></footer>
+    <footer><span>FISHCLUSTER / LOCAL VIDEO ANALYSIS</span><span><a href="#about">About the analysis</a> · <a href="https://github.com/dtauzell/fish_cluster" target="_blank" rel="noopener">Source code ↗</a> · <a href="./background-test.html">Background subtraction test</a> · Optional model: <a href="https://roboflow.com/" target="_blank" rel="noopener">Roboflow InferenceJS</a></span></footer>
   </div>
 </body>
 </html>

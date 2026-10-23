@@ -1,6 +1,8 @@
 const helpText = {
   'video-file': 'Choose a tank video from your device, or drag it here. The video is processed in your browser.',
   interval: 'Time between sampled frames, in milliseconds. Smaller values analyze more frames and take longer. Use 250 ms or less for tracking nearby frames.',
+  'filter-exact-count': 'Keep only sampled frames with exactly the selected number of detected fish. Other samples still help tracking, but are left out of results and exports.',
+  'filter-frame-count': 'Required number of detected fish for a frame to appear in results. Set this to 5 to keep only five-fish frames.',
   threshold: 'Maximum center-to-center distance, in inches, for linking two fish. Linked fish form groups, including chains of links.',
   'grid-pixels': 'Measure the width of one 0.5-inch grid square in the original video, in pixels. This converts pixel distances to approximate inches for either detection method.',
   method: 'Background subtraction finds dark fish against a fixed tank background. Roboflow uses the configured trained model and publishable key.',

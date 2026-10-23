@@ -23,8 +23,13 @@ export function createSettings(values, selectedCrop, frameWidth, frameHeight, se
     gridPixels,
     pixelsPerInch: gridPixels * 2,
     crop: { ...crop },
-    exclusions
+    exclusions,
+    filterExactCount: values.filterExactCount === true,
+    filterFrameCount: values.filterExactCount === true ? values.filterFrameCount : null
   };
+  if (values.filterExactCount && (!Number.isInteger(values.filterFrameCount) || values.filterFrameCount < 1)) {
+    throw new Error('Required fish per frame must be a whole number of at least one.');
+  }
   if (method === 'background') {
     if (!Number.isInteger(expectedFish) || expectedFish < 1) throw new Error('Known fish count must be at least one.');
     return { ...common, expectedFish, preferCenter: values.preferCenter === true, trackFish: values.trackFish !== false };

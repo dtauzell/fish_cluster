@@ -40,6 +40,13 @@
 /* Scores are diagnostics; manual labels do not affect the detector. */
 .sharpness-toggle{display:flex;align-items:center;gap:8px;margin:12px 0;color:#b9cdca;font-size:12px}.sharpness-toggle input{accent-color:#8ce6ce}.sharpness-panel{margin-top:20px;padding:18px;border:1px solid #31535c;border-radius:12px;background:#102b33}.sharpness-panel h2{margin:0 0 10px;font-size:18px}.sharpness-panel p{color:#b9cdca;font-size:13px;line-height:1.6}.sharpness-table{overflow-x:auto}.sharpness-table table{width:100%;border-collapse:collapse;font-size:13px}.sharpness-table th,.sharpness-table td{padding:9px 8px;border-bottom:1px solid #31535c;text-align:left;white-space:nowrap}.sharpness-table select{min-width:100px;padding:7px;border:1px solid #3b5860;border-radius:7px;background:#0c2029;color:#f3fbf8;font:inherit}.sharpness-panel .secondary{white-space:normal}
 .fields .center-option{display:flex;align-items:flex-start;gap:8px;line-height:1.5}.fields .center-option input{width:auto;height:auto;flex:none;margin:4px 0 0;accent-color:#8ce6ce}
+.frame-filter{grid-template-columns:1fr 1fr;align-items:end;margin-top:16px}
+.frame-filter label:first-child{display:flex;align-items:center;min-height:43px}
+.frame-filter label:last-child input{display:block;width:100%;height:43px;margin-top:8px;padding:0 12px;border-radius:8px;border:1px solid #3b5860;background:#0c2029;color:#f3fbf8}
+.review-toggle{display:block;width:100%;min-height:52px;margin-top:16px;padding:12px 18px;border:1px solid #68d2b4;border-radius:9px;background:#17443f;color:#d9fff2;font:700 15px 'DM Sans',sans-serif;text-align:left;transition:background .15s,border-color .15s}
+.review-toggle:hover{border-color:#a8f5dd;background:#1b5149}
+.review-toggle[aria-pressed=true]{border-color:#86e3c7;background:#86e3c7;color:#08242a}
+.review-toggle:focus-visible{outline:3px solid #f6d979;outline-offset:3px}
 
 /* Calibration uses original-video pixels even when the preview is resized. */
 .calibration-tools{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin:16px 0;padding:14px;border:1px solid #42636a;border-radius:8px}
@@ -50,3 +57,7 @@
 .calibration-tools p{flex-basis:100%}
 .calibration-tools:disabled{opacity:.5}
 .calibration-tools button:disabled{opacity:.45;cursor:not-allowed}
+@media(min-width:901px) and (max-width:1400px){.human-canvas-wrap canvas{width:100%;max-width:570px;max-height:40.5vh}}
+.human-mark-apply{display:block;width:100%;min-height:50px;margin:10px auto 0;padding:12px 16px;border:1px solid #74d8bb;border-radius:9px;background:#1c514a;color:#e4fff5;font:700 15px 'DM Sans',sans-serif;text-align:center;box-shadow:0 4px 14px #0003}
+.human-mark-apply:hover{background:#24665b;border-color:#a8f5dd}
+.human-mark-apply:focus-visible{outline:3px solid #f6d979;outline-offset:3px}

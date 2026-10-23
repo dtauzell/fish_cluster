@@ -142,7 +142,10 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     $('human-slider').value = index;
     $('human-frame-number').value = index + 1;
     $('human-frame-time').textContent = timeLabel(frame.timestampMs);
-    $('human-reviewed').checked = state.human.reviewed.has(index);
+    const reviewed = state.human.reviewed.has(index);
+    $('human-reviewed').setAttribute('aria-pressed', String(reviewed));
+    $('human-reviewed').textContent = reviewed ? 'Reviewed ✓ · click to undo' : 'Mark frame reviewed';
+    $('human-apply-centers').hidden = !(state.human.marks.get(index)?.length);
     $('human-prev').disabled = index === 0;
     $('human-next').disabled = index === state.frames.length - 1;
     $('human-frame-details').innerHTML = `<div><span>Your fish in usable area</span><strong>${manual.fishCount}</strong></div>
@@ -188,9 +191,10 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
   $('human-show-sharpness').addEventListener('change', drawHumanFrame);
   $('human-show-nearest').addEventListener('change', drawHumanFrame);
   new ResizeObserver(() => drawHumanFrame()).observe(humanCanvas.parentElement);
-  $('human-reviewed').addEventListener('change', event => {
-    if (event.target.checked) state.human.reviewed.add(state.human.index);
-    else state.human.reviewed.delete(state.human.index);
+  $('human-reviewed').addEventListener('click', () => {
+    if (state.human.index == null) return;
+    if (state.human.reviewed.has(state.human.index)) state.human.reviewed.delete(state.human.index);
+    else state.human.reviewed.add(state.human.index);
     updateHumanDetails();
   });
   $('human-clear').addEventListener('click', () => {
@@ -200,7 +204,9 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
   $('human-apply-centers').addEventListener('click', () => {
     const index = state.human.index;
     if (index == null || state.running || state.human.loading) return;
-    state.frames[index] = applyManualCenters(state.frames[index], state.human.marks.get(index) ?? [], state.settings);
+    const marks = state.human.marks.get(index) ?? [];
+    if (!marks.length) return;
+    state.frames[index] = applyManualCenters(state.frames[index], marks, state.settings);
     state.human.reviewed.add(index);
     onFrameCorrected();
     drawHumanFrame(); updateHumanDetails();
@@ -223,6 +229,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     if (hit >= 0) marks.splice(hit, 1);
     else marks.push(point);
     state.human.marks.set(state.human.index, marks);
+    $('human-apply-centers').hidden = marks.length === 0;
     drawHumanFrame(); updateHumanDetails();
   });
   $('human-export').addEventListener('click', () => {
