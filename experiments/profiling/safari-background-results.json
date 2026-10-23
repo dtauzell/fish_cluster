@@ -1,0 +1,983 @@
+{
+  "recordedDate": "2026-10-23",
+  "revision": "9e58f63",
+  "machine": {
+    "cpu": "Apple M1",
+    "ramBytes": 17179869184,
+    "macOS": "27.0.1"
+  },
+  "instrumented": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Safari/605.1.15",
+    "hardwareConcurrency": 8,
+    "visibility": "visible",
+    "video": {
+      "width": 540,
+      "height": 960,
+      "durationSeconds": 120.31666666666666
+    },
+    "settings": {
+      "method": "background",
+      "intervalMs": 200,
+      "thresholdInches": 1.5,
+      "thresholdPx": 45.900000000000006,
+      "gridPixels": 15.3,
+      "pixelsPerInch": 30.6,
+      "crop": {
+        "x": 50,
+        "y": 240,
+        "width": 420,
+        "height": 290
+      },
+      "exclusions": [],
+      "filterExactCount": true,
+      "filterFrameCount": 5,
+      "expectedFish": 5,
+      "preferCenter": false,
+      "trackFish": true
+    },
+    "render": true,
+    "runs": [
+      {
+        "run": 1,
+        "wallMs": 5908,
+        "visibilityAtEnd": "visible",
+        "keptFrames": 358,
+        "skippedFrames": 244,
+        "sampledFrames": 602,
+        "checksum": 20413204.796022072,
+        "stages": {
+          "seekAndDecode": {
+            "calls": 627,
+            "totalMs": 2688,
+            "meanMs": 4.287081339712919,
+            "medianMs": 4,
+            "p95Ms": 6
+          },
+          "pixel.drawImage": {
+            "calls": 627,
+            "totalMs": 45,
+            "meanMs": 0.07177033492822966,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "pixel.getImageData": {
+            "calls": 627,
+            "totalMs": 2215,
+            "meanMs": 3.532695374800638,
+            "medianMs": 4,
+            "p95Ms": 4
+          },
+          "pixel.grayscale": {
+            "calls": 627,
+            "totalMs": 122,
+            "meanMs": 0.19457735247208932,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "cooperativeYield": {
+            "calls": 627,
+            "totalMs": 63,
+            "meanMs": 0.10047846889952153,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "medianBackground": {
+            "calls": 1,
+            "totalMs": 29,
+            "meanMs": 29,
+            "medianMs": 29,
+            "p95Ms": 29
+          },
+          "detail.erode3": {
+            "calls": 2214,
+            "totalMs": 202,
+            "meanMs": 0.09123757904245709,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "detail.dilate3": {
+            "calls": 2214,
+            "totalMs": 195,
+            "meanMs": 0.08807588075880758,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "detail.connectedRegions": {
+            "calls": 738,
+            "totalMs": 88,
+            "meanMs": 0.11924119241192412,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "detail.splitLargeBlobs": {
+            "calls": 738,
+            "totalMs": 9,
+            "meanMs": 0.012195121951219513,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "detection": {
+            "calls": 602,
+            "totalMs": 586,
+            "meanMs": 0.973421926910299,
+            "medianMs": 1,
+            "p95Ms": 2
+          },
+          "sharpness": {
+            "calls": 3274,
+            "totalMs": 45,
+            "meanMs": 0.013744654856444716,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "candidateSelection": {
+            "calls": 602,
+            "totalMs": 2,
+            "meanMs": 0.0033222591362126247,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "tracking": {
+            "calls": 602,
+            "totalMs": 14,
+            "meanMs": 0.023255813953488372,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "metrics": {
+            "calls": 602,
+            "totalMs": 10,
+            "meanMs": 0.016611295681063124,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "previewDraw": {
+            "calls": 358,
+            "totalMs": 68,
+            "meanMs": 0.18994413407821228,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "summary": {
+            "calls": 1,
+            "totalMs": 1,
+            "meanMs": 1,
+            "medianMs": 1,
+            "p95Ms": 1
+          }
+        },
+        "unaccountedMs": 20
+      },
+      {
+        "run": 2,
+        "wallMs": 5814,
+        "visibilityAtEnd": "visible",
+        "keptFrames": 358,
+        "skippedFrames": 244,
+        "sampledFrames": 602,
+        "checksum": 20413204.796022072,
+        "stages": {
+          "seekAndDecode": {
+            "calls": 627,
+            "totalMs": 2689,
+            "meanMs": 4.288676236044657,
+            "medianMs": 4,
+            "p95Ms": 6
+          },
+          "pixel.drawImage": {
+            "calls": 627,
+            "totalMs": 49,
+            "meanMs": 0.07814992025518341,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "pixel.getImageData": {
+            "calls": 627,
+            "totalMs": 2154,
+            "meanMs": 3.4354066985645932,
+            "medianMs": 3,
+            "p95Ms": 4
+          },
+          "pixel.grayscale": {
+            "calls": 627,
+            "totalMs": 126,
+            "meanMs": 0.20095693779904306,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "cooperativeYield": {
+            "calls": 627,
+            "totalMs": 53,
+            "meanMs": 0.08452950558213716,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "medianBackground": {
+            "calls": 1,
+            "totalMs": 28,
+            "meanMs": 28,
+            "medianMs": 28,
+            "p95Ms": 28
+          },
+          "detail.erode3": {
+            "calls": 2214,
+            "totalMs": 174,
+            "meanMs": 0.07859078590785908,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "detail.dilate3": {
+            "calls": 2214,
+            "totalMs": 199,
+            "meanMs": 0.08988256549232158,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "detail.connectedRegions": {
+            "calls": 738,
+            "totalMs": 72,
+            "meanMs": 0.0975609756097561,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "detail.splitLargeBlobs": {
+            "calls": 738,
+            "totalMs": 5,
+            "meanMs": 0.006775067750677507,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "detection": {
+            "calls": 602,
+            "totalMs": 561,
+            "meanMs": 0.9318936877076412,
+            "medianMs": 1,
+            "p95Ms": 2
+          },
+          "sharpness": {
+            "calls": 3274,
+            "totalMs": 39,
+            "meanMs": 0.011912034208918754,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "candidateSelection": {
+            "calls": 602,
+            "totalMs": 0,
+            "meanMs": 0,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "tracking": {
+            "calls": 602,
+            "totalMs": 12,
+            "meanMs": 0.019933554817275746,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "metrics": {
+            "calls": 602,
+            "totalMs": 10,
+            "meanMs": 0.016611295681063124,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "previewDraw": {
+            "calls": 358,
+            "totalMs": 78,
+            "meanMs": 0.21787709497206703,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "summary": {
+            "calls": 1,
+            "totalMs": 0,
+            "meanMs": 0,
+            "medianMs": 0,
+            "p95Ms": 0
+          }
+        },
+        "unaccountedMs": 15
+      },
+      {
+        "run": 3,
+        "wallMs": 5819,
+        "visibilityAtEnd": "visible",
+        "keptFrames": 358,
+        "skippedFrames": 244,
+        "sampledFrames": 602,
+        "checksum": 20413204.796022072,
+        "stages": {
+          "seekAndDecode": {
+            "calls": 627,
+            "totalMs": 2690,
+            "meanMs": 4.290271132376396,
+            "medianMs": 4,
+            "p95Ms": 6
+          },
+          "pixel.drawImage": {
+            "calls": 627,
+            "totalMs": 51,
+            "meanMs": 0.08133971291866028,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "pixel.getImageData": {
+            "calls": 627,
+            "totalMs": 2143,
+            "meanMs": 3.4178628389154704,
+            "medianMs": 3,
+            "p95Ms": 4
+          },
+          "pixel.grayscale": {
+            "calls": 627,
+            "totalMs": 119,
+            "meanMs": 0.189792663476874,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "cooperativeYield": {
+            "calls": 627,
+            "totalMs": 68,
+            "meanMs": 0.10845295055821372,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "medianBackground": {
+            "calls": 1,
+            "totalMs": 28,
+            "meanMs": 28,
+            "medianMs": 28,
+            "p95Ms": 28
+          },
+          "detail.erode3": {
+            "calls": 2214,
+            "totalMs": 209,
+            "meanMs": 0.09439927732610659,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "detail.dilate3": {
+            "calls": 2214,
+            "totalMs": 170,
+            "meanMs": 0.07678410117434507,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "detail.connectedRegions": {
+            "calls": 738,
+            "totalMs": 70,
+            "meanMs": 0.0948509485094851,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "detail.splitLargeBlobs": {
+            "calls": 738,
+            "totalMs": 6,
+            "meanMs": 0.008130081300813009,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "detection": {
+            "calls": 602,
+            "totalMs": 565,
+            "meanMs": 0.9385382059800664,
+            "medianMs": 1,
+            "p95Ms": 2
+          },
+          "sharpness": {
+            "calls": 3274,
+            "totalMs": 41,
+            "meanMs": 0.012522907758094075,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "candidateSelection": {
+            "calls": 602,
+            "totalMs": 2,
+            "meanMs": 0.0033222591362126247,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "tracking": {
+            "calls": 602,
+            "totalMs": 7,
+            "meanMs": 0.011627906976744186,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "metrics": {
+            "calls": 602,
+            "totalMs": 11,
+            "meanMs": 0.018272425249169437,
+            "medianMs": 0,
+            "p95Ms": 0
+          },
+          "previewDraw": {
+            "calls": 358,
+            "totalMs": 67,
+            "meanMs": 0.1871508379888268,
+            "medianMs": 0,
+            "p95Ms": 1
+          },
+          "summary": {
+            "calls": 1,
+            "totalMs": 0,
+            "meanMs": 0,
+            "medianMs": 0,
+            "p95Ms": 0
+          }
+        },
+        "unaccountedMs": 27
+      }
+    ]
+  },
+  "controls": {
+    "uninstrumented": {
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Safari/605.1.15",
+      "hardwareConcurrency": 8,
+      "visibility": "visible",
+      "video": {
+        "width": 540,
+        "height": 960,
+        "durationSeconds": 120.31666666666666
+      },
+      "settings": {
+        "method": "background",
+        "intervalMs": 200,
+        "thresholdInches": 1.5,
+        "thresholdPx": 45.900000000000006,
+        "gridPixels": 15.3,
+        "pixelsPerInch": 30.6,
+        "crop": {
+          "x": 50,
+          "y": 240,
+          "width": 420,
+          "height": 290
+        },
+        "exclusions": [],
+        "filterExactCount": true,
+        "filterFrameCount": 5,
+        "expectedFish": 5,
+        "preferCenter": false,
+        "trackFish": true
+      },
+      "render": true,
+      "instrumented": false,
+      "runs": [
+        {
+          "run": 1,
+          "wallMs": 6152,
+          "visibilityAtEnd": "visible",
+          "keptFrames": 358,
+          "skippedFrames": 244,
+          "sampledFrames": 602,
+          "checksum": 20413204.796022072,
+          "stages": {
+            "seekAndDecode": {
+              "calls": 627,
+              "totalMs": 2805,
+              "meanMs": 4.473684210526316,
+              "medianMs": 4,
+              "p95Ms": 6
+            },
+            "previewDraw": {
+              "calls": 358,
+              "totalMs": 88,
+              "meanMs": 0.24581005586592178,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "summary": {
+              "calls": 1,
+              "totalMs": 1,
+              "meanMs": 1,
+              "medianMs": 1,
+              "p95Ms": 1
+            }
+          },
+          "unaccountedMs": 3258
+        },
+        {
+          "run": 2,
+          "wallMs": 6108,
+          "visibilityAtEnd": "visible",
+          "keptFrames": 358,
+          "skippedFrames": 244,
+          "sampledFrames": 602,
+          "checksum": 20413204.796022072,
+          "stages": {
+            "seekAndDecode": {
+              "calls": 627,
+              "totalMs": 2775,
+              "meanMs": 4.425837320574162,
+              "medianMs": 4,
+              "p95Ms": 6
+            },
+            "previewDraw": {
+              "calls": 358,
+              "totalMs": 94,
+              "meanMs": 0.26256983240223464,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "summary": {
+              "calls": 1,
+              "totalMs": 0,
+              "meanMs": 0,
+              "medianMs": 0,
+              "p95Ms": 0
+            }
+          },
+          "unaccountedMs": 3239
+        },
+        {
+          "run": 3,
+          "wallMs": 6149,
+          "visibilityAtEnd": "visible",
+          "keptFrames": 358,
+          "skippedFrames": 244,
+          "sampledFrames": 602,
+          "checksum": 20413204.796022072,
+          "stages": {
+            "seekAndDecode": {
+              "calls": 627,
+              "totalMs": 2814,
+              "meanMs": 4.488038277511961,
+              "medianMs": 4,
+              "p95Ms": 6
+            },
+            "previewDraw": {
+              "calls": 358,
+              "totalMs": 73,
+              "meanMs": 0.20391061452513967,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "summary": {
+              "calls": 1,
+              "totalMs": 0,
+              "meanMs": 0,
+              "medianMs": 0,
+              "p95Ms": 0
+            }
+          },
+          "unaccountedMs": 3262
+        }
+      ]
+    },
+    "noPreview": {
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Safari/605.1.15",
+      "hardwareConcurrency": 8,
+      "visibility": "visible",
+      "video": {
+        "width": 540,
+        "height": 960,
+        "durationSeconds": 120.31666666666666
+      },
+      "settings": {
+        "method": "background",
+        "intervalMs": 200,
+        "thresholdInches": 1.5,
+        "thresholdPx": 45.900000000000006,
+        "gridPixels": 15.3,
+        "pixelsPerInch": 30.6,
+        "crop": {
+          "x": 50,
+          "y": 240,
+          "width": 420,
+          "height": 290
+        },
+        "exclusions": [],
+        "filterExactCount": true,
+        "filterFrameCount": 5,
+        "expectedFish": 5,
+        "preferCenter": false,
+        "trackFish": true
+      },
+      "render": false,
+      "instrumented": true,
+      "runs": [
+        {
+          "run": 1,
+          "wallMs": 5937,
+          "visibilityAtEnd": "visible",
+          "keptFrames": 358,
+          "skippedFrames": 244,
+          "sampledFrames": 602,
+          "checksum": 20413204.796022072,
+          "stages": {
+            "seekAndDecode": {
+              "calls": 627,
+              "totalMs": 2675,
+              "meanMs": 4.2663476874003186,
+              "medianMs": 4,
+              "p95Ms": 6
+            },
+            "pixel.drawImage": {
+              "calls": 627,
+              "totalMs": 46,
+              "meanMs": 0.0733652312599681,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "pixel.getImageData": {
+              "calls": 627,
+              "totalMs": 2266,
+              "meanMs": 3.6140350877192984,
+              "medianMs": 4,
+              "p95Ms": 4
+            },
+            "pixel.grayscale": {
+              "calls": 627,
+              "totalMs": 142,
+              "meanMs": 0.22647527910685805,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "cooperativeYield": {
+              "calls": 627,
+              "totalMs": 115,
+              "meanMs": 0.18341307814992025,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "medianBackground": {
+              "calls": 1,
+              "totalMs": 30,
+              "meanMs": 30,
+              "medianMs": 30,
+              "p95Ms": 30
+            },
+            "detail.erode3": {
+              "calls": 2214,
+              "totalMs": 213,
+              "meanMs": 0.09620596205962059,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.dilate3": {
+              "calls": 2214,
+              "totalMs": 181,
+              "meanMs": 0.08175248419150859,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.connectedRegions": {
+              "calls": 738,
+              "totalMs": 83,
+              "meanMs": 0.11246612466124661,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.splitLargeBlobs": {
+              "calls": 738,
+              "totalMs": 6,
+              "meanMs": 0.008130081300813009,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "detection": {
+              "calls": 602,
+              "totalMs": 587,
+              "meanMs": 0.9750830564784053,
+              "medianMs": 1,
+              "p95Ms": 2
+            },
+            "sharpness": {
+              "calls": 3274,
+              "totalMs": 38,
+              "meanMs": 0.011606597434331093,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "candidateSelection": {
+              "calls": 602,
+              "totalMs": 1,
+              "meanMs": 0.0016611295681063123,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "tracking": {
+              "calls": 602,
+              "totalMs": 14,
+              "meanMs": 0.023255813953488372,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "metrics": {
+              "calls": 602,
+              "totalMs": 6,
+              "meanMs": 0.009966777408637873,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "summary": {
+              "calls": 1,
+              "totalMs": 0,
+              "meanMs": 0,
+              "medianMs": 0,
+              "p95Ms": 0
+            }
+          },
+          "unaccountedMs": 17
+        },
+        {
+          "run": 2,
+          "wallMs": 5823,
+          "visibilityAtEnd": "visible",
+          "keptFrames": 358,
+          "skippedFrames": 244,
+          "sampledFrames": 602,
+          "checksum": 20413204.796022072,
+          "stages": {
+            "seekAndDecode": {
+              "calls": 627,
+              "totalMs": 2613,
+              "meanMs": 4.167464114832536,
+              "medianMs": 4,
+              "p95Ms": 6
+            },
+            "pixel.drawImage": {
+              "calls": 627,
+              "totalMs": 58,
+              "meanMs": 0.09250398724082935,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "pixel.getImageData": {
+              "calls": 627,
+              "totalMs": 2218,
+              "meanMs": 3.5374800637958534,
+              "medianMs": 4,
+              "p95Ms": 4
+            },
+            "pixel.grayscale": {
+              "calls": 627,
+              "totalMs": 130,
+              "meanMs": 0.20733652312599682,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "cooperativeYield": {
+              "calls": 627,
+              "totalMs": 94,
+              "meanMs": 0.14992025518341306,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "medianBackground": {
+              "calls": 1,
+              "totalMs": 29,
+              "meanMs": 29,
+              "medianMs": 29,
+              "p95Ms": 29
+            },
+            "detail.erode3": {
+              "calls": 2214,
+              "totalMs": 214,
+              "meanMs": 0.0966576332429991,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.dilate3": {
+              "calls": 2214,
+              "totalMs": 181,
+              "meanMs": 0.08175248419150859,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.connectedRegions": {
+              "calls": 738,
+              "totalMs": 67,
+              "meanMs": 0.09078590785907859,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.splitLargeBlobs": {
+              "calls": 738,
+              "totalMs": 5,
+              "meanMs": 0.006775067750677507,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "detection": {
+              "calls": 602,
+              "totalMs": 580,
+              "meanMs": 0.9634551495016611,
+              "medianMs": 1,
+              "p95Ms": 2
+            },
+            "sharpness": {
+              "calls": 3274,
+              "totalMs": 53,
+              "meanMs": 0.016188149053146,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "candidateSelection": {
+              "calls": 602,
+              "totalMs": 1,
+              "meanMs": 0.0016611295681063123,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "tracking": {
+              "calls": 602,
+              "totalMs": 14,
+              "meanMs": 0.023255813953488372,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "metrics": {
+              "calls": 602,
+              "totalMs": 12,
+              "meanMs": 0.019933554817275746,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "summary": {
+              "calls": 1,
+              "totalMs": 0,
+              "meanMs": 0,
+              "medianMs": 0,
+              "p95Ms": 0
+            }
+          },
+          "unaccountedMs": 21
+        },
+        {
+          "run": 3,
+          "wallMs": 5869,
+          "visibilityAtEnd": "visible",
+          "keptFrames": 358,
+          "skippedFrames": 244,
+          "sampledFrames": 602,
+          "checksum": 20413204.796022072,
+          "stages": {
+            "seekAndDecode": {
+              "calls": 627,
+              "totalMs": 2619,
+              "meanMs": 4.177033492822966,
+              "medianMs": 4,
+              "p95Ms": 6
+            },
+            "pixel.drawImage": {
+              "calls": 627,
+              "totalMs": 55,
+              "meanMs": 0.08771929824561403,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "pixel.getImageData": {
+              "calls": 627,
+              "totalMs": 2257,
+              "meanMs": 3.5996810207336525,
+              "medianMs": 4,
+              "p95Ms": 4
+            },
+            "pixel.grayscale": {
+              "calls": 627,
+              "totalMs": 130,
+              "meanMs": 0.20733652312599682,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "cooperativeYield": {
+              "calls": 627,
+              "totalMs": 107,
+              "meanMs": 0.17065390749601275,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "medianBackground": {
+              "calls": 1,
+              "totalMs": 29,
+              "meanMs": 29,
+              "medianMs": 29,
+              "p95Ms": 29
+            },
+            "detail.erode3": {
+              "calls": 2214,
+              "totalMs": 199,
+              "meanMs": 0.08988256549232158,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.dilate3": {
+              "calls": 2214,
+              "totalMs": 207,
+              "meanMs": 0.09349593495934959,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.connectedRegions": {
+              "calls": 738,
+              "totalMs": 61,
+              "meanMs": 0.08265582655826559,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.splitLargeBlobs": {
+              "calls": 738,
+              "totalMs": 7,
+              "meanMs": 0.009485094850948509,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "detection": {
+              "calls": 602,
+              "totalMs": 585,
+              "meanMs": 0.9717607973421927,
+              "medianMs": 1,
+              "p95Ms": 2
+            },
+            "sharpness": {
+              "calls": 3274,
+              "totalMs": 33,
+              "meanMs": 0.010079413561392792,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "candidateSelection": {
+              "calls": 602,
+              "totalMs": 2,
+              "meanMs": 0.0033222591362126247,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "tracking": {
+              "calls": 602,
+              "totalMs": 6,
+              "meanMs": 0.009966777408637873,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "metrics": {
+              "calls": 602,
+              "totalMs": 21,
+              "meanMs": 0.03488372093023256,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "summary": {
+              "calls": 1,
+              "totalMs": 0,
+              "meanMs": 0,
+              "medianMs": 0,
+              "p95Ms": 0
+            }
+          },
+          "unaccountedMs": 25
+        }
+      ]
+    }
+  },
+  "normalApplication": {
+    "done": true,
+    "wallMs": 7119,
+    "status": "Complete: kept 358 frames with exactly 5 fish; skipped 244 of 602 samples.",
+    "frameSliderMax": "357",
+    "visibility": "visible"
+  }
+}

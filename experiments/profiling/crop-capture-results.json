@@ -1,0 +1,1049 @@
+{
+  "recordedDate": "2026-10-23",
+  "baselineRevision": "9e58f63",
+  "machine": {
+    "cpu": "Apple M1",
+    "ramBytes": 17179869184,
+    "macOS": "27.0.1",
+    "browser": "Safari 27.0.1"
+  },
+  "runs": [
+    {
+      "variant": "baseline",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Safari/605.1.15",
+      "hardwareConcurrency": 8,
+      "visibility": "visible",
+      "video": {
+        "width": 540,
+        "height": 960,
+        "durationSeconds": 120.31666666666666
+      },
+      "settings": {
+        "method": "background",
+        "intervalMs": 200,
+        "thresholdInches": 1.5,
+        "thresholdPx": 45.900000000000006,
+        "gridPixels": 15.3,
+        "pixelsPerInch": 30.6,
+        "crop": {
+          "x": 50,
+          "y": 240,
+          "width": 420,
+          "height": 290
+        },
+        "exclusions": [],
+        "filterExactCount": true,
+        "filterFrameCount": 5,
+        "expectedFish": 5,
+        "preferCenter": false,
+        "trackFish": true
+      },
+      "render": true,
+      "instrumented": true,
+      "videoModule": "profile-video-baseline.mjs",
+      "runs": [
+        {
+          "run": 1,
+          "wallMs": 5752,
+          "visibilityAtEnd": "visible",
+          "keptFrames": 358,
+          "skippedFrames": 244,
+          "sampledFrames": 602,
+          "checksum": 20413204.796022072,
+          "outputSha256": "19a799bc51e7c7d111591a3ddd30de5690f55d6c4262c80bebaed4538b29fdb8",
+          "stages": {
+            "seekAndDecode": {
+              "calls": 627,
+              "totalMs": 2638,
+              "meanMs": 4.2073365231259965,
+              "medianMs": 4,
+              "p95Ms": 6
+            },
+            "pixel.drawImage": {
+              "calls": 627,
+              "totalMs": 55,
+              "meanMs": 0.08771929824561403,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "pixel.getImageData": {
+              "calls": 627,
+              "totalMs": 2131,
+              "meanMs": 3.398724082934609,
+              "medianMs": 3,
+              "p95Ms": 4
+            },
+            "pixel.grayscale": {
+              "calls": 627,
+              "totalMs": 121,
+              "meanMs": 0.19298245614035087,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "cooperativeYield": {
+              "calls": 627,
+              "totalMs": 52,
+              "meanMs": 0.08293460925039872,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "medianBackground": {
+              "calls": 1,
+              "totalMs": 29,
+              "meanMs": 29,
+              "medianMs": 29,
+              "p95Ms": 29
+            },
+            "detail.erode3": {
+              "calls": 2214,
+              "totalMs": 187,
+              "meanMs": 0.08446251129177959,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.dilate3": {
+              "calls": 2214,
+              "totalMs": 222,
+              "meanMs": 0.1002710027100271,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.connectedRegions": {
+              "calls": 738,
+              "totalMs": 64,
+              "meanMs": 0.08672086720867209,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.splitLargeBlobs": {
+              "calls": 738,
+              "totalMs": 4,
+              "meanMs": 0.005420054200542005,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "detection": {
+              "calls": 602,
+              "totalMs": 583,
+              "meanMs": 0.96843853820598,
+              "medianMs": 1,
+              "p95Ms": 2
+            },
+            "sharpness": {
+              "calls": 3274,
+              "totalMs": 39,
+              "meanMs": 0.011912034208918754,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "candidateSelection": {
+              "calls": 602,
+              "totalMs": 2,
+              "meanMs": 0.0033222591362126247,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "tracking": {
+              "calls": 602,
+              "totalMs": 7,
+              "meanMs": 0.011627906976744186,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "metrics": {
+              "calls": 602,
+              "totalMs": 10,
+              "meanMs": 0.016611295681063124,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "previewDraw": {
+              "calls": 358,
+              "totalMs": 58,
+              "meanMs": 0.16201117318435754,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "summary": {
+              "calls": 1,
+              "totalMs": 0,
+              "meanMs": 0,
+              "medianMs": 0,
+              "p95Ms": 0
+            }
+          },
+          "unaccountedMs": 27
+        }
+      ]
+    },
+    {
+      "variant": "cropped",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Safari/605.1.15",
+      "hardwareConcurrency": 8,
+      "visibility": "visible",
+      "video": {
+        "width": 540,
+        "height": 960,
+        "durationSeconds": 120.31666666666666
+      },
+      "settings": {
+        "method": "background",
+        "intervalMs": 200,
+        "thresholdInches": 1.5,
+        "thresholdPx": 45.900000000000006,
+        "gridPixels": 15.3,
+        "pixelsPerInch": 30.6,
+        "crop": {
+          "x": 50,
+          "y": 240,
+          "width": 420,
+          "height": 290
+        },
+        "exclusions": [],
+        "filterExactCount": true,
+        "filterFrameCount": 5,
+        "expectedFish": 5,
+        "preferCenter": false,
+        "trackFish": true
+      },
+      "render": true,
+      "instrumented": true,
+      "videoModule": "video.mjs",
+      "runs": [
+        {
+          "run": 1,
+          "wallMs": 4902,
+          "visibilityAtEnd": "visible",
+          "keptFrames": 358,
+          "skippedFrames": 244,
+          "sampledFrames": 602,
+          "checksum": 20413204.796022072,
+          "outputSha256": "19a799bc51e7c7d111591a3ddd30de5690f55d6c4262c80bebaed4538b29fdb8",
+          "stages": {
+            "seekAndDecode": {
+              "calls": 627,
+              "totalMs": 2585,
+              "meanMs": 4.12280701754386,
+              "medianMs": 4,
+              "p95Ms": 6
+            },
+            "pixel.drawImage": {
+              "calls": 627,
+              "totalMs": 50,
+              "meanMs": 0.07974481658692185,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "pixel.getImageData": {
+              "calls": 627,
+              "totalMs": 1332,
+              "meanMs": 2.124401913875598,
+              "medianMs": 2,
+              "p95Ms": 3
+            },
+            "pixel.grayscale": {
+              "calls": 627,
+              "totalMs": 140,
+              "meanMs": 0.22328548644338117,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "cooperativeYield": {
+              "calls": 627,
+              "totalMs": 49,
+              "meanMs": 0.07814992025518341,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "medianBackground": {
+              "calls": 1,
+              "totalMs": 29,
+              "meanMs": 29,
+              "medianMs": 29,
+              "p95Ms": 29
+            },
+            "detail.erode3": {
+              "calls": 2214,
+              "totalMs": 204,
+              "meanMs": 0.0921409214092141,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.dilate3": {
+              "calls": 2214,
+              "totalMs": 181,
+              "meanMs": 0.08175248419150859,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.connectedRegions": {
+              "calls": 738,
+              "totalMs": 73,
+              "meanMs": 0.0989159891598916,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.splitLargeBlobs": {
+              "calls": 738,
+              "totalMs": 6,
+              "meanMs": 0.008130081300813009,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "detection": {
+              "calls": 602,
+              "totalMs": 567,
+              "meanMs": 0.9418604651162791,
+              "medianMs": 1,
+              "p95Ms": 2
+            },
+            "sharpness": {
+              "calls": 3274,
+              "totalMs": 43,
+              "meanMs": 0.013133781307269395,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "candidateSelection": {
+              "calls": 602,
+              "totalMs": 3,
+              "meanMs": 0.0049833887043189366,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "tracking": {
+              "calls": 602,
+              "totalMs": 9,
+              "meanMs": 0.014950166112956811,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "metrics": {
+              "calls": 602,
+              "totalMs": 9,
+              "meanMs": 0.014950166112956811,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "previewDraw": {
+              "calls": 358,
+              "totalMs": 66,
+              "meanMs": 0.18435754189944134,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "summary": {
+              "calls": 1,
+              "totalMs": 1,
+              "meanMs": 1,
+              "medianMs": 1,
+              "p95Ms": 1
+            }
+          },
+          "unaccountedMs": 19
+        }
+      ]
+    },
+    {
+      "variant": "cropped",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Safari/605.1.15",
+      "hardwareConcurrency": 8,
+      "visibility": "visible",
+      "video": {
+        "width": 540,
+        "height": 960,
+        "durationSeconds": 120.31666666666666
+      },
+      "settings": {
+        "method": "background",
+        "intervalMs": 200,
+        "thresholdInches": 1.5,
+        "thresholdPx": 45.900000000000006,
+        "gridPixels": 15.3,
+        "pixelsPerInch": 30.6,
+        "crop": {
+          "x": 50,
+          "y": 240,
+          "width": 420,
+          "height": 290
+        },
+        "exclusions": [],
+        "filterExactCount": true,
+        "filterFrameCount": 5,
+        "expectedFish": 5,
+        "preferCenter": false,
+        "trackFish": true
+      },
+      "render": true,
+      "instrumented": true,
+      "videoModule": "video.mjs",
+      "runs": [
+        {
+          "run": 1,
+          "wallMs": 4886,
+          "visibilityAtEnd": "visible",
+          "keptFrames": 358,
+          "skippedFrames": 244,
+          "sampledFrames": 602,
+          "checksum": 20413204.796022072,
+          "outputSha256": "19a799bc51e7c7d111591a3ddd30de5690f55d6c4262c80bebaed4538b29fdb8",
+          "stages": {
+            "seekAndDecode": {
+              "calls": 627,
+              "totalMs": 2588,
+              "meanMs": 4.127591706539075,
+              "medianMs": 4,
+              "p95Ms": 6
+            },
+            "pixel.drawImage": {
+              "calls": 627,
+              "totalMs": 46,
+              "meanMs": 0.0733652312599681,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "pixel.getImageData": {
+              "calls": 627,
+              "totalMs": 1306,
+              "meanMs": 2.082934609250399,
+              "medianMs": 2,
+              "p95Ms": 3
+            },
+            "pixel.grayscale": {
+              "calls": 627,
+              "totalMs": 147,
+              "meanMs": 0.23444976076555024,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "cooperativeYield": {
+              "calls": 627,
+              "totalMs": 55,
+              "meanMs": 0.08771929824561403,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "medianBackground": {
+              "calls": 1,
+              "totalMs": 30,
+              "meanMs": 30,
+              "medianMs": 30,
+              "p95Ms": 30
+            },
+            "detail.erode3": {
+              "calls": 2214,
+              "totalMs": 199,
+              "meanMs": 0.08988256549232158,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.dilate3": {
+              "calls": 2214,
+              "totalMs": 211,
+              "meanMs": 0.09530261969286359,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.connectedRegions": {
+              "calls": 738,
+              "totalMs": 65,
+              "meanMs": 0.08807588075880758,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.splitLargeBlobs": {
+              "calls": 738,
+              "totalMs": 7,
+              "meanMs": 0.009485094850948509,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "detection": {
+              "calls": 602,
+              "totalMs": 576,
+              "meanMs": 0.9568106312292359,
+              "medianMs": 1,
+              "p95Ms": 2
+            },
+            "sharpness": {
+              "calls": 3274,
+              "totalMs": 37,
+              "meanMs": 0.011301160659743433,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "candidateSelection": {
+              "calls": 602,
+              "totalMs": 1,
+              "meanMs": 0.0016611295681063123,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "tracking": {
+              "calls": 602,
+              "totalMs": 8,
+              "meanMs": 0.013289036544850499,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "metrics": {
+              "calls": 602,
+              "totalMs": 7,
+              "meanMs": 0.011627906976744186,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "previewDraw": {
+              "calls": 358,
+              "totalMs": 56,
+              "meanMs": 0.1564245810055866,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "summary": {
+              "calls": 1,
+              "totalMs": 1,
+              "meanMs": 1,
+              "medianMs": 1,
+              "p95Ms": 1
+            }
+          },
+          "unaccountedMs": 28
+        }
+      ]
+    },
+    {
+      "variant": "baseline",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Safari/605.1.15",
+      "hardwareConcurrency": 8,
+      "visibility": "visible",
+      "video": {
+        "width": 540,
+        "height": 960,
+        "durationSeconds": 120.31666666666666
+      },
+      "settings": {
+        "method": "background",
+        "intervalMs": 200,
+        "thresholdInches": 1.5,
+        "thresholdPx": 45.900000000000006,
+        "gridPixels": 15.3,
+        "pixelsPerInch": 30.6,
+        "crop": {
+          "x": 50,
+          "y": 240,
+          "width": 420,
+          "height": 290
+        },
+        "exclusions": [],
+        "filterExactCount": true,
+        "filterFrameCount": 5,
+        "expectedFish": 5,
+        "preferCenter": false,
+        "trackFish": true
+      },
+      "render": true,
+      "instrumented": true,
+      "videoModule": "profile-video-baseline.mjs",
+      "runs": [
+        {
+          "run": 1,
+          "wallMs": 5783,
+          "visibilityAtEnd": "visible",
+          "keptFrames": 358,
+          "skippedFrames": 244,
+          "sampledFrames": 602,
+          "checksum": 20413204.796022072,
+          "outputSha256": "19a799bc51e7c7d111591a3ddd30de5690f55d6c4262c80bebaed4538b29fdb8",
+          "stages": {
+            "seekAndDecode": {
+              "calls": 627,
+              "totalMs": 2656,
+              "meanMs": 4.236044657097288,
+              "medianMs": 4,
+              "p95Ms": 6
+            },
+            "pixel.drawImage": {
+              "calls": 627,
+              "totalMs": 61,
+              "meanMs": 0.09728867623604466,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "pixel.getImageData": {
+              "calls": 627,
+              "totalMs": 2136,
+              "meanMs": 3.4066985645933014,
+              "medianMs": 3,
+              "p95Ms": 4
+            },
+            "pixel.grayscale": {
+              "calls": 627,
+              "totalMs": 126,
+              "meanMs": 0.20095693779904306,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "cooperativeYield": {
+              "calls": 627,
+              "totalMs": 59,
+              "meanMs": 0.09409888357256778,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "medianBackground": {
+              "calls": 1,
+              "totalMs": 29,
+              "meanMs": 29,
+              "medianMs": 29,
+              "p95Ms": 29
+            },
+            "detail.erode3": {
+              "calls": 2214,
+              "totalMs": 205,
+              "meanMs": 0.09259259259259259,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.dilate3": {
+              "calls": 2214,
+              "totalMs": 205,
+              "meanMs": 0.09259259259259259,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.connectedRegions": {
+              "calls": 738,
+              "totalMs": 72,
+              "meanMs": 0.0975609756097561,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.splitLargeBlobs": {
+              "calls": 738,
+              "totalMs": 3,
+              "meanMs": 0.0040650406504065045,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "detection": {
+              "calls": 602,
+              "totalMs": 578,
+              "meanMs": 0.9601328903654485,
+              "medianMs": 1,
+              "p95Ms": 2
+            },
+            "sharpness": {
+              "calls": 3274,
+              "totalMs": 31,
+              "meanMs": 0.009468540012217471,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "candidateSelection": {
+              "calls": 602,
+              "totalMs": 1,
+              "meanMs": 0.0016611295681063123,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "tracking": {
+              "calls": 602,
+              "totalMs": 14,
+              "meanMs": 0.023255813953488372,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "metrics": {
+              "calls": 602,
+              "totalMs": 9,
+              "meanMs": 0.014950166112956811,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "previewDraw": {
+              "calls": 358,
+              "totalMs": 58,
+              "meanMs": 0.16201117318435754,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "summary": {
+              "calls": 1,
+              "totalMs": 0,
+              "meanMs": 0,
+              "medianMs": 0,
+              "p95Ms": 0
+            }
+          },
+          "unaccountedMs": 25
+        }
+      ]
+    },
+    {
+      "variant": "baseline",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Safari/605.1.15",
+      "hardwareConcurrency": 8,
+      "visibility": "visible",
+      "video": {
+        "width": 540,
+        "height": 960,
+        "durationSeconds": 120.31666666666666
+      },
+      "settings": {
+        "method": "background",
+        "intervalMs": 200,
+        "thresholdInches": 1.5,
+        "thresholdPx": 45.900000000000006,
+        "gridPixels": 15.3,
+        "pixelsPerInch": 30.6,
+        "crop": {
+          "x": 50,
+          "y": 240,
+          "width": 420,
+          "height": 290
+        },
+        "exclusions": [],
+        "filterExactCount": true,
+        "filterFrameCount": 5,
+        "expectedFish": 5,
+        "preferCenter": false,
+        "trackFish": true
+      },
+      "render": true,
+      "instrumented": true,
+      "videoModule": "profile-video-baseline.mjs",
+      "runs": [
+        {
+          "run": 1,
+          "wallMs": 5913,
+          "visibilityAtEnd": "visible",
+          "keptFrames": 358,
+          "skippedFrames": 244,
+          "sampledFrames": 602,
+          "checksum": 20413204.796022072,
+          "outputSha256": "19a799bc51e7c7d111591a3ddd30de5690f55d6c4262c80bebaed4538b29fdb8",
+          "stages": {
+            "seekAndDecode": {
+              "calls": 627,
+              "totalMs": 2704,
+              "meanMs": 4.312599681020734,
+              "medianMs": 4,
+              "p95Ms": 7
+            },
+            "pixel.drawImage": {
+              "calls": 627,
+              "totalMs": 43,
+              "meanMs": 0.0685805422647528,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "pixel.getImageData": {
+              "calls": 627,
+              "totalMs": 2175,
+              "meanMs": 3.4688995215311005,
+              "medianMs": 3,
+              "p95Ms": 4
+            },
+            "pixel.grayscale": {
+              "calls": 627,
+              "totalMs": 147,
+              "meanMs": 0.23444976076555024,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "cooperativeYield": {
+              "calls": 627,
+              "totalMs": 102,
+              "meanMs": 0.16267942583732056,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "medianBackground": {
+              "calls": 1,
+              "totalMs": 30,
+              "meanMs": 30,
+              "medianMs": 30,
+              "p95Ms": 30
+            },
+            "detail.erode3": {
+              "calls": 2214,
+              "totalMs": 196,
+              "meanMs": 0.08852755194218609,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.dilate3": {
+              "calls": 2214,
+              "totalMs": 172,
+              "meanMs": 0.07768744354110207,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.connectedRegions": {
+              "calls": 738,
+              "totalMs": 68,
+              "meanMs": 0.0921409214092141,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.splitLargeBlobs": {
+              "calls": 738,
+              "totalMs": 3,
+              "meanMs": 0.0040650406504065045,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "detection": {
+              "calls": 602,
+              "totalMs": 560,
+              "meanMs": 0.9302325581395349,
+              "medianMs": 1,
+              "p95Ms": 2
+            },
+            "sharpness": {
+              "calls": 3274,
+              "totalMs": 31,
+              "meanMs": 0.009468540012217471,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "candidateSelection": {
+              "calls": 602,
+              "totalMs": 4,
+              "meanMs": 0.006644518272425249,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "tracking": {
+              "calls": 602,
+              "totalMs": 7,
+              "meanMs": 0.011627906976744186,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "metrics": {
+              "calls": 602,
+              "totalMs": 21,
+              "meanMs": 0.03488372093023256,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "previewDraw": {
+              "calls": 358,
+              "totalMs": 63,
+              "meanMs": 0.17597765363128492,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "summary": {
+              "calls": 1,
+              "totalMs": 1,
+              "meanMs": 1,
+              "medianMs": 1,
+              "p95Ms": 1
+            }
+          },
+          "unaccountedMs": 25
+        }
+      ]
+    },
+    {
+      "variant": "cropped",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Safari/605.1.15",
+      "hardwareConcurrency": 8,
+      "visibility": "visible",
+      "video": {
+        "width": 540,
+        "height": 960,
+        "durationSeconds": 120.31666666666666
+      },
+      "settings": {
+        "method": "background",
+        "intervalMs": 200,
+        "thresholdInches": 1.5,
+        "thresholdPx": 45.900000000000006,
+        "gridPixels": 15.3,
+        "pixelsPerInch": 30.6,
+        "crop": {
+          "x": 50,
+          "y": 240,
+          "width": 420,
+          "height": 290
+        },
+        "exclusions": [],
+        "filterExactCount": true,
+        "filterFrameCount": 5,
+        "expectedFish": 5,
+        "preferCenter": false,
+        "trackFish": true
+      },
+      "render": true,
+      "instrumented": true,
+      "videoModule": "video.mjs",
+      "runs": [
+        {
+          "run": 1,
+          "wallMs": 5019,
+          "visibilityAtEnd": "visible",
+          "keptFrames": 358,
+          "skippedFrames": 244,
+          "sampledFrames": 602,
+          "checksum": 20413204.796022072,
+          "outputSha256": "19a799bc51e7c7d111591a3ddd30de5690f55d6c4262c80bebaed4538b29fdb8",
+          "stages": {
+            "seekAndDecode": {
+              "calls": 627,
+              "totalMs": 2667,
+              "meanMs": 4.253588516746412,
+              "medianMs": 4,
+              "p95Ms": 6
+            },
+            "pixel.drawImage": {
+              "calls": 627,
+              "totalMs": 49,
+              "meanMs": 0.07814992025518341,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "pixel.getImageData": {
+              "calls": 627,
+              "totalMs": 1330,
+              "meanMs": 2.121212121212121,
+              "medianMs": 2,
+              "p95Ms": 3
+            },
+            "pixel.grayscale": {
+              "calls": 627,
+              "totalMs": 129,
+              "meanMs": 0.20574162679425836,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "cooperativeYield": {
+              "calls": 627,
+              "totalMs": 92,
+              "meanMs": 0.1467304625199362,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "medianBackground": {
+              "calls": 1,
+              "totalMs": 30,
+              "meanMs": 30,
+              "medianMs": 30,
+              "p95Ms": 30
+            },
+            "detail.erode3": {
+              "calls": 2214,
+              "totalMs": 204,
+              "meanMs": 0.0921409214092141,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.dilate3": {
+              "calls": 2214,
+              "totalMs": 205,
+              "meanMs": 0.09259259259259259,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.connectedRegions": {
+              "calls": 738,
+              "totalMs": 71,
+              "meanMs": 0.09620596205962059,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "detail.splitLargeBlobs": {
+              "calls": 738,
+              "totalMs": 12,
+              "meanMs": 0.016260162601626018,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "detection": {
+              "calls": 602,
+              "totalMs": 589,
+              "meanMs": 0.978405315614618,
+              "medianMs": 1,
+              "p95Ms": 2
+            },
+            "sharpness": {
+              "calls": 3274,
+              "totalMs": 43,
+              "meanMs": 0.013133781307269395,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "candidateSelection": {
+              "calls": 602,
+              "totalMs": 2,
+              "meanMs": 0.0033222591362126247,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "tracking": {
+              "calls": 602,
+              "totalMs": 5,
+              "meanMs": 0.008305647840531562,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "metrics": {
+              "calls": 602,
+              "totalMs": 11,
+              "meanMs": 0.018272425249169437,
+              "medianMs": 0,
+              "p95Ms": 0
+            },
+            "previewDraw": {
+              "calls": 358,
+              "totalMs": 57,
+              "meanMs": 0.15921787709497207,
+              "medianMs": 0,
+              "p95Ms": 1
+            },
+            "summary": {
+              "calls": 1,
+              "totalMs": 0,
+              "meanMs": 0,
+              "medianMs": 0,
+              "p95Ms": 0
+            }
+          },
+          "unaccountedMs": 15
+        }
+      ]
+    }
+  ],
+  "pixelComparison": {
+    "videoSeconds": 120.31666666666666,
+    "grayComparisons": 647,
+    "bitmapComparisons": 20,
+    "pngComparisons": 20,
+    "comparedBytes": 101920860,
+    "differingBytes": 0,
+    "failures": [],
+    "passed": true
+  },
+  "normalApplication": {
+    "baseline": {
+      "wallMs": 7095,
+      "status": "Complete: kept 358 frames with exactly 5 fish; skipped 244 of 602 samples.",
+      "visibility": "visible",
+      "source": "baseline import map"
+    },
+    "cropped": {
+      "wallMs": 6067,
+      "status": "Complete: kept 358 frames with exactly 5 fish; skipped 244 of 602 samples.",
+      "visibility": "visible",
+      "source": "cropped grayscale canvas",
+      "note": "Measured after tests completed"
+    }
+  },
+  "tests": {
+    "passed": 79,
+    "failed": 0
+  }
+}
