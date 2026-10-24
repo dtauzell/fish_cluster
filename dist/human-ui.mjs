@@ -12,7 +12,8 @@ import { fmt, timeLabel } from './format.mjs';
 import { reviewFrameIndices, automaticCandidateCount, framePassesCountFilter } from './frame-selection.mjs';
 
 /** Human-review controls and overlays. Comparisons live in review.mjs. */
-export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek, onFrameCorrected, onFrameSelected }) {
+export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek, downloadFramePng,
+  onFrameCorrected, onFrameSelected }) {
   const $ = id => document.getElementById(id);
   const humanCtx = humanCanvas.getContext('2d');
   const sharpnessReview = createSharpnessReview(state);
@@ -21,6 +22,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     dimensions: () => state.settings ? humanViewBox() : { width: 1600, height: 1000 },
     onChange: drawHumanFrame });
   const reviewHelp = $('review-help-dialog');
+  let downloadingFrame = false;
   $('review-help').addEventListener('click', () => reviewHelp.showModal());
   reviewHelp.addEventListener('click', event => {
     if (event.target !== reviewHelp) return;
@@ -204,6 +206,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
       : 'Centers marked † are estimates inside joined regions. Check each one against the image.';
     const { manual, automatic, outside, matched } = compareFrame(frame, state.human.marks.get(index) ?? [], state.settings);
     const busy = state.human.loading || state.human.loadFailed;
+    $('human-download-frame').disabled = busy || state.running || downloadingFrame;
     const editing = $('human-edit-centers').checked;
     $('human-edit-centers').disabled = busy;
     const marks = state.human.marks.get(index);
@@ -254,11 +257,13 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
 
   function selectHumanFrame(index) {
     if (state.running) return;
+    $('human-download-status').textContent = '';
     const indices = updateReviewFilter();
     if (!indices.length) {
       ++state.previewToken;
       state.human.index = null;
       state.human.loading = false;
+      $('human-download-frame').disabled = true;
       $('human-frame-details').textContent = 'No frames in this view.';
       $('human-overlap-note').hidden = true;
       onFrameSelected();
@@ -322,6 +327,27 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
   });
   $('human-prev').addEventListener('click', () => selectHumanPosition(visibleIndices().indexOf(state.human.index) - 1));
   $('human-next').addEventListener('click', () => selectHumanPosition(visibleIndices().indexOf(state.human.index) + 1));
+  $('human-download-frame').addEventListener('click', async () => {
+    const index = state.human.index;
+    if (index == null || state.running || state.human.loading || state.human.loadFailed || downloadingFrame) return;
+    const frame = state.reviewFrames[index];
+    const fullFrame = $('human-show-full').checked;
+    const view = { ...humanViewBox() };
+    downloadingFrame = true;
+    $('human-download-frame').disabled = true;
+    $('human-download-status').textContent = '';
+    try {
+      await downloadFramePng(frame, view, fullFrame);
+      if (state.human.index === index && state.reviewFrames[index] === frame)
+        $('human-download-status').textContent = `Downloaded sample ${frame.frameIndex + 1} PNG.`;
+    } catch (error) {
+      if (state.human.index === index && state.reviewFrames[index] === frame)
+        $('human-download-status').textContent = `Could not download sample ${frame.frameIndex + 1}: ${error.message}`;
+    } finally {
+      downloadingFrame = false;
+      $('human-download-frame').disabled = state.human.loading || state.human.loadFailed || state.running;
+    }
+  });
   $('human-show-full').addEventListener('change', () => { viewport.reset(); drawHumanFrame(); });
   $('human-show-auto').addEventListener('change', drawHumanFrame);
   $('human-show-sharpness').addEventListener('change', drawHumanFrame);

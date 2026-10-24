@@ -70,6 +70,12 @@ function changeFrames() { return findChangeFrames(visibleResultIndices().map(ind
 function selectedResultFrame() { return state.human.index == null ? null : state.reviewFrames[state.human.index]; }
 const { selectHumanFrame, indices: visibleResultIndices, refresh: refreshHumanFrame } = createHumanReview({
   state, video, humanCanvas, queuePreviewSeek,
+  downloadFramePng: async (frame, view, fullFrame) => {
+    const sample = String(frame.frameIndex + 1).padStart(6, '0');
+    const name = `${baseName(state.file?.name)}-sample-${sample}-${frame.timestampMs}ms-${fullFrame ? 'full' : 'crop'}.png`;
+    const image = await videoSource.readPng(view);
+    download(name, image, 'image/png');
+  },
   onFrameSelected: () => { updateSelectedFrameDetails(); drawClusterChart(); },
   onFrameCorrected: () => {
     state.frames = state.reviewFrames.filter(frame => framePassesCountFilter(frame, state.settings));
@@ -420,6 +426,9 @@ $('analyze').addEventListener('click', async () => {
   try { config = settings(); } catch (error) { status(error.message, true); return; }
   if (Math.ceil(video.duration * 1000 / config.intervalMs) > 10000) { status('This setting would analyze over 10,000 frames. Increase the frame interval.', true); return; }
   state.running = true;
+  // An earlier Results or labeling seek can still be in flight. Invalidate its
+  // queued work and let the active seek finish before detection reads the video.
+  ++state.previewToken;
   updateWorkflow();
   state.stopped = false;
   state.settings = config;
@@ -449,6 +458,7 @@ $('analyze').addEventListener('click', async () => {
   $('progress').value = 0;
   for (const id of ['expected-fish', 'interval', 'threshold', 'grid-pixels', 'model-slug', 'model-version', 'confidence', 'publishable-key']) $(id).disabled = true;
   try {
+    await previewSeek.catch(() => {});
     const events = analyzeVideo({
       config, duration: video.duration, source: videoSource, prepareModel,
       isStopped: () => state.stopped

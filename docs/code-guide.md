@@ -328,8 +328,11 @@ cached by fish count, crop, and reflection masks so distance-slider changes stay
 `review.mjs` excludes marks outside the crop or inside reflection masks from comparison, then finds the
 maximum number of one-to-one center matches within half an inch. All marks remain in CSV exports. `inside_crop` retains its rectangular meaning;
 `included_in_analysis` also accounts for reflection masks. The corresponding
-`manual_fish_count_in_analysis` counts only marks in the usable area. Only frames explicitly marked reviewed contribute to
-the review summary. Empty frames still get a CSV row so review status is retained.
+`manual_fish_count_in_analysis` counts only marks in the usable area. A blank manual count with
+`manual_annotation_present=false` means the reviewer accepted the result without adding marks;
+an explicit empty annotation has `manual_annotation_present=true` and a count of zero.
+Only frames explicitly marked reviewed contribute to the review summary. Empty frames still get
+a CSV row so review status is retained.
 
 `applyManualCenters()` replaces one frame's result with a snapshot of the usable
 manual marks, including an explicitly empty set. It preserves `automaticDetections`

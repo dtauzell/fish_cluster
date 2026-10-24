@@ -70,7 +70,21 @@ test('human CSV preserves outside marks, group numbering and frames without mark
   assert.equal(exported[2].x_px, '20.00');
   assert.equal(exported[3].frame_number, '2');
   assert.equal(exported[3].reviewed, 'false');
-  assert.equal(exported[3].manual_fish_count_in_crop, '0');
+  assert.equal(exported[3].manual_annotation_present, 'false');
+  assert.equal(exported[3].manual_fish_count_in_crop, '');
+});
+
+test('review CSV distinguishes accepted automatic centers from an explicitly empty manual annotation', () => {
+  const accepted = records(humanCsv([frame], new Map(), new Set([0]), config))[0];
+  const empty = records(humanCsv([frame], new Map([[0, []]]), new Set([0]), config))[0];
+  assert.equal(accepted.reviewed, 'true');
+  assert.equal(accepted.result_fish_count, '2');
+  assert.equal(accepted.manual_annotation_present, 'false');
+  for (const key of ['manual_fish_count_in_crop', 'manual_fish_count_in_analysis',
+    'manual_cluster_count', 'matched_center_count', 'manual_group_sizes']) assert.equal(accepted[key], '');
+  assert.equal(empty.manual_annotation_present, 'true');
+  assert.equal(empty.manual_fish_count_in_analysis, '0');
+  assert.equal(empty.matched_center_count, '0');
 });
 
 test('detection and frame exports preserve metrics and flag group-size changes', () => {

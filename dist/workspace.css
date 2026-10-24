@@ -1184,6 +1184,25 @@ footer {
   flex: 0 1 35%;
   width: auto;
 }
+.review-action-bar #human-download-frame {
+  flex: 0 0 auto;
+  width: auto;
+}
+.human-download-status:empty {
+  display: none;
+}
+.human-download-status {
+  color: #c7e5dc;
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .review-action-bar {
+    flex-wrap: wrap;
+  }
+  .review-action-bar #human-download-frame {
+    flex: 1 1 100%;
+  }
+}
 .results-workspace #human-progress {
   margin: 0 0 12px;
   color: #d4eee4;

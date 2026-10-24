@@ -6,10 +6,11 @@ import { download } from './download.mjs';
 import { timeLabel } from './format.mjs';
 
 /** A manual dataset editor. It shares decoded video access, but never runs detection. */
-export function createLabeling({ canvas, source, queueSeek, isRunning }) {
+export function createLabeling({ canvas, source, queueSeek, isRunning, storageFactory = createLabelStorage }) {
   const $ = id => document.getElementById(id), context = canvas.getContext('2d');
   let project = null, records = new Map(), index = 0, selectedId = null;
   let image = null, bitmap = null, loading = false, importing = false, token = 0, storage = null;
+  let importRevision = 0;
   let saved = Promise.resolve(), drag = null;
   let saveRevision = 0;
   const failedSaves = new Set();
@@ -152,11 +153,13 @@ export function createLabeling({ canvas, source, queueSeek, isRunning }) {
   async function start(config) {
     const candidate = createLabelProject(config);
     if (project?.id === candidate.id) return;
+    ++importRevision;
+    importing = false;
     ++token; bitmap?.close(); bitmap = null; image = null;
     project = candidate; records = new Map(); undo.clear(); index = 0; selectedId = null; loading = true;
     try {
       await saved;
-      storage ??= createLabelStorage();
+      storage ??= storageFactory();
       const loaded = await storage.load(candidate);
       if (project?.id !== candidate.id) return;
       validateLabelProject({ ...candidate, records: loaded }, candidate);
@@ -293,7 +296,10 @@ export function createLabeling({ canvas, source, queueSeek, isRunning }) {
   $('label-progress-import').addEventListener('change', async event => {
     const file = event.target.files[0];
     if (!file || !project || importing) return;
+    event.target.value = '';
     const expected = project;
+    const revision = ++importRevision;
+    const stillCurrent = () => project === expected && importRevision === revision;
     importing = true; finishDrag(); render(); message('Restoring labeling progress…');
     try {
       const imported = importLabelProgress(await file.text(), expected);
@@ -302,19 +308,21 @@ export function createLabeling({ canvas, source, queueSeek, isRunning }) {
         const decoded = await createImageBitmap(record.image); decoded.close();
       }
       await saved;
-      if (project?.id !== imported.id) throw new Error('The active video changed during import.');
+      if (!stillCurrent()) return;
       if (storage) try { await storage.replace(imported); }
-      catch { $('label-save-status').textContent = 'Progress restored in this tab. Browser saving failed; keep a progress JSON backup.'; }
+      catch { if (stillCurrent()) $('label-save-status').textContent = 'Progress restored in this tab. Browser saving failed; keep a progress JSON backup.'; }
+      if (!stillCurrent()) return;
       records = new Map(imported.records.map(record => [record.frameIndex, record])); undo.clear();
       importing = false;
       if (!$('label-page').hidden) await selectFrame(index);
-      message('Progress restored. This replaces labels for this video and crop.');
-    } catch (error) { message(error.message, true); }
-    finally { importing = false; render(); }
-    event.target.value = '';
+      if (stillCurrent()) message('Progress restored. This replaces labels for this video and crop.');
+    } catch (error) { if (stillCurrent()) message(error.message, true); }
+    finally {
+      if (stillCurrent()) { importing = false; render(); }
+    }
   });
   new ResizeObserver(draw).observe(canvas.parentElement);
   return { start, hasProject: () => Boolean(project), show: () => selectFrame(index),
     leave: () => { ++token; finishDrag(); },
-    reset: () => { ++token; finishDrag(); bitmap?.close(); bitmap = null; image = null; project = null; records.clear(); undo.clear(); } };
+    reset: () => { ++importRevision; importing = false; ++token; finishDrag(); bitmap?.close(); bitmap = null; image = null; project = null; records.clear(); undo.clear(); } };
 }

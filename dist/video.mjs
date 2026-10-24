@@ -6,6 +6,13 @@ export function createVideoSource(video) {
   const context = canvas.getContext('2d', { willReadFrequently: true });
   const grayCanvas = document.createElement('canvas');
   const grayContext = grayCanvas.getContext('2d', { willReadFrequently: true });
+  let seekQueue = Promise.resolve();
+
+  function queueSeek(operation) {
+    const pending = seekQueue.catch(() => {}).then(operation);
+    seekQueue = pending;
+    return pending;
+  }
 
   function capture() {
     if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
@@ -61,7 +68,7 @@ export function createVideoSource(video) {
     }
   }
 
-  function seekTo(seconds) {
+  function performSeek(seconds) {
     return new Promise((resolve, reject) => {
       if (video.readyState >= 2 && Math.abs(video.currentTime - seconds) < .001) { resolve(); return; }
       const timer = setTimeout(() => { cleanup(); reject(new Error('Timed out while seeking the video.')); }, 12000);
@@ -80,10 +87,16 @@ export function createVideoSource(video) {
     });
   }
 
-  async function seekToDrawableFrame(seconds) {
-    await seekTo(seconds);
-    // Safari updates drawImage after seeked even when a paused video's frame callback does not fire.
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  function seekTo(seconds) {
+    return queueSeek(() => performSeek(seconds));
+  }
+
+  function seekToDrawableFrame(seconds) {
+    return queueSeek(async () => {
+      await performSeek(seconds);
+      // Safari updates drawImage after seeked even when a paused video's frame callback does not fire.
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
   }
 
   return { showFirstFrame, seekTo, seekToDrawableFrame, readGray, readBitmap, readPng };

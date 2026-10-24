@@ -77,20 +77,22 @@ export function framesCsv(frames) {
 
 function humanRows(frames, marksByFrame, reviewed, config) {
   return frames.flatMap((frame, index) => {
+    const hasManualMarks = marksByFrame.has(index);
     const marks = marksByFrame.get(index) ?? [];
     const { within: inCrop, manual: metrics, automatic, matched } = compareFrame(frame, marks, config);
     const common = { frame_index: frame.frameIndex, frame_number: frame.frameIndex + 1, timestamp_ms: frame.timestampMs,
       included_in_results: framePassesCountFilter(frame, config),
       automatic_candidate_count: automaticCandidateCount(frame),
-      reviewed: reviewed.has(index), manual_fish_count_in_crop: marks.filter(mark => insideCrop(mark, config.crop)).length,
-      manual_fish_count_in_analysis: inCrop.length,
-      manual_fish_count_outside_crop: marks.filter(mark => !insideCrop(mark, config.crop)).length,
-      automatic_fish_count: automatic.fishCount, manual_cluster_count: metrics.clusterCount,
+      reviewed: reviewed.has(index), manual_annotation_present: hasManualMarks,
+      manual_fish_count_in_crop: hasManualMarks ? marks.filter(mark => insideCrop(mark, config.crop)).length : null,
+      manual_fish_count_in_analysis: hasManualMarks ? inCrop.length : null,
+      manual_fish_count_outside_crop: hasManualMarks ? marks.filter(mark => !insideCrop(mark, config.crop)).length : null,
+      automatic_fish_count: automatic.fishCount, manual_cluster_count: hasManualMarks ? metrics.clusterCount : null,
       automatic_cluster_count: automatic.clusterCount,
       manual_correction_applied: frame.manualCorrectionApplied ?? false,
       result_fish_count: frame.metrics.fishCount,
-      matched_center_count: matched,
-      manual_group_sizes: [...metrics.groupSizes].sort((a, b) => b - a).join('+'),
+      matched_center_count: hasManualMarks ? matched : null,
+      manual_group_sizes: hasManualMarks ? [...metrics.groupSizes].sort((a, b) => b - a).join('+') : null,
       automatic_group_sizes: groupSignature({ metrics: automatic }), close_distance_inches: config.thresholdInches };
     return marks.length ? marks.map((mark, markIndex) => ({ ...common, mark_number: markIndex + 1,
       x_px: mark.x.toFixed(2), y_px: mark.y.toFixed(2), inside_crop: insideCrop(mark, config.crop),
@@ -100,7 +102,7 @@ function humanRows(frames, marksByFrame, reviewed, config) {
 }
 
 export function humanCsv(frames, marksByFrame, reviewed, config) {
-  return csv(humanRows(frames, marksByFrame, reviewed, config), ['frame_index', 'frame_number', 'timestamp_ms', 'reviewed', 'manual_fish_count_in_crop', 'manual_fish_count_outside_crop', 'automatic_fish_count', 'matched_center_count', 'manual_cluster_count', 'automatic_cluster_count', 'manual_group_sizes', 'automatic_group_sizes', 'close_distance_inches', 'mark_number', 'x_px', 'y_px', 'inside_crop', 'included_in_analysis', 'manual_group_id', 'manual_fish_count_in_analysis', 'manual_correction_applied', 'result_fish_count', 'included_in_results', 'automatic_candidate_count']);
+  return csv(humanRows(frames, marksByFrame, reviewed, config), ['frame_index', 'frame_number', 'timestamp_ms', 'reviewed', 'manual_annotation_present', 'manual_fish_count_in_crop', 'manual_fish_count_outside_crop', 'automatic_fish_count', 'matched_center_count', 'manual_cluster_count', 'automatic_cluster_count', 'manual_group_sizes', 'automatic_group_sizes', 'close_distance_inches', 'mark_number', 'x_px', 'y_px', 'inside_crop', 'included_in_analysis', 'manual_group_id', 'manual_fish_count_in_analysis', 'manual_correction_applied', 'result_fish_count', 'included_in_results', 'automatic_candidate_count']);
 }
 
 

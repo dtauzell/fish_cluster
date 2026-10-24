@@ -36,6 +36,9 @@ Progress above the summary counts done frames in the current view. When all are
 done, a Review complete message links to Export results. Editing a done frame
 makes it unfinished again. At the last frame, Done returns to any unfinished
 frames in the current view before declaring completion.
+**Download frame PNG** saves the selected video image at its original pixel size.
+It follows the current tank crop or **Show full frame** setting and excludes drawn
+centers and other overlays. The filename includes the sample number and time.
 **Undo mark** is also available in Display & correction options. Clearing marks
 creates an explicitly empty correction that can be applied; undo restores the
 previous marks. Sharpness tables and scores are under collapsed **Diagnostics**.

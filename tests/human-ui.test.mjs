@@ -54,8 +54,10 @@ async function withReview(run) {
     const state = { settings, reviewFrames: frames, frames: [...frames], running: false, previewToken: 0,
       human: { index: null, marks: new Map(), candidateLabels: new Map(), reviewed: new Set(), loading: false } };
     let changes = 0;
+    const downloadedFrames = [];
     const review = createHumanReview({ state, video: { videoWidth: 100, videoHeight: 100 },
       humanCanvas: $('human-canvas'), queuePreviewSeek: async (_token, _time, render) => render(),
+      downloadFramePng: async (frame, view, fullFrame) => downloadedFrames.push({ frame, view, fullFrame }),
       onFrameSelected() {}, onFrameCorrected() {
         changes++;
         state.frames = state.reviewFrames.filter(frame => framePassesCountFilter(frame, settings));
@@ -70,7 +72,7 @@ async function withReview(run) {
       Object.assign(event, { clientX: 320, clientY: 320 });
       $('human-canvas').dispatchEvent(event);
     };
-    await run({ $, state, review, edit, addCenter, changes: () => changes, document });
+    await run({ $, state, review, edit, addCenter, changes: () => changes, downloadedFrames, document });
   } finally {
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete globalThis[key]; else globalThis[key] = value;
@@ -136,5 +138,26 @@ test('Done applies pending edits, Apply & stay keeps selection, and completion r
     assert.equal(state.human.index, 0, 'finishing at the last frame returns to an earlier unfinished frame');
     $('human-done').click();
     assert.equal($('human-review-complete').hidden, false);
+  });
+});
+
+test('download exports the selected sample using the current crop or full-frame view', async () => {
+  await withReview(async ({ $, state, review, downloadedFrames }) => {
+    await review.selectHumanFrame(1);
+    $('human-download-frame').click();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(downloadedFrames.length, 1);
+    assert.equal(downloadedFrames[0].frame, state.reviewFrames[1]);
+    assert.deepEqual(downloadedFrames[0].view, state.settings.crop);
+    assert.equal(downloadedFrames[0].fullFrame, false);
+    assert.match($('human-download-status').textContent, /sample 2 PNG/);
+
+    $('human-show-full').checked = true;
+    $('human-download-frame').click();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(downloadedFrames[1].view, { x: 0, y: 0, width: 100, height: 100 });
+    assert.equal(downloadedFrames[1].fullFrame, true);
+    await review.selectHumanFrame(2);
+    assert.equal($('human-download-status').textContent, '');
   });
 });

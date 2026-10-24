@@ -10,8 +10,8 @@
   <link rel="stylesheet" href="./style.css?v=28">
   <link rel="stylesheet" href="./about.css?v=1">
   <link rel="stylesheet" href="./labeling.css?v=1">
-  <link rel="stylesheet" href="./workspace.css?v=5">
-  <script type="module" src="./app.mjs?v=39"></script>
+  <link rel="stylesheet" href="./workspace.css?v=6">
+  <script type="module" src="./app.mjs?v=40"></script>
 </head>
 <body>
   <div class="shell">
@@ -125,9 +125,11 @@
 
             <div class="human-canvas-wrap" id="human-viewport"><div class="canvas-surface"><canvas id="human-canvas" aria-label="Click fish centers in the selected sampled frame"></canvas></div></div>
             <div class="frame-summary"><span id="human-edit-status" role="status"></span><span id="frame-groups" class="frame-groups" hidden></span></div>
+            <span id="human-download-status" class="human-download-status" role="status" aria-live="polite"></span>
             <div class="review-action-bar">
               <button id="human-done" class="primary" type="button">Done &amp; next →</button>
               <button id="human-apply-centers" class="secondary" type="button" hidden>Apply &amp; stay</button>
+              <button id="human-download-frame" class="secondary" type="button" title="Save the current video image at its original resolution, without overlays">Download frame PNG ↓</button>
             </div>
 
             <details class="sharpness-panel"><summary id="sharpness-title">Diagnostics: fish &amp; reflections</summary>
@@ -229,6 +231,7 @@
           <tbody>
             <tr><th scope="row">Done &amp; next</th><td>Applies pending corrections and marks this frame done, then advances. At the end, it returns to any unfinished frames in this view or shows review complete.</td></tr>
             <tr><th scope="row">Apply &amp; stay</th><td>Applies pending corrections, updates the summary, and marks the frame done while keeping it on screen. Available when there are unapplied edits.</td></tr>
+            <tr><th scope="row">Download frame PNG</th><td>Saves the selected video image at its original resolution. It uses the current crop or full-frame view and leaves out drawn centers and overlays.</td></tr>
           </tbody>
         </table>
         <table>
