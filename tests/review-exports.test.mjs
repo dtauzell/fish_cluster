@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { frameMetrics, changeFrames } from '../dist/measurements.mjs';
-import { applyManualCenters, restoreAutomaticCenters, compareFrame, summarizeReview } from '../dist/review.mjs';
+import { applyManualCenters, restoreAutomaticCenters, compareFrame, summarizeReview, hasPendingCenters } from '../dist/review.mjs';
 import { detectionsCsv, framesCsv, humanCsv, exportedSettings } from '../dist/exports.mjs';
 import { frameCandidates } from '../dist/candidate-selection.mjs';
 
@@ -22,6 +22,27 @@ const records = text => {
   const [columns, ...values] = rows(text);
   return values.map(row => Object.fromEntries(columns.map((key, index) => [key, row[index]])));
 };
+
+test('Done distinguishes an absent or unchanged draft from changed or explicitly empty centers', () => {
+  assert.equal(hasPendingCenters(frame, undefined, config), false);
+  assert.equal(hasPendingCenters(frame, detections.map(({ x, y }) => ({ x, y })), config), false);
+  assert.equal(hasPendingCenters(frame, [], config), true);
+  const moved = [{ x: 61, y: 110 }, { x: 70, y: 110 }];
+  assert.equal(hasPendingCenters(frame, moved, config), true);
+  const applied = applyManualCenters(frame, moved, config);
+  assert.equal(hasPendingCenters(applied, moved, config), false);
+  assert.equal(hasPendingCenters(applied, detections, config), true);
+  const empty = applyManualCenters(frame, [], config);
+  assert.equal(hasPendingCenters(empty, [], config), false);
+});
+
+test('pending result edits use usable centers, including original-video crop and mask offsets', () => {
+  const masked = { ...config, exclusions: [{ x: 65, y: 100, width: 20, height: 20 }] };
+  const current = applyManualCenters(frame, detections, masked);
+  const marks = [...detections, { x: 10, y: 20 }, { x: 75, y: 115 }];
+  assert.equal(hasPendingCenters(current, marks, masked), false);
+  assert.equal(hasPendingCenters(current, [{ x: 62, y: 110 }], masked), true);
+});
 
 test('review excludes outside marks and matches duplicate marks only once', () => {
   const marks = [{ x: 60, y: 110 }, { x: 60, y: 110 }, { x: 49, y: 110 }];

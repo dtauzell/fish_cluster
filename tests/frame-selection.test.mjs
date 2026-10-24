@@ -32,6 +32,23 @@ test('manual correction promotes a skipped frame without removing it from the mi
   assert.deepEqual(reviewFrameIndices(frames, 'mismatches', 5), [1]);
 });
 
+test('combined results navigation includes corrected samples without changing sample identity', () => {
+  const frames = [frame(17, 4), frame(23, 5), frame(42, 6)];
+  assert.deepEqual(reviewFrameIndices(frames, 'included', 5, config), [1]);
+  assert.deepEqual(reviewFrameIndices(frames, 'mismatches', 5, config), [0, 2]);
+  frames[0] = applyManualCenters(frames[0], points(5), config);
+  assert.deepEqual(reviewFrameIndices(frames, 'included', 5, config), [0, 1]);
+  assert.deepEqual(reviewFrameIndices(frames, 'mismatches', 5, config), [0, 2]);
+  assert.equal(frames[0].frameIndex, 17);
+  frames[1] = applyManualCenters(frames[1], [], config);
+  assert.deepEqual(reviewFrameIndices(frames, 'included', 5, config), [0]);
+  assert.deepEqual(reviewFrameIndices(frames, 'all', 5, config), [0, 1, 2]);
+  frames[0] = restoreAutomaticCenters(frames[0], config);
+  assert.deepEqual(reviewFrameIndices(frames, 'included', 5, config), []);
+  assert.deepEqual(reviewFrameIndices(frames, 'all', 5, config), [0, 1, 2]);
+  assert.deepEqual(reviewFrameIndices(frames, 'included', 5, { ...config, filterExactCount: false }), [0, 1, 2]);
+});
+
 test('review filtering handles no mismatches and all samples excluded from results', () => {
   assert.deepEqual(reviewFrameIndices([frame(0, 5)], 'mismatches', 5), []);
   const frames = [frame(0, 4), frame(1, 3)];

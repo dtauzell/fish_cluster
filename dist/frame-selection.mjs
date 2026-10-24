@@ -10,6 +10,10 @@ export function automaticCandidateCount(frame) {
 }
 
 /** Return stable collection indices so filtering never reassigns marks or labels. */
-export function reviewFrameIndices(frames, mode, knownFishCount) {
-  return frames.flatMap((frame, index) => mode !== 'mismatches' || automaticCandidateCount(frame) !== knownFishCount ? [index] : []);
+export function reviewFrameIndices(frames, mode, knownFishCount, config = {}) {
+  return frames.flatMap((frame, index) => {
+    if (mode === 'included' && !framePassesCountFilter(frame, config)) return [];
+    if (mode === 'mismatches' && automaticCandidateCount(frame) === knownFishCount) return [];
+    return [index];
+  });
 }

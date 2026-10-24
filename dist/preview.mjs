@@ -4,7 +4,6 @@ import { drawCandidateSharpness } from './sharpness-ui.mjs';
 // Paint detections supplied by the analyzer; this module does not detect fish.
 export function createPreview(canvas, video) {
   const ctx = canvas.getContext('2d');
-  const groupColors = ['#8ce6ce', '#f6d979', '#f4a7b9', '#9ab9ff', '#d3a9f0', '#ffba87'];
   function drawFrame(frame, threshold, crop, exclusions = [], showSharpness = false,
     view = { x: 0, y: 0, width: video.videoWidth || canvas.width, height: video.videoHeight || canvas.height }) {
     if (canvas.width !== view.width) canvas.width = view.width;
@@ -15,37 +14,7 @@ export function createPreview(canvas, video) {
     if (video.readyState >= 2) ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
     if (!frame) { drawCrop(crop); drawExclusions(ctx, exclusions); return; }
     const dots = frame.detections;
-    ctx.lineWidth = Math.max(1, canvas.width / 800);
-    for (let i = 0; i < dots.length; i++) for (let j = i + 1; j < dots.length; j++) {
-      if (Math.hypot(dots[i].x - dots[j].x, dots[i].y - dots[j].y) <= threshold) {
-        ctx.strokeStyle = groupColors[frame.metrics.groupIds[i] % groupColors.length];
-        ctx.beginPath();
-        ctx.moveTo(dots[i].x, dots[i].y);
-        ctx.lineTo(dots[j].x, dots[j].y);
-        ctx.stroke();
-      }
-    }
-    const radius = Math.max(4, canvas.width / 180);
-    for (const [i, dot] of dots.entries()) {
-      const group = frame.metrics.groupIds[i];
-      const color = frame.metrics.groupSizes[group] === 1 ? '#cad1d0' : groupColors[group % groupColors.length];
-      ctx.beginPath();
-      ctx.arc(dot.x, dot.y, radius + 3, 0, Math.PI * 2);
-      ctx.fillStyle = '#071a22';
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(dot.x, dot.y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = color;
-      ctx.fill();
-      ctx.font = `bold ${Math.max(12, canvas.width / 42)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#071a22';
-      const label = String(group + 1);
-      ctx.strokeText(label, dot.x, dot.y - radius - 7);
-      ctx.fillStyle = color;
-      ctx.fillText(label, dot.x, dot.y - radius - 7);
-    }
+    drawFrameGroups(ctx, frame, threshold, { x: 0, y: 0 }, canvas.width / Math.max(1, canvas.getBoundingClientRect().width));
     drawCrop(crop);
     drawExclusions(ctx, exclusions);
     drawRejectedCandidates(ctx, frame.rejectedDetections ?? [], { x: 0, y: 0 }, canvas.width / Math.max(1, canvas.getBoundingClientRect().width));
@@ -89,6 +58,46 @@ export function createPreview(canvas, video) {
   }
 
   return { drawFrame, drawCalibrationLine };
+}
+
+/** Group colors and links are shared by setup previews and the results editor. */
+export function drawFrameGroups(ctx, frame, threshold, view, scale) {
+  const groupColors = ['#8ce6ce', '#f6d979', '#f4a7b9', '#9ab9ff', '#d3a9f0', '#ffba87'];
+  ctx.save();
+  ctx.translate(-view.x, -view.y);
+  const dots = frame.detections;
+  ctx.lineWidth = scale;
+  for (let i = 0; i < dots.length; i++) for (let j = i + 1; j < dots.length; j++) {
+    if (Math.hypot(dots[i].x - dots[j].x, dots[i].y - dots[j].y) <= threshold) {
+      ctx.strokeStyle = groupColors[frame.metrics.groupIds[i] % groupColors.length];
+      ctx.beginPath();
+      ctx.moveTo(dots[i].x, dots[i].y);
+      ctx.lineTo(dots[j].x, dots[j].y);
+      ctx.stroke();
+    }
+  }
+  const radius = 4 * scale;
+  for (const [i, dot] of dots.entries()) {
+    const group = frame.metrics.groupIds[i];
+    const color = frame.metrics.groupSizes[group] === 1 ? '#cad1d0' : groupColors[group % groupColors.length];
+    ctx.beginPath();
+    ctx.arc(dot.x, dot.y, radius + 3 * scale, 0, Math.PI * 2);
+    ctx.fillStyle = '#071a22';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(dot.x, dot.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.font = `bold ${12 * scale}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 3 * scale;
+    ctx.strokeStyle = '#071a22';
+    const label = String(group + 1);
+    ctx.strokeText(label, dot.x, dot.y - radius - 7 * scale);
+    ctx.fillStyle = color;
+    ctx.fillText(label, dot.x, dot.y - radius - 7 * scale);
+  }
+  ctx.restore();
 }
 
 /** Dashed rings and a dagger remain visible even with sharpness labels hidden. */

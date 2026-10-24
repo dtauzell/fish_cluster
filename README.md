@@ -13,31 +13,37 @@ Open <http://localhost:8000>. No install or build is required. Tests: `npm test`
 ## Use
 
 1. Add a tank video the browser can decode.
-2. Drag a rectangle around the tank in the preview if the fish occupy only part of the video, or open **Tank area, reflection masks & scale → Precise crop & display options** to enter exact X/Y/width/height values. The preview fits both the available width and height. **Focus on tank** enlarges the selected tank crop, especially useful for portrait footage; **Full frame** shows the whole image for adjusting the crop. Fit resets zoom, and +/− zoom within the preview; scroll inside a zoomed image to reach its edges. For this repository's `fish.mov` (540 × 960), the tested 420 × 290 tank crop is selected automatically. Exported x/y coordinates remain in the original video frame. Set the frame interval, close distance in inches, and paper-grid calibration in pixels per 0.5-inch square. The calibration applies to both detection methods. About 15.3 px per square and a 1.5-inch close distance are prefilled for this video. To measure your own scale, open **Set scale** and click **Draw calibration line**, drag along a known distance, enter the line length in inches, and click **Use this scale**. The app uses original-video pixels to update the calibration and any existing distance results. Measure several grid squares near the swimming area for better accuracy; clearing the line keeps the applied scale. By default, analysis keeps only samples with exactly five detected fish; change the count or turn off **Only include frames with exactly** to keep every sample. Skipped samples still help tracking across neighboring frames.
+2. Drag a rectangle around the tank in the preview if the fish occupy only part of the video, or open **Tank area, reflection masks & scale → Precise crop** to enter exact X/Y/width/height values. The preview fits both the available width and height. **Focus on tank** enlarges the selected tank crop, especially useful for portrait footage; **Full frame** shows the whole image for adjusting the crop. Fit resets zoom, and +/− zoom within the preview; scroll inside a zoomed image to reach its edges. For this repository's `fish.mov` (540 × 960), the tested 420 × 290 tank crop is selected automatically. Exported x/y coordinates remain in the original video frame. Set the frame interval, close distance in inches, and paper-grid calibration in pixels per 0.5-inch square. The calibration applies to both detection methods. About 15.3 px per square and a 1.5-inch close distance are prefilled for this video. To measure your own scale, open **Set scale** and click **Draw calibration line**, drag along a known distance, enter the line length in inches, and click **Use this scale**. The app uses original-video pixels to update the calibration and any existing distance results. Measure several grid squares near the swimming area for better accuracy; clearing the line keeps the applied scale. By default, analysis keeps only samples with exactly five detected fish; change the count or turn off **Only include frames with exactly** to keep every sample. Skipped samples still help tracking across neighboring frames.
 3. Background subtraction is the default method. It samples 25 points across the video to build a median tank background, then finds dark connected regions in each selected frame. Enter the known fish count. For this video, five fish are prefilled. The grid scale is approximate; nearby fish can merge into one blob and reflections can create false detections.
 4. The optional Roboflow mode uses the trained `zebrafish_in_aquarium/9` model by the `zebrafish-zxjvh` workspace. Its publishable key is prefilled in the static page and is therefore visible to visitors. Detection method, tracking options, frame inclusion, direct pixel calibration, and Model settings are under **Advanced settings**. The required inclusion count follows the tank count until you enter a different required count.
 4a. By default, analysis keeps only samples with exactly five detected fish. Change the required count or turn off **Only include frames with exactly** to keep every sample. Skipped samples still help tracking across neighboring frames.
-5. Analyze opens the **Results** view on the first included frame. Left/right arrow keys move between included frames while you are not editing a control. Use **Setup**, **Results**, and **Review** to switch between tasks. The Analyze button and status stay visible while setup settings scroll. Use the timeline above the video to skip to sampled frames. Yellow marks show where the detected group-size pattern changes; the previous/next buttons jump between those marks. The link-distance slider updates group colors, the selected-frame chart, timeline marks, and exports without rerunning detection. Export detections CSV, frame metrics CSV, or full JSON. The **Review** tab opens the review view in the same browser tab: click fish centers, optionally show automatic centers or the full frame, mark frames reviewed, and export manual annotations as CSV. Fish marked outside the crop are kept in the export but excluded from the automatic comparison. The review reports one-to-one center matches within 0.5 inch as well as count and group-size agreement. Manual marks are kept only until the tab reloads.
+5. Analyze opens the **Results** view on the first included frame. Left/right arrow keys move through the selected frame view while you are not editing a control. Use **Setup** to configure the recording and **Results** to inspect and correct it. The Analyze button and status stay visible while setup settings scroll. Use the timeline above the video to skip to sampled frames. Yellow marks show where the detected group-size pattern changes; the previous/next buttons jump between those marks. The link-distance slider updates group colors, the selected-frame chart, timeline marks, and exports without rerunning detection. Export detections CSV, frame metrics CSV, or full JSON. In the same Results workspace, enable **Edit centers** to start from the current detections. Click a center to remove it, or click an empty location to add a center. Choose **Apply & stay** to update that frame’s groups, measurements, inclusion status, and exports. Draft edits do not affect results until applied. You can also show original automatic centers or the full frame, mark frames reviewed, and export annotations as CSV. Fish marked outside the crop are kept in the export but excluded from the automatic comparison. The review reports one-to-one center matches within 0.5 inch as well as count and group-size agreement. Manual marks are kept only until the tab reloads.
 
-In **Review**, **Frames to review → Count mismatches** shows samples whose
+In **Results**, **Frames → Count mismatches** shows samples whose
 original automatic candidate count differs from the known fish count. This
 includes samples skipped by the analysis count filter and candidates excluded
 by the crop-center rule. Previous/Next, the slider, and the frame-position input
 navigate the selected review view; the original sample number appears beside
 the timestamp. Review marks and status stay with their original samples when
-switching views. Review filters and display options are in the sidebar. The image
-fits the available height, with Fit and +/− controls for zooming. **Mark reviewed &
-next** records inspection and advances without applying marks. **Apply correction &
-next** explicitly applies the marks and advances. Arrow keys navigate, **R** reviews
-and advances, and **Cmd/Ctrl+Z** undoes a mark edit when focus is outside a control.
+switching views. The sidebar offers **Included in results**, **All sampled frames**, and **Count mismatches**, plus display options and summary metrics. The default is the first included frame, or the first sampled frame if all were excluded. If a correction removes the current frame from the included subset, Results switches to All sampled frames and keeps that frame selected. The image
+fits the available height, with Fit and +/− controls for zooming. **Done & next** applies pending changes, updates the summary,
+marks the frame done, and advances. With no changes, it only marks the frame done.
+**Apply & stay** applies pending changes and marks the frame done while keeping it
+on screen. Edit centers stays enabled across both actions. Previous/Next and arrow
+keys only navigate; drafts are retained. **R** performs Done & next, and
+**Cmd/Ctrl+Z** undoes a mark edit when focus is outside a control.
+Progress above the summary counts done frames in the current view. When all are
+done, a Review complete message links to Export results. Editing a done frame
+makes it unfinished again. At the last frame, Done returns to any unfinished
+frames in the current view before declaring completion.
 **Undo mark** is also available in Display & correction options. Clearing marks
 creates an explicitly empty correction that can be applied; undo restores the
 previous marks. Sharpness tables and scores are under collapsed **Diagnostics**.
 
-Use **Use my marks for this frame** to apply a correction. If the corrected
+Use **Apply & stay** to apply a correction. If the corrected
 count meets the analysis filter, a skipped frame is included in results;
-restoring automatic centers applies the filter again. Corrected frames stay in
-the mismatch view based on their original candidates. The review link remains
+restoring automatic centers applies the filter again. **Restore automatic centers** also resets the draft to the original detections so Done does not reapply an old correction; Undo mark can recover the previous draft. **Start from current centers** resets a draft to the applied result, and **Clear draft centers** prepares an explicitly empty correction. Corrected frames stay in
+the mismatch view based on their original candidates. The Results workspace remains
 available even when all samples were skipped. Human CSV includes every sampled
 frame, its `automatic_candidate_count`, and an `included_in_results` flag.
 Analysis CSVs contain included frames; the full JSON also saves `excludedFrames`.
@@ -60,7 +66,7 @@ A complete, non-estimated sample from the preceding 250 ms can also support an
 estimated merge. With tracking enabled, established paths can also support an overlap for up to one second after an observed center. Estimates never renew that deadline. Split estimates are marked with dashed rings and † and recorded in exports. The final center
 selection leaves frames at or below the known count alone. This can
 reject reflections, but can also reject real edge fish. Pink × markers and the
-Human analysis table show the excluded candidates. They retain their scores and
+Results diagnostic table show the excluded candidates. They retain their scores and
 are included in the comparison CSV and full JSON; detection CSV and spacing/group
 metrics use only the kept candidates. The random-spacing percentile is omitted
 for frames affected by this rule because selecting central points biases spacing.
@@ -76,8 +82,8 @@ If several pairs merge at once and the count is low, recent observed fish sizes
 can provide the size reference for splitting them. These remain uncertain estimates,
 including the two centers inside an X-shaped crossing.
 
-In **Review**, dashed † centers need checking against neighboring frames.
-Mark every visible fish, then choose **Use my centers for this frame** to update
+In **Results**, dashed † centers need checking against neighboring frames.
+Enable **Edit centers**, check or adjust every visible fish, then choose **Apply & stay** to update
 that frame's measurements and exports. Applying no marks explicitly sets its
 count to zero. **Restore automatic centers** undoes the correction. Manual marks
 outside the crop or inside reflection masks are not applied. Corrections affect
@@ -90,7 +96,7 @@ Distances and groups include estimated positions until you correct them.
 Candidate overlays can show **S**, a sharpness score measured from the original
 video pixels around each detection. Higher values usually indicate sharper edges;
 this is a diagnostic measurement, not a reflection probability. After analyzing,
-open **Human analysis → Compare fish and reflections** to see sharpness and local
+open **Results → Diagnostics: fish & reflections** to see sharpness and local
 contrast, label candidates as fish or reflections, and compare their median scores
 across frames. Export the comparison CSV to keep those labels. Labels do not
 remove detections or change counts. To compare reflections, leave the areas you
@@ -135,7 +141,7 @@ When Roboflow mode is selected, the app begins preparing the model after a video
    **Restore progress JSON** replaces this project's current marks with that
    backup. Dataset ZIPs are for training; progress JSON is for resuming editing.
 
-The labeler is separate from Human analysis comparisons and never changes the
+The labeler is separate from Results corrections and comparisons and never changes the
 detector's results. Its boxes are manual training annotations, not automatic fish
 predictions. Browser storage can be cleared or fill up; keep progress backups.
 

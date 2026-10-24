@@ -59,6 +59,13 @@ test('settings validate units and snapshot the selected crop', () => {
   assert.throws(() => createSettings({ ...values, method: 'roboflow', versionText: '' }, crop, 200, 200), /trained model version/);
 });
 
+test('model results retain the recording fish count independently of the inclusion override', () => {
+  const settings = createSettings({ ...values, method: 'roboflow', expectedFish: 8,
+    filterExactCount: true, filterFrameCount: 3 }, crop, 200, 200);
+  assert.equal(settings.expectedFish, 8);
+  assert.equal(settings.filterFrameCount, 3);
+});
+
 test('background pipeline samples a tank, detects a region, and exports full-frame centers', async () => {
   let reads = 0;
   const seeks = [];

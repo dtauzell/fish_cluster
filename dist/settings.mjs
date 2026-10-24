@@ -8,6 +8,7 @@ export function createSettings(values, selectedCrop, frameWidth, frameHeight, se
   if (!Number.isInteger(intervalMs) || intervalMs < 1) throw new Error('Frame interval must be at least 1 ms.');
   if (!Number.isFinite(thresholdInches) || thresholdInches < 0.01) throw new Error('Close distance must be at least 0.01 inches.');
   if (!Number.isFinite(gridPixels) || gridPixels <= 0) throw new Error('Enter the number of pixels across one 0.5-inch square.');
+  if (!Number.isInteger(expectedFish) || expectedFish < 1) throw new Error('Known fish count must be at least one.');
   const crop = selectedCrop ?? { x: 0, y: 0, width: frameWidth, height: frameHeight };
   const exclusions = selectedExclusions.map(box => ({ ...box }));
   if (exclusions.some(box => ![box.x, box.y, box.width, box.height].every(Number.isFinite) || box.width <= 0 || box.height <= 0)) {
@@ -17,6 +18,7 @@ export function createSettings(values, selectedCrop, frameWidth, frameHeight, se
   // Each grid square is half an inch, so two squares span one inch.
   const common = {
     method,
+    expectedFish,
     intervalMs,
     thresholdInches,
     thresholdPx: inchesToPixels(thresholdInches, gridPixels),
@@ -31,7 +33,6 @@ export function createSettings(values, selectedCrop, frameWidth, frameHeight, se
     throw new Error('Required fish per frame must be a whole number of at least one.');
   }
   if (method === 'background') {
-    if (!Number.isInteger(expectedFish) || expectedFish < 1) throw new Error('Known fish count must be at least one.');
     return { ...common, expectedFish, preferCenter: values.preferCenter === true, trackFish: values.trackFish !== false };
   }
   if (!(confidence >= 0 && confidence <= 1)) throw new Error('Confidence must be between 0 and 1.');

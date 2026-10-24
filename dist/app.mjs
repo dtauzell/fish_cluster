@@ -54,9 +54,7 @@ function previewViewBox() {
   return state.focusTank && state.crop ? state.crop : { x: 0, y: 0, width: video.videoWidth || 1600, height: video.videoHeight || 1000 };
 }
 function drawFrame(frame) {
-  $('preview-instruction').textContent = $('workspace').dataset.view === 'results'
-    ? 'Explore frames and groups. Open Review to check detections.'
-    : state.crop && state.focusTank ? 'Tank area enlarged. Use Full frame to adjust the crop.'
+  $('preview-instruction').textContent = state.crop && state.focusTank ? 'Tank area enlarged. Use Full frame to adjust the crop.'
     : 'Drag around the swimming area to enlarge it, then check the scale.';
   $('preview-focus').disabled = !state.crop;
   $('preview-focus').setAttribute('aria-pressed', String(Boolean(state.focusTank && state.crop)));
@@ -65,18 +63,20 @@ function drawFrame(frame) {
   previewViewport.resize();
   const crop = state.drag && !state.drag.exclude && !state.drag.calibration ? state.drag.box : state.crop;
   const exclusions = state.drag?.exclude ? [...state.exclusions, state.drag.box] : state.exclusions;
-  preview.drawFrame(frame, state.settings?.thresholdPx, crop, exclusions, $('show-sharpness').checked, previewViewBox());
+  preview.drawFrame(frame, state.settings?.thresholdPx, crop, exclusions, false, previewViewBox());
   preview.drawCalibrationLine(state.drag?.calibration ? state.drag : state.calibrationLine);
 }
-function changeFrames() { return findChangeFrames(state.frames); }
-const { selectHumanFrame } = createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
+function changeFrames() { return findChangeFrames(visibleResultIndices().map(index => state.reviewFrames[index])); }
+function selectedResultFrame() { return state.human.index == null ? null : state.reviewFrames[state.human.index]; }
+const { selectHumanFrame, indices: visibleResultIndices, refresh: refreshHumanFrame } = createHumanReview({
+  state, video, humanCanvas, queuePreviewSeek,
+  onFrameSelected: () => { updateSelectedFrameDetails(); drawClusterChart(); },
   onFrameCorrected: () => {
-    const hadResults = state.resultsReady;
-    const selectedFrame = state.frames[Number($('frame-slider').value)];
     state.frames = state.reviewFrames.filter(frame => framePassesCountFilter(frame, state.settings));
-    const selected = state.frames.findIndex(frame => frame.frameIndex === selectedFrame?.frameIndex);
-    $('frame-slider').value = Math.max(0, selected);
-    showResults(hadResults);
+    // Keep an excluded correction visible so it can be inspected or undone.
+    if (state.human.filter === 'included' && !framePassesCountFilter(selectedResultFrame(), state.settings)) state.human.filter = 'all';
+    showResults(true);
+    refreshHumanFrame();
     status(`Results updated: ${state.frames.length} of ${state.reviewFrames.length} sampled frames included.`);
   } });
 const labeling = createLabeling({ canvas: $('label-canvas'), source: videoSource, isRunning: () => state.running,
@@ -115,7 +115,7 @@ window.addEventListener('unhandledrejection', event => {
 });
 function resetHuman() {
   state.human = { marks: new Map(), candidateLabels: new Map(), reviewed: new Set(), index: null, loading: false };
-  $('human-link').hidden = true;
+  $('human-edit-centers').checked = false;
   $('human-review-link').hidden = true;
 }
 
@@ -128,8 +128,6 @@ function clearResults() {
   $('results').hidden = true;
   updateWorkflow();
   if (location.hash === '#results') location.hash = '#analysis';
-  $('frame-slider').disabled = true;
-  $('frame-position').textContent = 'Frame —';
   $('frame-groups').hidden = true;
   $('timeline').hidden = true;
 }
@@ -207,7 +205,6 @@ video.addEventListener('loadedmetadata', async () => {
     drawFrame(null);
     $('empty-preview').hidden = true;
     $('calibration-tools').disabled = false;
-    $('frame-time').textContent = timeLabel(video.currentTime * 1000);
   } catch (error) {
     if (state.file === selectedFile) status(`Could not show the first frame: ${error.message}`, true);
     return;
@@ -281,7 +278,7 @@ canvas.addEventListener('pointerup', event => {
       state.calibrationLine = line;
       updateCalibrationControls();
     } else $('calibration-status').textContent = 'Draw a longer line along a known distance.';
-    drawFrame(state.frames[Number($('frame-slider').value)] ?? null);
+    drawFrame(null);
     return;
   }
   const { box, exclude } = state.drag;
@@ -329,7 +326,7 @@ $('clear-calibration').addEventListener('click', () => {
   if (state.running) return;
   state.calibrationLine = null;
   updateCalibrationControls();
-  drawFrame(state.frames[Number($('frame-slider').value)] ?? null);
+  drawFrame(null);
 });
 $('calibration-length').addEventListener('input', updateCalibrationControls);
 $('apply-crop').addEventListener('click', () => {
@@ -450,7 +447,6 @@ $('analyze').addEventListener('click', async () => {
   $('calibration-tools').disabled = true;
   $('progress').hidden = false;
   $('progress').value = 0;
-  $('frame-slider').disabled = true;
   for (const id of ['expected-fish', 'interval', 'threshold', 'grid-pixels', 'model-slug', 'model-version', 'confidence', 'publishable-key']) $(id).disabled = true;
   try {
     const events = analyzeVideo({
@@ -475,13 +471,11 @@ $('analyze').addEventListener('click', async () => {
       state.frames.push(frame);
       drawFrame(frame);
       $('empty-preview').hidden = true;
-      $('frame-position').textContent = `${frame.frameIndex + 1} / ${total}`;
-      $('frame-time').textContent = timeLabel(frame.timestampMs);
       status(config.method === 'background'
         ? `Analyzed ${frame.frameIndex + 1} of ${total} frames · ${frame.detections.length} fish candidates (known count ${config.expectedFish})${frame.rejectedDetections.length ? ` · ${frame.rejectedDetections.length} outer candidates excluded` : ''}`
         : `Analyzed ${frame.frameIndex + 1} of ${total} frames · ${frame.detections.length} fish in current frame (${frame.rawPredictionCount} model boxes)`);
     }
-    if (state.frames.length) showResults();
+    if (state.reviewFrames.length) showResults();
     const maxRawCount = Math.max(0, ...state.frames.map(frame => frame.rawPredictionCount));
     status(state.settings.filterExactCount && !state.frames.length && !state.stopped
       ? `No frames matched exactly ${state.settings.filterFrameCount} fish. Skipped all ${totalSamples} sampled frames.`
@@ -493,12 +487,11 @@ $('analyze').addEventListener('click', async () => {
       `Complete: ${state.frames.length} frames analyzed. Up to ${maxRawCount} model boxes in a frame.`);
   } catch (error) {
     analysisFailed = true;
-    if (state.frames.length) showResults();
+    if (state.reviewFrames.length) showResults();
     status(config.method === 'background' ? `Analysis stopped: ${error.message}` : modelErrorMessage(error, config), true);
   } finally {
     state.running = false;
     $('human-review-link').hidden = !state.reviewFrames.length;
-    $('human-link').hidden = !state.reviewFrames.length;
     $('analyze').disabled = false;
     $('cancel').hidden = true;
     $('progress').hidden = true;
@@ -520,29 +513,25 @@ $('analyze').addEventListener('click', async () => {
 $('cancel').addEventListener('click', () => { state.stopped = true; status('Stopping after the current frame…'); });
 
 function showResults(preserveSelection = false) {
-  if (!state.frames.length) {
+  if (!state.reviewFrames.length) {
     state.resultsReady = false;
     $('results').hidden = true;
-    $('frame-slider').disabled = true;
     $('timeline').hidden = true;
     $('frame-groups').hidden = true;
     updateWorkflow();
     return;
   }
-  const selected = preserveSelection ? Math.max(0, Math.min(Number($('frame-slider').value), state.frames.length - 1)) : 0;
+  if (!preserveSelection) state.human.index = visibleResultIndices()[0] ?? null;
   const summary = summarizeFrames(state.frames);
   state.resultsReady = true;
   $('results').hidden = location.hash !== '#results';
   updateWorkflow();
-  $('human-link').hidden = false;
   $('stat-fish').textContent = fmt(summary.meanFishCount);
   $('stat-distance').textContent = Number.isFinite(summary.meanPairDistanceInches) ? `${fmt(summary.meanPairDistanceInches, 2)} in` : '—';
   $('distance-note').textContent = `approximate · ${fmt(summary.meanPairDistancePx)} px · ${fmt(state.settings.pixelsPerInch)} px/in`;
   $('stat-close').textContent = Number.isFinite(summary.meanCloseFishFraction) ? `${fmt(summary.meanCloseFishFraction * 100, 0)}%` : '—';
   $('stat-clusters').textContent = fmt(summary.meanClusterCount);
-  $('frame-slider').max = state.frames.length - 1;
-  $('frame-slider').value = selected;
-  $('frame-slider').disabled = false;
+  $('results-inclusion').textContent = `${state.frames.length} of ${state.reviewFrames.length} samples included${!state.frames.length ? '. Choose All sampled frames or Count mismatches to correct excluded samples.' : '. Corrections update these measurements and exports.'}`;
   if (!preserveSelection) {
     const cropDiagonalInches = Math.hypot(state.settings.crop.width, state.settings.crop.height) / state.settings.pixelsPerInch;
     $('cluster-distance').max = Math.max(5, Math.min(cropDiagonalInches, state.settings.thresholdInches * 2), state.settings.thresholdInches);
@@ -562,19 +551,21 @@ function showResults(preserveSelection = false) {
   const temporal = state.frames.filter(frame => frame.metrics.randomSpacingUnavailableReason === 'temporal-overlap-estimate').length;
   if (temporal) $('random-summary').textContent += ` ${temporal} frame(s) omitted because some centers use temporal overlap estimates.`;
   const uncertain = state.frames.filter(frame => frame.metrics.uncertainPositionCount).length;
-  if (uncertain) $('random-summary').textContent += ` Distances and groups include uncertain overlap estimates in ${uncertain} frame(s). Check these in Human analysis; dashed rings and † mark estimated positions.`;
+  if (uncertain) $('random-summary').textContent += ` Distances and groups include uncertain overlap estimates in ${uncertain} frame(s). Check these in this view; dashed rings and † mark estimated positions.`;
 }
 
 function drawTimeline() {
   const canvas = $('change-timeline');
   const context = canvas.getContext('2d');
   const changes = changeFrames();
-  const last = Math.max(1, state.frames.length - 1);
+  const indices = visibleResultIndices();
+  $('timeline').hidden = !indices.length;
+  const last = Math.max(1, indices.length - 1);
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = '#24444c'; context.fillRect(0, 10, canvas.width, 6);
   context.fillStyle = '#f6d979';
   for (const index of changes) context.fillRect(index / last * (canvas.width - 2), 4, 2, 18);
-  const selected = Number($('frame-slider').value);
+  const selected = indices.indexOf(state.human.index);
   context.fillStyle = '#8ce6ce'; context.fillRect(selected / last * (canvas.width - 3), 0, 3, 26);
   $('change-count').textContent = `${changes.length} change${changes.length === 1 ? '' : 's'} in group sizes`;
   $('previous-change').disabled = !changes.some(index => index < selected);
@@ -582,19 +573,18 @@ function drawTimeline() {
 }
 
 function updateSelectedFrameDetails() {
-  const frame = state.frames[Number($('frame-slider').value)];
-  if (!frame) return;
+  const frame = selectedResultFrame();
+  if (!frame) { $('frame-groups').hidden = true; drawTimeline(); return; }
   const sizes = frame.metrics.groupSizes;
-  const groups = sizes.map((size, index) => `Group ${index + 1}: ${size}`).join(' · ') || 'No detections';
-  const percentile = frame.metrics.randomSpacingPercentile;
-  $('frame-groups').textContent = `${groups} · ${frame.metrics.clusterCount} group${frame.metrics.clusterCount === 1 ? '' : 's'} of 2+ · ${frame.metrics.isolatedCount} single · ${Number.isFinite(percentile) ? `spacing percentile ${fmt(percentile * 100, 1)}% vs random` : 'random comparison unavailable'}${frame.metrics.uncertainPositionCount ? ` · ${frame.metrics.uncertainPositionCount} uncertain centers` : ''}${frame.manualCorrectionApplied ? ' · manual centers applied' : frame.rejectedDetections?.length ? ` · ${frame.rejectedDetections.length} outer candidates excluded; random comparison skipped` : ''}`;
+  const groups = sizes.slice().sort((a, b) => b - a).join('+') || 'none';
+  $('frame-groups').textContent = `${frame.detections.length} fish · groups ${groups} · ${frame.metrics.clusterCount} cluster${frame.metrics.clusterCount === 1 ? '' : 's'} · ${frame.metrics.isolatedCount} single${frame.metrics.uncertainPositionCount ? ` · ${frame.metrics.uncertainPositionCount} uncertain centers` : ''}`;
   $('frame-groups').hidden = false;
   drawTimeline();
 }
 
 function drawClusterChart() {
-  const frame = state.frames[Number($('frame-slider').value)];
-  if (!frame) return;
+  const frame = selectedResultFrame();
+  if (!frame) { $('cluster-chart').replaceChildren(); return; }
   const maxInches = Number($('cluster-distance').max);
   const points = Array.from({ length: 101 }, (_, i) => analyzeFrame(frame.detections, maxInches * state.settings.pixelsPerInch * i / 100));
   const ymax = Math.max(1, frame.detections.length);
@@ -613,40 +603,16 @@ function queuePreviewSeek(token, timestampMs, render) {
     if (token !== state.previewToken) return;
     state.human.loading = false;
     status(error.message, true);
+    return false;
   });
   return previewSeek;
 }
 
-function selectFrame(index) {
-  const frame = state.frames[index];
-  if (!frame || state.running) return;
-  $('frame-slider').value = index;
-  updateSelectedFrameDetails();
-  drawClusterChart();
-  const token = ++state.previewToken;
-  return queuePreviewSeek(token, frame.timestampMs, () => {
-    drawFrame(frame);
-    const frameNumber = `${index + 1} / ${state.frames.length}${frame.frameIndex !== index ? ` · sample ${frame.frameIndex + 1}` : ''}`;
-    $('frame-position').textContent = state.settings.method === 'background'
-      ? `${frameNumber} · ${frame.detections.length} kept / ${state.settings.expectedFish} expected${frame.rejectedDetections?.length ? ` · ${frame.rejectedDetections.length} outer candidates excluded` : ''}`
-      : `${frameNumber} · ${frame.detections.length} fish / ${frame.rawPredictionCount} boxes`;
-    $('frame-time').textContent = timeLabel(frame.timestampMs);
-  });
+function selectFrame(position) {
+  const index = visibleResultIndices()[position];
+  if (index != null && !state.running) return selectHumanFrame(index);
 }
 
-$('frame-slider').addEventListener('input', event => selectFrame(Number(event.target.value)));
-document.addEventListener('keydown', event => {
-  if (activeView !== 'results' || !state.resultsReady || state.running || event.defaultPrevented ||
-      event.metaKey || event.ctrlKey || event.altKey || event.shiftKey ||
-      !['ArrowLeft', 'ArrowRight'].includes(event.key) ||
-      event.target.closest('input,select,textarea,summary,[role="button"],[role="textbox"],[role="slider"],[contenteditable]:not([contenteditable="false"])')) return;
-  event.preventDefault();
-  const next = Number($('frame-slider').value) + (event.key === 'ArrowRight' ? 1 : -1);
-  if (next >= 0 && next < state.frames.length) selectFrame(next);
-});
-$('show-sharpness').addEventListener('change', () => {
-  if (!state.running) drawFrame(state.frames[Number($('frame-slider').value)] ?? null);
-});
 function refreshDistanceResults() {
   if (!state.reviewFrames.length || state.running) return;
   state.settings.thresholdPx = inchesToPixels(state.settings.thresholdInches, state.settings.gridPixels);
@@ -654,10 +620,11 @@ function refreshDistanceResults() {
   for (const frame of state.reviewFrames) frame.metrics = frameMetrics(frame.detections, state.settings,
     frame.manualCorrectionApplied ? 0 : frame.rejectedDetections?.length ?? 0);
   showResults(true);
-  drawFrame(state.frames[Number($('frame-slider').value)] ?? null);
+  refreshHumanFrame();
+  if (!$('workspace').hidden) drawFrame(null);
 }
 $('cluster-distance').addEventListener('input', event => {
-  if (!state.settings || state.running || !state.frames.length) return;
+  if (!state.settings || state.running || !state.reviewFrames.length) return;
   state.settings.thresholdInches = Number(event.target.value);
   $('threshold').value = state.settings.thresholdInches;
   refreshDistanceResults();
@@ -679,16 +646,16 @@ $('change-timeline').addEventListener('click', event => {
   const changes = changeFrames();
   if (!changes.length) return;
   const rect = event.currentTarget.getBoundingClientRect();
-  const target = (event.clientX - rect.left) / rect.width * (state.frames.length - 1);
+  const target = (event.clientX - rect.left) / rect.width * (visibleResultIndices().length - 1);
   selectFrame(changes.reduce((best, index) => Math.abs(index - target) < Math.abs(best - target) ? index : best));
 });
 $('previous-change').addEventListener('click', () => {
-  const selected = Number($('frame-slider').value);
+  const selected = visibleResultIndices().indexOf(state.human.index);
   const previous = changeFrames().filter(index => index < selected).at(-1);
   if (previous != null) selectFrame(previous);
 });
 $('next-change').addEventListener('click', () => {
-  const selected = Number($('frame-slider').value);
+  const selected = visibleResultIndices().indexOf(state.human.index);
   const next = changeFrames().find(index => index > selected);
   if (next != null) selectFrame(next);
 });
@@ -723,12 +690,11 @@ function loadAbout() {
 
 function updateWorkflow() {
   $('nav-results').setAttribute('aria-disabled', String(!state.resultsReady || state.running));
-  $('nav-review').setAttribute('aria-disabled', String(!state.reviewFrames.length || state.running));
   $('workflow-summary').textContent = state.running ? 'Analyzing video…'
     : state.reviewFrames.length ? `${state.frames.length} of ${state.reviewFrames.length} samples included`
     : state.file?.name ?? 'Add a video to begin';
 }
-for (const id of ['nav-results', 'nav-review']) $(id).addEventListener('click', event => {
+for (const id of ['nav-results']) $(id).addEventListener('click', event => {
   if ($(id).getAttribute('aria-disabled') === 'true') event.preventDefault();
 });
 function updateSamplingSummary() {
@@ -759,43 +725,36 @@ $('preview-focus').addEventListener('click', () => { state.focusTank = true; pre
 $('preview-full').addEventListener('click', () => { state.focusTank = false; previewViewport.reset(); });
 
 function showPage() {
-  if ((location.hash === '#human-analysis' && (!state.reviewFrames.length || state.running)) ||
-      (location.hash === '#results' && (!state.resultsReady || state.running)) ||
+  // Existing review bookmarks lead to the unified results workspace.
+  if (location.hash === '#human-analysis') history.replaceState(null, '', `${location.pathname}${location.search}#results`);
+  if ((location.hash === '#results' && (!state.resultsReady || state.running)) ||
       (location.hash === '#labeling' && !labeling.hasProject())) {
     history.replaceState(null, '', `${location.pathname}${location.search}#analysis`);
   }
-  const nextView = location.hash === '#about' ? 'about' : location.hash === '#human-analysis' ? 'human'
-    : location.hash === '#labeling' ? 'label' : location.hash === '#results' ? 'results' : 'analysis';
+  const nextView = location.hash === '#about' ? 'about' : location.hash === '#labeling' ? 'label'
+    : location.hash === '#results' ? 'results' : 'analysis';
   if (activeView === 'label' && nextView !== 'label') labeling.leave();
   if (activeView) viewScroll.set(activeView, window.scrollY);
   activeView = nextView;
-  const human = nextView === 'human', about = nextView === 'about', label = nextView === 'label';
-  $('workspace').hidden = human || about || label;
-  $('workspace').dataset.view = nextView === 'results' ? 'results' : 'setup';
+  const results = nextView === 'results', about = nextView === 'about', label = nextView === 'label';
+  $('workspace').hidden = nextView !== 'analysis';
+  $('workspace').dataset.view = 'setup';
   document.querySelector('.setup').hidden = nextView !== 'analysis';
-  $('results').hidden = nextView !== 'results' || !state.resultsReady;
-  $('human-page').hidden = !human;
+  $('results').hidden = !results;
+  $('human-page').hidden = !results;
   $('about-page').hidden = !about;
   $('label-page').hidden = !label;
-  for (const [id, view] of [['nav-setup', 'analysis'], ['nav-results', 'results'], ['nav-review', 'human']]) {
+  for (const [id, view] of [['nav-setup', 'analysis'], ['nav-results', 'results']]) {
     if (nextView === view) $(id).setAttribute('aria-current', 'page');
     else $(id).removeAttribute('aria-current');
   }
-  $('preview-title').textContent = nextView === 'results' ? 'Analyzed frames' : 'Tank preview';
-  $('preview-instruction').textContent = nextView === 'results' ? 'Explore frames and groups. Open Review to check detections.' : 'Select the swimming area, then check the scale.';
   updateWorkflow();
-  document.title = label ? 'Label training frames — Fish Cluster' : about ? 'About the analysis — Fish Cluster' : human ? 'Review — Fish Cluster' : 'Fish Cluster — zebrafish video analysis';
+  document.title = label ? 'Label training frames — Fish Cluster' : about ? 'About the analysis — Fish Cluster'
+    : results ? 'Results & corrections — Fish Cluster' : 'Fish Cluster — zebrafish video analysis';
   if (about) loadAbout();
   else if (label) labeling.show();
-  else if (human) {
-    const crop = state.settings.crop;
-    humanCanvas.width = crop.width;
-    humanCanvas.height = crop.height;
-    const selected = state.frames[Number($('frame-slider').value)];
-    selectHumanFrame(state.human.index ?? state.reviewFrames.indexOf(selected));
-  } else if (state.resultsReady && !state.running) {
-    selectFrame(Number($('frame-slider').value));
-  } else if (video.readyState >= 2) drawFrame(null);
+  else if (results) selectHumanFrame(state.human.index ?? visibleResultIndices()[0]);
+  else if (video.readyState >= 2) drawFrame(null);
   requestAnimationFrame(() => window.scrollTo(0, viewScroll.get(nextView) ?? 0));
 }
 window.addEventListener('hashchange', showPage);

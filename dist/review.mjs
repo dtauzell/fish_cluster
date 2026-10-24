@@ -13,6 +13,14 @@ export function compareFrame(frame, marks, config) {
   return { within, manual, automatic, matched, outside: marks.length - within.length };
 }
 
+/** An absent draft accepts the current result; an explicit empty draft can remove centers. */
+export function hasPendingCenters(frame, marks, config) {
+  if (!marks) return false;
+  const within = marks.filter(point => insideAnalysisArea(point, config.crop, config.exclusions));
+  return within.length !== frame.detections.length || within.some((point, index) =>
+    point.x !== frame.detections[index].x || point.y !== frame.detections[index].y);
+}
+
 /** Apply a complete set of manual centers to this frame; preserve the automatic result for audit/undo. */
 export function applyManualCenters(frame, marks, config) {
   const automaticDetections = frame.automaticDetections ?? frame.detections;
