@@ -1,4 +1,4 @@
-import { tankSide, darkZoneMask } from './tank-zones.mjs';
+import { analysisTankSide, darkZoneMask } from './tank-zones.mjs';
 import { selectCentralCandidates } from './candidate-selection.mjs';
 import { candidateSharpness } from './sharpness.mjs';
 import { insideAnalysisArea, localExclusions, analysisPixelMask } from './region.mjs';
@@ -99,7 +99,7 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
         ...candidateSharpness(gray, crop.width, crop.height, candidate, exclusions) }));
     }
     detections = detections.map(point => ({ ...point, x: point.x + crop.x, y: point.y + crop.y,
-      tankSide: tankSide({ x: point.x + crop.x, y: point.y + crop.y }, config.tankZones) }));
+      tankSide: analysisTankSide({ x: point.x + crop.x, y: point.y + crop.y }, config) }));
     // A split region's estimated center must also fall in the usable area.
     detections = detections.filter(point => insideAnalysisArea(point, crop, config.exclusions));
     const selected = selectCentralCandidates(detections, crop,

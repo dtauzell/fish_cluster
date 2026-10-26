@@ -1,3 +1,5 @@
+import { trackSingleFishSides, visibleSideChanges } from './side-tracking.mjs';
+import { createVelocityView } from './velocity-ui.mjs';
 import { polygonBox, copyShape } from './geometry.mjs';
 import { drawTankZones } from './tank-zones.mjs';
 import { createCanvasViewport } from './canvas-viewport.mjs';
@@ -36,6 +38,7 @@ const state = {
   tankZones: [],
   drag: null,
   corners: [],
+  areaTool: 'crop',
   calibrationLine: null,
   running: false,
   stopped: false,
@@ -43,6 +46,8 @@ const state = {
   previewToken: 0,
   human: { marks: new Map(), candidateLabels: new Map(), reviewed: new Set(), index: null, loading: false }
 };
+const velocity = createVelocityView({ getFrames: () => state.reviewFrames, getSettings: () => state.settings,
+  getSelectedTime: () => selectedResultFrame()?.timestampMs });
 let previewSeek = Promise.resolve();
 // The entry point owns page state and translates UI actions into service calls.
 const videoSource = createVideoSource(video);
@@ -80,7 +85,12 @@ function drawFrame(frame) {
   }
   preview.drawCalibrationLine(state.drag?.calibration ? state.drag : state.calibrationLine);
 }
-function changeFrames() { return findChangeFrames(visibleResultIndices().map(index => state.reviewFrames[index])); }
+function sideTracking() { return trackSingleFishSides(state.reviewFrames, state.settings); }
+function changeFrames() {
+  const indices = visibleResultIndices();
+  const sides = sideTracking();
+  return sides ? visibleSideChanges(sides, indices) : findChangeFrames(indices.map(index => state.reviewFrames[index]));
+}
 function selectedResultFrame() { return state.human.index == null ? null : state.reviewFrames[state.human.index]; }
 const { selectHumanFrame, indices: visibleResultIndices, refresh: refreshHumanFrame } = createHumanReview({
   state, video, humanCanvas, queuePreviewSeek,
@@ -90,7 +100,7 @@ const { selectHumanFrame, indices: visibleResultIndices, refresh: refreshHumanFr
     const image = await videoSource.readPng(view);
     download(name, image, 'image/png');
   },
-  onFrameSelected: () => { updateSelectedFrameDetails(); drawClusterChart(); },
+  onFrameSelected: () => { updateSelectedFrameDetails(); drawClusterChart(); velocity.select(); },
   onFrameCorrected: () => {
     state.frames = state.reviewFrames.filter(frame => framePassesCountFilter(frame, state.settings));
     // Keep an excluded correction visible so it can be inspected or undone.
@@ -168,6 +178,7 @@ function loadMetadata(file) {
   state.tankZones = [];
   updateZoneControls();
   $('crop-tool').value = 'crop';
+  state.areaTool = 'crop';
   updateMaskControls();
   state.drag = null;
   state.calibrationLine = null;
@@ -288,28 +299,34 @@ function commitCrop(box) {
 canvas.addEventListener('pointerdown', event => {
   if (!state.file || state.running || video.readyState < 2 || !canvas.width) return;
   if (event.button !== 0 || state.drag) return;
-  const point = pointOnCanvas(event);
   if ($('selection-shape').value === 'polygon' && $('crop-tool').value !== 'calibrate') {
-    state.corners.push(point);
-    if (state.corners.length === 4) {
-      try {
-        const shape = polygonBox(state.corners);
-        const tool = $('crop-tool').value;
-        if (tool === 'crop') commitCrop(shape);
-        else {
-          if (shape.width < 4 || shape.height < 4) throw new Error('Select a larger area.');
-          if (tool === 'exclude') { state.exclusions.push(shape); updateMaskControls(); }
-          else { state.tankZones.push({ ...shape, side: tool }); updateZoneControls(); }
-          clearResults();
-          state.corners = [];
-          status('Four-corner area selected. Analyze again to apply it.');
-        }
-      } catch (error) { state.corners.pop(); status(error.message, true); }
-    }
-    updateCornerControls(); drawFrame(null); return;
+    return; // Four-corner areas are placed on completed clicks, not drags.
   }
+  const point = pointOnCanvas(event);
   state.drag = { start: point, end: point, side: ['dark', 'light'].includes($('crop-tool').value) ? $('crop-tool').value : null, calibration: $('crop-tool').value === 'calibrate', exclude: $('crop-tool').value === 'exclude', box: { x: point.x, y: point.y, width: 0, height: 0 } };
   canvas.setPointerCapture(event.pointerId);
+});
+canvas.addEventListener('click', event => {
+  if (!state.file || state.running || video.readyState < 2 || event.button !== 0 || state.drag ||
+    $('selection-shape').value !== 'polygon' || $('crop-tool').value === 'calibrate') return;
+  const point = pointOnCanvas(event);
+  state.corners.push(point);
+  if (state.corners.length === 4) {
+    try {
+      const shape = polygonBox(state.corners);
+      const tool = $('crop-tool').value;
+      if (tool === 'crop') commitCrop(shape);
+      else {
+        if (shape.width < 4 || shape.height < 4) throw new Error('Select a larger area.');
+        if (tool === 'exclude') { state.exclusions.push(shape); updateMaskControls(); }
+        else { state.tankZones.push({ ...shape, side: tool }); updateZoneControls(); }
+        clearResults();
+        state.corners = [];
+        status('Four-corner area selected. Analyze again to apply it.');
+      }
+    } catch (error) { state.corners.pop(); status(error.message, true); }
+  }
+  updateCornerControls(); drawFrame(null);
 });
 canvas.addEventListener('pointermove', event => {
   if (!state.drag) return;
@@ -369,6 +386,7 @@ function updateCalibrationControls() {
 }
 $('draw-calibration').addEventListener('click', () => {
   $('crop-tool').value = 'calibrate';
+  $('crop-tool').dispatchEvent(new Event('change'));
   $('calibration-status').textContent = 'Drag from one end of a known distance to the other in the preview.';
   canvas.scrollIntoView({ block: 'nearest' });
 });
@@ -616,6 +634,7 @@ function showResults(preserveSelection = false) {
   }
   if (!preserveSelection) state.human.index = visibleResultIndices()[0] ?? null;
   const summary = summarizeFrames(state.frames);
+  velocity.refresh();
   state.resultsReady = true;
   $('results').hidden = location.hash !== '#results';
   updateWorkflow();
@@ -652,15 +671,46 @@ function drawTimeline() {
   const context = canvas.getContext('2d');
   const changes = changeFrames();
   const indices = visibleResultIndices();
+  const sides = sideTracking();
+  const selected = indices.indexOf(state.human.index);
   $('timeline').hidden = !indices.length;
+  $('timeline').dataset.mode = sides ? 'side' : 'group';
+  $('timeline-title').textContent = sides ? 'Light / dark changes' : 'Group changes';
+  $('side-timeline-details').hidden = !sides;
+  canvas.setAttribute('aria-label', sides
+    ? 'Fish side over video time: purple dark, cyan light, gray unknown; click to jump to an observed side change'
+    : 'Timeline of changes in group sizes; click to jump to a change');
+  for (const [id, direction] of [['previous-change', 'Previous'], ['next-change', 'Next']]) {
+    const label = `${direction} ${sides ? 'side' : 'group'} change`;
+    $(id).setAttribute('aria-label', label); $(id).title = label;
+  }
   const last = Math.max(1, indices.length - 1);
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = '#24444c'; context.fillRect(0, 10, canvas.width, 6);
-  context.fillStyle = '#f6d979';
-  for (const index of changes) context.fillRect(index / last * (canvas.width - 2), 4, 2, 18);
-  const selected = indices.indexOf(state.human.index);
-  context.fillStyle = '#8ce6ce'; context.fillRect(selected / last * (canvas.width - 3), 0, 3, 26);
-  $('change-count').textContent = `${changes.length} change${changes.length === 1 ? '' : 's'} in group sizes`;
+  if (sides) {
+    const start = sides.samples[0]?.timestampMs ?? 0;
+    const span = Math.max(1, (sides.samples.at(-1)?.timestampMs ?? start) - start);
+    const x = time => (time - start) / span * (canvas.width - 3);
+    const colors = { dark: '#bdadff', light: '#69e3e9', unknown: '#52666f' };
+    sides.samples.forEach((sample, index) => {
+      const left = x(sample.timestampMs);
+      const right = index + 1 < sides.samples.length ? x(sides.samples[index + 1].timestampMs) : canvas.width;
+      context.fillStyle = colors[sample.side]; context.fillRect(left, 8, Math.max(2, right - left), 12);
+    });
+    context.fillStyle = '#f6d979';
+    for (const change of sides.changes) context.fillRect(x(change.timestampMs), 4, 2, 20);
+    const frame = selectedResultFrame();
+    if (frame) { context.fillStyle = '#ffffff'; context.fillRect(x(frame.timestampMs), 0, 3, 26); }
+    const side = sides.samples[state.human.index]?.side ?? 'unknown';
+    $('side-timeline-current').textContent = `Selected frame: ${side === 'dark' ? 'Dark side' : side === 'light' ? 'Light side' : 'Unknown'}`;
+    $('side-timeline-summary').textContent = `All samples: ${sides.darkSampleCount} dark · ${sides.lightSampleCount} light · ${sides.unknownSampleCount} unknown. Gray gaps have no reliable position; crossings are marked only between adjacent known samples.`;
+    $('change-count').textContent = `${sides.changes.length} observed side change${sides.changes.length === 1 ? '' : 's'} · ${changes.length} in this frame view`;
+  } else {
+    context.fillStyle = '#f6d979';
+    for (const index of changes) context.fillRect(index / last * (canvas.width - 2), 4, 2, 18);
+    context.fillStyle = '#8ce6ce'; context.fillRect(selected / last * (canvas.width - 3), 0, 3, 26);
+    $('change-count').textContent = `${changes.length} change${changes.length === 1 ? '' : 's'} in group sizes`;
+  }
   $('previous-change').disabled = !changes.some(index => index < selected);
   $('next-change').disabled = !changes.some(index => index > selected);
 }
@@ -740,8 +790,14 @@ $('change-timeline').addEventListener('click', event => {
   const changes = changeFrames();
   if (!changes.length) return;
   const rect = event.currentTarget.getBoundingClientRect();
-  const target = (event.clientX - rect.left) / rect.width * (visibleResultIndices().length - 1);
-  selectFrame(changes.reduce((best, index) => Math.abs(index - target) < Math.abs(best - target) ? index : best));
+  const fraction = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  const indices = visibleResultIndices();
+  const sides = sideTracking();
+  const start = sides?.samples[0]?.timestampMs ?? 0;
+  const end = sides?.samples.at(-1)?.timestampMs ?? start;
+  const target = sides ? start + fraction * (end - start) : fraction * (indices.length - 1);
+  const location = position => sides ? state.reviewFrames[indices[position]].timestampMs : position;
+  selectFrame(changes.reduce((best, index) => Math.abs(location(index) - target) < Math.abs(location(best) - target) ? index : best));
 });
 $('previous-change').addEventListener('click', () => {
   const selected = visibleResultIndices().indexOf(state.human.index);
@@ -808,6 +864,7 @@ $('open-scale').addEventListener('click', () => {
   $('preview-tools').open = true;
   $('scale-panel').open = true;
   $('crop-tool').value = 'calibrate';
+  $('crop-tool').dispatchEvent(new Event('change'));
   $('calibration-tools').scrollIntoView({ block: 'nearest' });
   $('draw-calibration').focus({ preventScroll: true });
 });
@@ -824,11 +881,22 @@ for (const id of ['undo-corner', 'cancel-corners']) $(id).addEventListener('clic
   updateCornerControls(); drawFrame(null);
 });
 $('selection-shape').addEventListener('change', () => {
-  state.corners = []; state.drag = null; updateCornerControls(); drawFrame(null);
+  state.corners = []; state.drag = null;
+  if ($('selection-shape').value === 'polygon') {
+    if ($('crop-tool').value === 'calibrate') $('crop-tool').value = state.areaTool;
+    if ($('crop-tool').value === 'crop') { state.focusTank = false; previewViewport.reset(); }
+  }
+  updateCornerControls(); drawFrame(null);
 });
 $('crop-tool').addEventListener('change', () => {
+  state.drag = null;
+  if ($('crop-tool').value !== 'calibrate') state.areaTool = $('crop-tool').value;
   state.corners = []; updateCornerControls();
-  if ($('crop-tool').value === 'calibrate') $('scale-panel').open = true;
+  if ($('crop-tool').value === 'calibrate') {
+    $('selection-shape').value = 'rectangle';
+    updateCornerControls();
+    $('scale-panel').open = true;
+  }
   if ($('crop-tool').value === 'crop') { state.focusTank = false; previewViewport.reset(); }
   drawFrame(null);
 });
@@ -880,8 +948,12 @@ $('download-frames').addEventListener('click', () => {
   download(`${baseName(state.file?.name)}-frames.csv`, framesCsv(state.frames), 'text/csv');
 });
 $('download-json').addEventListener('click', () => {
+  const velocityReport = velocity.exportReport();
+  const sideReport = sideTracking();
   const result = {
     videoName: state.file.name,
+    ...(velocityReport ? { velocity: velocityReport } : {}),
+    ...(sideReport ? { sideTracking: sideReport } : {}),
     sharpnessMethod: SHARPNESS_METHOD,
     trackingMethod: state.settings.trackFish ? TRACKING_METHOD : null,
     sharpnessLabels: exportedSharpnessLabels(state.human.candidateLabels),

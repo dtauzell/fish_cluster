@@ -1,4 +1,4 @@
-import { tankSide } from './tank-zones.mjs';
+import { analysisTankSide } from './tank-zones.mjs';
 import { frameCandidates } from './candidate-selection.mjs';
 import { insideAnalysisArea } from './region.mjs';
 // Plain-data export formatting. These functions have no browser or page-state dependencies.
@@ -97,7 +97,7 @@ function humanRows(frames, marksByFrame, reviewed, config) {
       manual_group_sizes: hasManualMarks ? [...metrics.groupSizes].sort((a, b) => b - a).join('+') : null,
       automatic_group_sizes: groupSignature({ metrics: automatic }), close_distance_inches: config.thresholdInches };
     return marks.length ? marks.map((mark, markIndex) => ({ ...common, mark_number: markIndex + 1,
-      x_px: mark.x.toFixed(2), y_px: mark.y.toFixed(2), tank_side: tankSide(mark, config.tankZones), inside_crop: insideCrop(mark, config.crop),
+      x_px: mark.x.toFixed(2), y_px: mark.y.toFixed(2), tank_side: analysisTankSide(mark, config), inside_crop: insideCrop(mark, config.crop),
       included_in_analysis: insideAnalysisArea(mark, config.crop, config.exclusions),
       manual_group_id: insideAnalysisArea(mark, config.crop, config.exclusions) ? metrics.groupIds[inCrop.indexOf(mark)] + 1 : null })) : [common];
   });

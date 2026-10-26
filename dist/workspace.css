@@ -1228,3 +1228,11 @@ footer {
 .review-complete p {
   margin: 5px 0;
 }
+
+/* The side summary occupies its own row below the existing timeline controls. */
+.results-workspace .timeline > canvas{grid-column:2;grid-row:1}
+.results-workspace .timeline > .timeline-controls{grid-column:3;grid-row:1}
+.results-workspace .timeline > #side-timeline-details{grid-column:1/-1;grid-row:2;min-width:0;margin-top:0}
+.results-workspace .timeline[data-mode=side]{grid-template-columns:minmax(130px,220px) minmax(60px,1fr) auto}
+.results-workspace .timeline[data-mode=side] .timeline-head{min-width:0}
+@media(max-width:760px){.results-workspace .timeline[data-mode=side]{grid-template-columns:minmax(100px,150px) minmax(60px,1fr) auto}}

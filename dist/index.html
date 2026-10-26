@@ -7,11 +7,11 @@
   <meta name="description" content="Analyze zebrafish spacing and clustering in a tank video, entirely in your browser.">
   <title>Fish Cluster — zebrafish video analysis</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css?v=28">
+  <link rel="stylesheet" href="./style.css?v=29">
   <link rel="stylesheet" href="./about.css?v=1">
   <link rel="stylesheet" href="./labeling.css?v=1">
-  <link rel="stylesheet" href="./workspace.css?v=6">
-  <script type="module" src="./app.mjs?v=40"></script>
+  <link rel="stylesheet" href="./workspace.css?v=7">
+  <script type="module" src="./app.mjs?v=42"></script>
 </head>
 <body>
   <div class="shell">
@@ -114,7 +114,7 @@
             <p class="fine-print">Measure several grid squares near the swimming area for better accuracy. Perspective makes distances approximate. Clearing the line keeps the applied scale.</p>
           </fieldset>
           </details>
-          <p class="fine-print">For a light/dark tank, select Mark dark region and outline the dark side, then Mark light region and outline the light side. Use Four corners for angled areas: click four corners in order around the edge. This also works for the tank crop and reflection masks. Marked regions keep fish in the analysis; reflection masks exclude them. Dark regions detect brighter or darker fish; light and unmarked regions detect darker fish. The last region drawn wins at overlaps. Fish centers outside marked regions are reported as unmarked. Analyze again after changes.</p>
+          <p class="fine-print">For a light/dark tank, select Mark dark region and outline the dark side, then Mark light region and outline the light side. Use Four corners for angled areas: click four corners in order around the edge. This also works for the tank crop and reflection masks. Marked regions keep fish in the analysis; reflection masks exclude them. Dark regions detect brighter or darker fish; light and unmarked regions detect darker fish. The last region drawn wins at overlaps. With one fish expected and a marked dark region, the rest of the usable tank counts as light and the timeline tracks side changes. Other recordings report centers outside marked regions as unmarked. Analyze again after changes.</p>
           <details class="preview-detail"><summary>Precise crop</summary>
           <p class="fine-print">Four-corner tank selections analyze only the outlined area; precise crop fields below replace that outline with a rectangle. Masks exclude reflections and any real fish that enter those areas. Changing the crop or masks requires analyzing again.</p>
           <fieldset class="crop-fields" id="crop-fields" disabled><legend>Or enter a precise crop in video pixels</legend><label>X<input id="crop-x" type="number" min="0" step="1"></label><label>Y<input id="crop-y" type="number" min="0" step="1"></label><label>Width<input id="crop-width" type="number" min="30" step="1"></label><label>Height<input id="crop-height" type="number" min="30" step="1"></label><button id="apply-crop" class="secondary" type="button">Apply crop</button></fieldset>
@@ -129,7 +129,7 @@
 
             <p id="human-empty-filter" class="human-help" hidden>No samples in this view. Choose another frame filter to continue.</p>
             <div id="human-frame-workspace">
-          <div id="timeline" class="timeline" hidden><div class="timeline-head"><strong>Group changes</strong><span id="change-count">—</span></div><canvas id="change-timeline" width="1200" height="26" aria-label="Timeline of changes in group sizes; click to jump to a change"></canvas><div class="timeline-controls"><button id="previous-change" class="secondary" type="button" aria-label="Previous group change" title="Previous group change">←</button><button id="next-change" class="secondary" type="button" aria-label="Next group change" title="Next group change">→</button></div></div>
+          <div id="timeline" class="timeline" hidden><div class="timeline-head"><strong id="timeline-title">Group changes</strong><span id="change-count">—</span></div><div id="side-timeline-details" hidden><strong id="side-timeline-current"></strong><p id="side-timeline-summary"></p><div class="side-timeline-legend"><span><i class="side-dark"></i>Dark</span><span><i class="side-light"></i>Light</span><span><i class="side-unknown"></i>Unknown</span></div></div><canvas id="change-timeline" width="1200" height="26" aria-label="Timeline of changes in group sizes; click to jump to a change"></canvas><div class="timeline-controls"><button id="previous-change" class="secondary" type="button" aria-label="Previous group change" title="Previous group change">←</button><button id="next-change" class="secondary" type="button" aria-label="Next group change" title="Next group change">→</button></div></div>
             <div class="human-controls"><button id="human-prev" class="secondary" type="button">← Previous</button><label for="human-frame-number">Item <input id="human-frame-number" type="number" min="1" step="1" value="1"></label><span id="human-frame-time">—</span><button id="human-next" class="secondary" type="button">Next →</button><button id="review-help" class="review-help-link" type="button" aria-haspopup="dialog" aria-controls="review-help-dialog">Help</button>            <div class="human-view-controls view-controls" aria-label="Frame view"><label class="center-edit-toggle"><input id="human-edit-centers" type="checkbox"> Edit centers</label><button id="human-fit" class="secondary" type="button">Fit</button><button id="human-zoom-out" class="secondary" type="button" aria-label="Zoom out review">−</button><output id="human-zoom" aria-live="polite">100%</output><button id="human-zoom-in" class="secondary" type="button" aria-label="Zoom in review">+</button><span class="fine-print">← → Navigate · R Done &amp; next</span></div></div>
             <input id="human-slider" type="range" min="0" max="0" value="0" aria-label="Sampled frame">
 
@@ -172,6 +172,23 @@
           <article class="stat"><span>Detections near another</span><strong id="stat-close">—</strong><small>within chosen distance</small></article>
           <article class="stat"><span>Average clusters / frame</span><strong id="stat-clusters">—</strong><small>groups of at least 2</small></article>
         </div>
+        <section id="velocity-panel" class="velocity-panel" hidden aria-labelledby="velocity-title">
+          <h3 id="velocity-title">Single-fish velocity</h3>
+          <label class="velocity-toggle"><input id="show-velocity" type="checkbox"> Show velocity tracker</label>
+          <div id="velocity-details" hidden>
+            <label class="velocity-unit-label">Speed units<select id="velocity-units"><option value="pixels">Pixels / second</option><option value="inches">Inches / second (approximate)</option></select></label>
+            <div class="velocity-stats">
+              <div><span>Minimum</span><strong id="velocity-min">—</strong></div>
+              <div><span>Maximum</span><strong id="velocity-max">—</strong></div>
+              <div><span>Average</span><strong id="velocity-average">—</strong></div>
+            </div>
+            <p id="velocity-coverage" class="human-help" role="status"></p>
+            <p id="velocity-scale-note" class="human-help" hidden>Inches use the current scale. Calibrate this recording for meaningful physical speeds.</p>
+            <svg id="velocity-chart" viewBox="0 0 360 190" role="img" aria-label="Single-fish speed versus video time; gaps indicate unavailable intervals"></svg>
+            <p id="velocity-empty" class="human-help">The graph will appear when valid intervals are available.</p>
+            <p class="human-help">Speed is center displacement divided by elapsed time. Missing, multiple, excluded, estimated, or ambiguous detections leave gaps. Corrections and scale changes update this view. The yellow line marks the selected frame. Curved motion between samples is not measured.</p>
+          </div>
+        </section>
         <details id="results-exports" class="result-exports"><summary>Export results</summary><div class="downloads"><button id="download-csv" class="secondary">Export detections CSV ↓</button><button id="download-frames" class="secondary">Export frames CSV ↓</button><button id="download-json" class="secondary">Export all JSON ↓</button></div></details>
         <details class="chart-panel"><summary>Explore groups &amp; link distance</summary>
         <div class="cluster-explorer">

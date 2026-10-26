@@ -154,7 +154,8 @@ centers against ordered light/dark shapes (last drawn wins), and rasterizes
 the dark regions once into crop pixels for detection. Regions keep fish usable;
 reflection masks still exclude pixels. `tankSide` is attached to automatic and
 manually corrected detections, and `frameMetrics()` recalculates side counts.
-Uncovered centers are `unmarked`. Reflections can become false detections,
+Uncovered centers are `unmarked`, except in the single-fish dark-region mode,
+where `analysisTankSide()` assigns the remaining usable tank to light. Reflections can become false detections,
 and touching fish can become one region.
 
 ## Optional selection by distance from the center
@@ -430,3 +431,43 @@ pixels and 8% of its area beyond the learned range (or darker foreground evidenc
 on the light side). This validates a core without shrinking the full outline of
 a fish crossing a ridge. The check also applies to edge recovery. The optional
 setting does not affect runs without marked dark regions or model detection.
+
+
+## Optional single-fish velocity
+
+`velocity.mjs` computes scalar speed from adjacent original samples only when
+`settings.expectedFish === 1`. Both frames must pass the inclusion filter and
+contain exactly one finite observed/manual center. Uncertain or split estimates,
+unapplied excess-candidate selections, automatic track-ID changes, nonpositive
+time deltas, nonconsecutive sample indices, and elapsed gaps over 1.5 times the
+configured interval are rejected. Rejected intervals remain gaps, not zeroes.
+Manual corrections can repair their adjacent intervals. Average speed is summed
+displacement divided by summed measured duration, rather than a mean that assigns
+unobserved time zero speed. Statistics are null when no interval is available.
+
+`velocity-ui.mjs` owns the opt-in Results controls, units, coverage, and SVG chart.
+The graph uses one constant-speed line per measured interval, connecting only
+consecutive valid intervals; its marker follows the selected frame. The existing
+correction and calibration refresh paths recalculate the report. Pixel speeds
+remain independent of calibration. Full JSON includes the report only when the
+view is enabled; `single-fish-adjacent-centers-v1` identifies its method.
+
+
+## Single-fish side timeline
+
+`usesSingleFishSides()` enables the experiment when the configured expected count
+is one and a dark region exists. `analysisTankSide()` applies the complement-light
+rule consistently to automatic detections, manual centers, metrics, and exports;
+reflection masks and the angled crop still define the usable area. Geometric
+`tankSide()` retains generic marked-area membership.
+
+`side-tracking.mjs` retains every original sample with an observed side or unknown
+status. Inclusion filtering, missing/multiple centers, uncertain estimates,
+excess-candidate selections, and unusable centers produce unknown samples.
+Crossings require adjacent known samples, increasing timestamps within the
+sampling gap limit, and an uninterrupted automatic track (or manual correction).
+`visibleSideChanges()` projects actual changes into the current review indices,
+so removing an unknown frame from a review view cannot invent a transition.
+The Results timeline uses video time for colored side segments and keeps the
+original group-size mode for other recordings. Manual correction refreshes the
+same timeline; JSON includes the full report independently of the velocity toggle.

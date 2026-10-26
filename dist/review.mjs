@@ -1,4 +1,4 @@
-import { tankSide } from './tank-zones.mjs';
+import { analysisTankSide } from './tank-zones.mjs';
 import { analyzeFrame, matchPointsWithin } from './analysis.mjs';
 import { frameMetrics, groupSignature } from './measurements.mjs';
 import { insideAnalysisArea } from './region.mjs';
@@ -27,7 +27,7 @@ export function applyManualCenters(frame, marks, config) {
   const automaticDetections = frame.automaticDetections ?? frame.detections;
   const detections = marks.filter(point => insideAnalysisArea(point, config.crop, config.exclusions))
     .map((point, index) => ({ x: point.x, y: point.y, detectionId: index + 1,
-      tankSide: tankSide(point, config.tankZones), className: 'manually marked fish', positionSource: 'manual', positionUncertain: false }));
+      tankSide: analysisTankSide(point, config), className: 'manually marked fish', positionSource: 'manual', positionUncertain: false }));
   return { ...frame, automaticDetections, detections, manualCorrectionApplied: true,
     metrics: frameMetrics(detections, config) };
 }

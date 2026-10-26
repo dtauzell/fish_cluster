@@ -69,3 +69,24 @@
 #human-frame-workspace>.input-caption{display:block;margin-top:12px;color:#b9cdca;font-size:12px}
 #human-empty-filter{padding:22px;border:1px solid #31535c;border-radius:9px;text-align:center;font-size:14px}
 @media(max-width:560px){.human-review-filter{grid-template-columns:1fr}}
+
+/* Optional speed measurements for a recording configured with one fish. */
+.velocity-panel{margin-top:20px;padding:16px;border:1px solid #31535c;border-radius:10px;min-width:0}
+.velocity-panel h3{margin:0 0 12px;font:600 18px 'Space Grotesk',sans-serif}
+.velocity-toggle{display:flex;align-items:center;gap:8px;color:#d9eae6;font-size:13px}
+.velocity-toggle input{accent-color:#8ce6ce}
+.velocity-unit-label{display:block;margin:14px 0;color:#b9cdca;font-size:12px}
+.velocity-unit-label select{display:block;width:100%;margin-top:6px;padding:8px;border:1px solid #3b5860;border-radius:7px;background:#0c2029;color:#f3fbf8;font:inherit}
+.velocity-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.velocity-stats span,.velocity-stats strong{display:block}
+.velocity-stats span{font-size:11px;color:#abc2bf}
+.velocity-stats strong{margin-top:5px;color:#8ce6ce;font:600 16px 'Space Grotesk',sans-serif;overflow-wrap:anywhere}
+#velocity-chart{display:block;width:100%;height:auto;background:#0b222b;border-radius:8px;margin:12px 0}
+#velocity-chart[hidden]{display:none}
+
+#side-timeline-details{font-size:12px;color:#c5dcd7;margin-top:8px}
+#side-timeline-details p{font-size:11px;line-height:1.5;color:#a4bebb;margin:6px 0}
+.side-timeline-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px}
+.side-timeline-legend span{display:flex;align-items:center;gap:5px}
+.side-timeline-legend i{display:inline-block;width:14px;height:5px;border-radius:2px}
+.side-dark{background:#bdadff}.side-light{background:#69e3e9}.side-unknown{background:#52666f}

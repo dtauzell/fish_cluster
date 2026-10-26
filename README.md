@@ -62,7 +62,9 @@ area. Masks appear in human review and are saved in the JSON settings.
 For an angled tank, open **Tank area, light/dark sides, reflection masks & scale**,
 choose **Select tank crop** under **Area tool**, and set **Selection shape** to
 **Four corners**. Click four corners in order around the swimming area. The
-fourth click applies the outline; **Undo corner** and **Cancel corners** adjust
+fourth click applies the outline. Switching to Four corners exits calibration
+and restores the last area tool; each corner uses a simple click, including the
+first. Selecting calibration shows Rectangle/drag mode. **Undo corner** and **Cancel corners** adjust
 an unfinished selection. Crossed or concave outlines are rejected. The same
 four-corner mode works for light/dark regions and reflection masks. Rectangle
 mode still uses dragging. The detector and manual corrections use the outlined
@@ -84,12 +86,31 @@ outlines and counts under frame details. Detection CSV adds `tank_side`
 (`dark`, `light`, or `unmarked`); frame CSV adds `darkSideCount`, `lightSideCount`,
 and `unmarkedSideCount`. Full JSON includes region shapes and each detection's
 `tankSide`. Classification uses the fish center, including after manual corrections;
-it does not assign a whole straddling fish to both sides. Unmarked areas are not
-silently assigned to either side. These are sampled positions, not continuous
+it does not assign a whole straddling fish to both sides. With exactly one fish
+expected and at least one dark region marked, the remaining usable tank area
+counts as light; marking a light region is optional. Other recordings retain
+`unmarked` for areas outside all marked regions. These are sampled positions, not continuous
 residence-time estimates. Set **Fish in tank** and the required inclusion
 count to **1** for a single-fish recording. Files named `single_fish_dark_side…`
 start with both counts at one. Calibrate scale for each recording if using inch
 measurements.
+
+With **Fish in tank = 1** and a marked dark region, the **Group changes**
+timeline automatically becomes **Light / dark changes**. Purple and cyan show
+the fish center in dark and light areas over video time; gray marks unknown
+samples. The selected frame's side and the dark/light/unknown sample totals
+appear above the bar. A missing or multiple detection, an uncertain estimate,
+an excluded sample, or an automatic selection among excess candidates is unknown.
+Applied manual corrections update the side classification and timeline.
+
+Yellow ticks mark observed changes between adjacent known samples. They do not
+claim a crossing time across an unknown gap or a lost automatic track. The
+previous/next arrows and timeline clicks navigate side changes available in the
+current review view; the bar retains all original samples so review filtering
+does not conceal gaps. The count states both the recording's observed changes
+and those available in the current view. Full JSON adds `sideTracking`, including
+each sample's side, observed changes, and sample totals. These are sample counts,
+not continuous time spent on each side. Other recordings keep **Group changes**.
 
 For bright ridges and fixtures on the dark side, **Advanced settings → Learn
 background flicker in dark regions** is enabled by default. It learns the usual
@@ -101,6 +122,28 @@ ridge. This does not change the dark/light side classification. Fixed bright
 objects are already part of the median background. Turn the option off and
 reanalyze if faint fish are missed. Reflection masks remain an option for areas
 to exclude, but also exclude fish swimming through them.
+
+For a recording configured with **Fish in tank = 1**, Results offers an optional
+**Single-fish velocity → Show velocity tracker**. It starts off. Enable it to see
+minimum, maximum, and average speed and a speed-versus-video-time graph. Pixels
+per second are the default; choose approximate inches per second to use the
+current scale, calibrated for this recording. Here “velocity” is scalar speed,
+measured as the straight-line center displacement divided by elapsed time.
+Curved motion between samples is not measured, and detection jitter can inflate
+speed. The average is total measured distance divided by measured time.
+
+Only consecutive, included samples with exactly one observed or manually
+corrected center contribute. Missing or multiple centers, excluded samples,
+estimates, excess candidates discarded by the center rule, and automatic track
+changes break the graph. The tracker never bridges skipped samples or treats
+unknown time as stationary. Coverage reports measured intervals and seconds;
+fewer than two usable consecutive samples leaves the statistics unavailable.
+Applying a correction or changing scale recalculates the view, and the yellow
+line follows the selected frame. This view is hidden for recordings configured
+with more than one fish; it does not depend on the review count override or
+require the provisional identity tracker. With velocity enabled, **Export all
+JSON** also includes its summary, coverage, method, and timestamped intervals in
+both units. Existing CSV formats are unchanged.
 
 Background mode also offers **If there are extra candidates, keep those nearest
 the crop center**. This is off by default. When enabled, a frame with more
@@ -223,6 +266,8 @@ calculate measurements, compare manual annotations, and format exports.
 | [dist/settings.mjs](dist/settings.mjs) | Validates settings, copies the selected crop, and converts calibrated inches to pixels. |
 | [dist/analysis.mjs](dist/analysis.mjs) | Calculates distances and connected groups from centers, normalizes model predictions, and supplies geometry and statistics helpers. |
 | [dist/sharpness.mjs](dist/sharpness.mjs), [dist/sharpness-ui.mjs](dist/sharpness-ui.mjs) | Measure candidate sharpness and contrast, draw scores, and collect diagnostic fish/reflection labels without filtering detections. |
+| [dist/side-tracking.mjs](dist/side-tracking.mjs) | Single-fish dark/light observations and side-change navigation that preserves unknown gaps. |
+| [dist/velocity.mjs](dist/velocity.mjs), [dist/velocity-ui.mjs](dist/velocity-ui.mjs) | Optional single-fish speed intervals, summary statistics, and graph with gaps for unavailable positions. |
 | [dist/measurements.mjs](dist/measurements.mjs) | Adds calibrated distances and random-spacing comparisons to frame metrics; identifies group-size changes. |
 | [dist/review.mjs](dist/review.mjs) | Compares manual marks with automatic centers and summarizes reviewed frames. |
 | [dist/exports.mjs](dist/exports.mjs) | Formats detection, frame, and manual-review CSV data and prepares settings for export. |

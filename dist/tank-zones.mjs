@@ -1,5 +1,5 @@
 import { shapePath } from './geometry.mjs';
-import { insideCrop } from './region.mjs';
+import { insideCrop, insideAnalysisArea } from './region.mjs';
 
 /** Last drawn area wins at overlaps; uncovered pixels remain unmarked. */
 export function tankSide(point, zones = []) {
@@ -7,6 +7,18 @@ export function tankSide(point, zones = []) {
     if (insideCrop(point, zones[i])) return zones[i].side;
   }
   return 'unmarked';
+}
+
+/** Single-fish light/dark experiments treat the remaining usable tank as light. */
+export function usesSingleFishSides(config) {
+  return config?.expectedFish === 1 && Boolean(config.tankZones?.some(zone => zone.side === 'dark'));
+}
+
+export function analysisTankSide(point, config) {
+  const side = tankSide(point, config.tankZones);
+  if (!usesSingleFishSides(config)) return side;
+  if (!insideAnalysisArea(point, config.crop, config.exclusions)) return 'unmarked';
+  return side === 'dark' ? 'dark' : 'light';
 }
 
 /** Build once per run, in crop pixels, so foreground detection stays inexpensive. */
