@@ -77,7 +77,7 @@ center at `(10, 20)` inside a crop starting at `(50, 240)` becomes `(60, 260)`
 in saved results. The review overlay also stores original-video coordinates,
 even when displaying only the cropped region.
 
-`settings.exclusions` contains reflection-mask rectangles, also in original video
+`settings.exclusions` contains reflection-mask shapes, also in original video
 pixels. They subtract areas from the crop. Background mode removes their pixels
 before connecting regions; both detection methods reject centers in the masks.
 Masks apply to the entire video, including real fish that enter them. Use a larger
@@ -136,8 +136,9 @@ functions above it explain the details.
   middle brightness at each pixel. A moving fish usually occupies a given pixel
   in fewer than half the samples, leaving an estimate of the stationary tank.
 - **Threshold / mask:** a pixel sufficiently darker than the background becomes
-  1 (a possible fish); other pixels become 0. This comparison is directional:
-  brighter changes are not selected.
+  1 (a possible fish); other pixels become 0. In marked dark regions, absolute
+  brightness difference selects both brighter and darker changes. Light and
+  unmarked pixels retain the directional darker-only comparison.
 - **Erosion / dilation:** shrink or grow foreground pixels using their four
   neighbors. Opening removes specks; closing fills gaps within a region.
 - **Blob / connected region:** flood-fill adjacent selected pixels. Reject
@@ -148,9 +149,13 @@ functions above it explain the details.
   estimated centers and updating their averages (two-cluster k-means). These
   are heuristics guided by the known count; they do not force the output count.
 
-The detector assumes a fixed camera and fish darker than the background.
-Reflections can become false detections, and touching fish can become one
-region. This refactor preserves the detection settings and heuristics.
+The detector assumes a fixed camera. `tank-zones.mjs` classifies original-video
+centers against ordered light/dark shapes (last drawn wins), and rasterizes
+the dark regions once into crop pixels for detection. Regions keep fish usable;
+reflection masks still exclude pixels. `tankSide` is attached to automatic and
+manually corrected detections, and `frameMetrics()` recalculates side counts.
+Uncovered centers are `unmarked`. Reflections can become false detections,
+and touching fish can become one region.
 
 ## Optional selection by distance from the center
 
@@ -402,3 +407,26 @@ coordinate conversion, cancellation, inference cleanup, review comparisons, and
 CSV semantics. To check browser integration, load a local video, analyze it,
 change the distance, select a frame, add human marks, and visit About and back.
 Roboflow initialization also requires network access and a working trained model.
+
+
+## Angled areas and bright fixtures
+
+`geometry.mjs` validates four convex corners in edge order and returns their
+integer bounding box plus original-video `polygon` vertices. Crop, light/dark
+regions, and reflection masks can each carry these vertices. `insideCrop()`
+checks the polygon when present; `analysisPixelMask()` removes outside pixels
+before and after detector morphology. Video decoding still reads the bounding
+rectangle. Manual marks and model centers use the same area-membership check.
+Random spacing uses uniform bounding-box rejection for polygon runs, with a
+bounded retry count; old rectangular runs retain their original reference sequence.
+JSON saves the vertices, and settings deep-copy them. Training PNGs and clean
+frame downloads retain the rectangular bounding image.
+
+In dark-region runs, `suppressFlicker` defaults to true. `backgroundVariation()`
+learns the 10th–90th percentile pixel range from the background samples and expands
+it over a two-pixel neighborhood, accounting for small fixture-edge movements.
+After ordinary foreground cleanup, a connected region must contain at least five
+pixels and 8% of its area beyond the learned range (or darker foreground evidence
+on the light side). This validates a core without shrinking the full outline of
+a fish crossing a ridge. The check also applies to edge recovery. The optional
+setting does not affect runs without marked dark regions or model detection.

@@ -1,8 +1,9 @@
+import { tankSide, darkZoneMask } from './tank-zones.mjs';
 import { selectCentralCandidates } from './candidate-selection.mjs';
 import { candidateSharpness } from './sharpness.mjs';
-import { insideAnalysisArea, localExclusions } from './region.mjs';
+import { insideAnalysisArea, localExclusions, analysisPixelMask } from './region.mjs';
 import { normalizePredictions, sampleTimes } from './analysis.mjs';
-import { detectBackgroundFish, medianBackground } from './background.mjs';
+import { detectBackgroundFish, medianBackground, backgroundVariation } from './background.mjs';
 import { frameMetrics } from './measurements.mjs';
 import { createFishTracker } from './tracking.mjs';
 import { framePassesCountFilter } from './frame-selection.mjs';
@@ -21,6 +22,9 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
   const times = sampleTimes(duration, config.intervalMs);
   const { crop } = config;
   const exclusions = localExclusions(crop, config.exclusions);
+  const darkZones = darkZoneMask(crop, config.tankZones);
+  const analysisMask = analysisPixelMask(crop, config.exclusions);
+  let variation = null;
   let previousFrame = null;
   let background = null;
   let model = null;
@@ -41,6 +45,7 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
     }
     yield { type: 'status', progress: 10, message: 'Finding the median tank background…' };
     background = medianBackground(samples);
+    if (config.suppressFlicker !== false && darkZones.some(Boolean)) variation = backgroundVariation(samples, crop.width, crop.height);
   } else {
     yield { type: 'status', progress: 0, message: 'Preparing Roboflow model in this browser…' };
     model = await prepareModel(config);
@@ -64,7 +69,8 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
         ...point, x: point.x - crop.x, y: point.y - crop.y
       })) : [];
       const candidates = detectBackgroundFish(gray, background, crop.width, crop.height,
-        { expectedFish: config.expectedFish, preferCenter: config.preferCenter, exclusions,
+        { expectedFish: config.expectedFish, preferCenter: config.preferCenter, exclusions, darkZones, analysisMask, backgroundVariation: variation,
+          ...(crop.polygon ? { edgeX: 0, edgeTop: 0, edgeBottom: 0 } : {}),
           previousDetections, previousTimestampMs: canReferencePrevious ? previousFrame.timestampMs : undefined,
           observedSizeReference: tracker?.sizeReference(timestampMs),
           overlapSeedsFor: tracker && config.preferCenter
@@ -92,7 +98,8 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
       detections = detections.map(candidate => ({ ...candidate,
         ...candidateSharpness(gray, crop.width, crop.height, candidate, exclusions) }));
     }
-    detections = detections.map(point => ({ ...point, x: point.x + crop.x, y: point.y + crop.y }));
+    detections = detections.map(point => ({ ...point, x: point.x + crop.x, y: point.y + crop.y,
+      tankSide: tankSide({ x: point.x + crop.x, y: point.y + crop.y }, config.tankZones) }));
     // A split region's estimated center must also fall in the usable area.
     detections = detections.filter(point => insideAnalysisArea(point, crop, config.exclusions));
     const selected = selectCentralCandidates(detections, crop,

@@ -1,3 +1,5 @@
+import { shapePath } from './geometry.mjs';
+import { drawTankZones } from './tank-zones.mjs';
 import { createCanvasViewport } from './canvas-viewport.mjs';
 import { frameCandidates } from './candidate-selection.mjs';
 import { createSharpnessReview, drawCandidateSharpness } from './sharpness-ui.mjs';
@@ -98,13 +100,15 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     humanCtx.setTransform(width / view.width, 0, 0, height / view.height, 0, 0);
     humanCtx.clearRect(0, 0, view.width, view.height);
     humanCtx.drawImage(video, view.x, view.y, view.width, view.height, 0, 0, view.width, view.height);
+    drawTankZones(humanCtx, state.settings.tankZones, view, view.width / Math.max(1, displayWidth));
     drawExclusions(humanCtx, state.settings.exclusions, view);
-    if ($('human-show-full').checked) {
+    if ($('human-show-full').checked || crop.polygon) {
       humanCtx.save();
       humanCtx.strokeStyle = '#f6d979';
       humanCtx.lineWidth = 2;
       humanCtx.setLineDash([7, 5]);
-      humanCtx.strokeRect(crop.x, crop.y, crop.width, crop.height);
+      shapePath(humanCtx, crop, view);
+      humanCtx.stroke();
       humanCtx.restore();
     }
     const editing = $('human-edit-centers').checked;
@@ -244,6 +248,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     $('human-next').disabled = state.human.loading || position === indices.length - 1;
     $('human-frame-details').innerHTML = `<div><span>Your fish in usable area</span><strong>${manual.fishCount}</strong></div>
       <div><span>Your fish outside usable area</span><strong>${outside}</strong></div>
+      ${state.settings.tankZones?.length ? `<div><span>Fish by side (applied result)</span><strong>${frame.metrics.darkSideCount} dark / ${frame.metrics.lightSideCount} light / ${frame.metrics.unmarkedSideCount} unmarked</strong></div>` : ''}
       <div><span>Automatic fish</span><strong>${automatic.fishCount}</strong></div>
       <div><span>Original candidates (all)</span><strong>${automaticCandidateCount(frame)}</strong></div>
       <div><span>Centers used in results</span><strong>${frame.detections.length}${frame.manualCorrectionApplied ? ' (manual)' : ''}</strong></div>

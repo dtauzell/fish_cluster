@@ -1,3 +1,4 @@
+import { shapePath } from './geometry.mjs';
 import { frameCandidates } from './candidate-selection.mjs';
 import { drawCandidateSharpness } from './sharpness-ui.mjs';
 
@@ -34,7 +35,8 @@ export function createPreview(canvas, video) {
     ctx.strokeStyle = '#f6d979';
     ctx.lineWidth = Math.max(2, canvas.width / 250);
     ctx.setLineDash([Math.max(6, canvas.width / 80), Math.max(4, canvas.width / 120)]);
-    ctx.strokeRect(box.x, box.y, box.width, box.height);
+    shapePath(ctx, box);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -134,8 +136,9 @@ export function drawExclusions(context, exclusions = [], view = { x: 0, y: 0 }) 
   context.strokeStyle = '#f4a7b9';
   context.lineWidth = 2;
   for (const box of exclusions) {
-    context.fillRect(box.x - view.x, box.y - view.y, box.width, box.height);
-    context.strokeRect(box.x - view.x, box.y - view.y, box.width, box.height);
+    shapePath(context, box, view);
+    context.fill();
+    context.stroke();
   }
   context.restore();
 }

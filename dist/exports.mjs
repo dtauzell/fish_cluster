@@ -1,3 +1,4 @@
+import { tankSide } from './tank-zones.mjs';
 import { frameCandidates } from './candidate-selection.mjs';
 import { insideAnalysisArea } from './region.mjs';
 // Plain-data export formatting. These functions have no browser or page-state dependencies.
@@ -32,6 +33,7 @@ function detectionsRows(frames) {
       group_size: frame.metrics.groupSizes[groupId],
       class: detection.className,
       confidence: detection.confidence,
+      tank_side: detection.tankSide,
       x_px: detection.x,
       y_px: detection.y,
       box_width_px: detection.width,
@@ -53,7 +55,7 @@ function detectionsRows(frames) {
 }
 
 export function detectionsCsv(frames) {
-  return csv(detectionsRows(frames), ['frame_index', 'timestamp_ms', 'detection_id', 'group_id', 'group_size', 'class', 'confidence', 'x_px', 'y_px', 'box_width_px', 'box_height_px', 'blob_area_px', 'split_from_blob', 'edge_recovered', 'sharpness', 'local_contrast', 'sharpness_pixel_count', 'sharpness_clipped', 'distance_from_center_px', 'split_reason', 'source_blob_area_px', 'split_reference_timestamp_ms', ...positionColumns]);
+  return csv(detectionsRows(frames), ['frame_index', 'timestamp_ms', 'detection_id', 'group_id', 'group_size', 'class', 'confidence', 'x_px', 'y_px', 'box_width_px', 'box_height_px', 'blob_area_px', 'tank_side', 'split_from_blob', 'edge_recovered', 'sharpness', 'local_contrast', 'sharpness_pixel_count', 'sharpness_clipped', 'distance_from_center_px', 'split_reason', 'source_blob_area_px', 'split_reference_timestamp_ms', ...positionColumns]);
 }
 
 function framesRows(frames) {
@@ -72,7 +74,7 @@ function framesRows(frames) {
 }
 
 export function framesCsv(frames) {
-  return csv(framesRows(frames), ['frame_index', 'timestamp_ms', 'rawPredictionCount', 'fishCount', 'countDifference', 'pairCount', 'meanPairDistancePx', 'meanPairDistanceInches', 'meanNearestDistancePx', 'meanNearestDistanceInches', 'closeFishFraction', 'clusterCount', 'isolatedCount', 'groupSizes', 'groupChanged', 'randomSpacingPercentile', 'randomSpacingUnavailableReason', 'rejectedCandidateCount', 'splitCandidateCount', 'uncertainPositionCount', 'manualPositionCount', 'manualCorrectionApplied', 'automaticFishCount']);
+  return csv(framesRows(frames), ['frame_index', 'timestamp_ms', 'rawPredictionCount', 'fishCount', 'countDifference', 'pairCount', 'meanPairDistancePx', 'meanPairDistanceInches', 'meanNearestDistancePx', 'meanNearestDistanceInches', 'closeFishFraction', 'clusterCount', 'isolatedCount', 'groupSizes', 'groupChanged', 'randomSpacingPercentile', 'randomSpacingUnavailableReason', 'rejectedCandidateCount', 'splitCandidateCount', 'uncertainPositionCount', 'manualPositionCount', 'manualCorrectionApplied', 'automaticFishCount', 'darkSideCount', 'lightSideCount', 'unmarkedSideCount']);
 }
 
 function humanRows(frames, marksByFrame, reviewed, config) {
@@ -95,14 +97,14 @@ function humanRows(frames, marksByFrame, reviewed, config) {
       manual_group_sizes: hasManualMarks ? [...metrics.groupSizes].sort((a, b) => b - a).join('+') : null,
       automatic_group_sizes: groupSignature({ metrics: automatic }), close_distance_inches: config.thresholdInches };
     return marks.length ? marks.map((mark, markIndex) => ({ ...common, mark_number: markIndex + 1,
-      x_px: mark.x.toFixed(2), y_px: mark.y.toFixed(2), inside_crop: insideCrop(mark, config.crop),
+      x_px: mark.x.toFixed(2), y_px: mark.y.toFixed(2), tank_side: tankSide(mark, config.tankZones), inside_crop: insideCrop(mark, config.crop),
       included_in_analysis: insideAnalysisArea(mark, config.crop, config.exclusions),
       manual_group_id: insideAnalysisArea(mark, config.crop, config.exclusions) ? metrics.groupIds[inCrop.indexOf(mark)] + 1 : null })) : [common];
   });
 }
 
 export function humanCsv(frames, marksByFrame, reviewed, config) {
-  return csv(humanRows(frames, marksByFrame, reviewed, config), ['frame_index', 'frame_number', 'timestamp_ms', 'reviewed', 'manual_annotation_present', 'manual_fish_count_in_crop', 'manual_fish_count_outside_crop', 'automatic_fish_count', 'matched_center_count', 'manual_cluster_count', 'automatic_cluster_count', 'manual_group_sizes', 'automatic_group_sizes', 'close_distance_inches', 'mark_number', 'x_px', 'y_px', 'inside_crop', 'included_in_analysis', 'manual_group_id', 'manual_fish_count_in_analysis', 'manual_correction_applied', 'result_fish_count', 'included_in_results', 'automatic_candidate_count']);
+  return csv(humanRows(frames, marksByFrame, reviewed, config), ['frame_index', 'frame_number', 'timestamp_ms', 'reviewed', 'manual_annotation_present', 'manual_fish_count_in_crop', 'manual_fish_count_outside_crop', 'automatic_fish_count', 'matched_center_count', 'manual_cluster_count', 'automatic_cluster_count', 'manual_group_sizes', 'automatic_group_sizes', 'close_distance_inches', 'mark_number', 'x_px', 'y_px', 'inside_crop', 'included_in_analysis', 'manual_group_id', 'tank_side', 'manual_fish_count_in_analysis', 'manual_correction_applied', 'result_fish_count', 'included_in_results', 'automatic_candidate_count']);
 }
 
 

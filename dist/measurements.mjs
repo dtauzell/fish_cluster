@@ -1,3 +1,4 @@
+import { tankSide } from './tank-zones.mjs';
 // Measurements use centers in original video pixels; no image or DOM access is needed.
 import { analyzeFrame, randomSpacingReference, spacingPercentile } from './analysis.mjs';
 
@@ -10,7 +11,11 @@ function referenceFor(count, crop, exclusions = []) {
 }
 
 export function frameMetrics(detections, config, rejectedCount = 0) {
+  const sides = detections.map(point => tankSide(point, config.tankZones));
   const metrics = analyzeFrame(detections, config.thresholdPx);
+  metrics.darkSideCount = sides.filter(side => side === 'dark').length;
+  metrics.lightSideCount = sides.filter(side => side === 'light').length;
+  metrics.unmarkedSideCount = sides.filter(side => side === 'unmarked').length;
   // Selecting central candidates biases spacing inward. A uniform placement of
   // only the kept count is no longer a fair reference for these frames.
   const previousFrameEstimate = detections.some(point =>

@@ -1,3 +1,5 @@
+import { polygonBox, copyShape } from './geometry.mjs';
+import { drawTankZones } from './tank-zones.mjs';
 import { createCanvasViewport } from './canvas-viewport.mjs';
 import { SHARPNESS_METHOD } from './sharpness.mjs';
 import { TRACKING_METHOD } from './tracking.mjs';
@@ -31,7 +33,9 @@ const state = {
   crop: null,
   focusTank: true,
   exclusions: [],
+  tankZones: [],
   drag: null,
+  corners: [],
   calibrationLine: null,
   running: false,
   stopped: false,
@@ -54,16 +58,26 @@ function previewViewBox() {
   return state.focusTank && state.crop ? state.crop : { x: 0, y: 0, width: video.videoWidth || 1600, height: video.videoHeight || 1000 };
 }
 function drawFrame(frame) {
-  $('preview-instruction').textContent = state.crop && state.focusTank ? 'Tank area enlarged. Use Full frame to adjust the crop.'
+  $('preview-instruction').textContent = $('selection-shape').value === 'polygon' && $('crop-tool').value !== 'calibrate' ? `Click corner ${state.corners.length + 1} of 4, continuing around the edge.` : state.crop && state.focusTank ? 'Tank area enlarged. Use Full frame to adjust the crop.'
     : 'Drag around the swimming area to enlarge it, then check the scale.';
   $('preview-focus').disabled = !state.crop;
   $('preview-focus').setAttribute('aria-pressed', String(Boolean(state.focusTank && state.crop)));
   $('preview-full').setAttribute('aria-pressed', String(!state.focusTank || !state.crop));
   lastPreviewFrame = frame;
   previewViewport.resize();
-  const crop = state.drag && !state.drag.exclude && !state.drag.calibration ? state.drag.box : state.crop;
+  const crop = state.drag && !state.drag.exclude && !state.drag.calibration && !state.drag.side ? state.drag.box : state.crop;
   const exclusions = state.drag?.exclude ? [...state.exclusions, state.drag.box] : state.exclusions;
   preview.drawFrame(frame, state.settings?.thresholdPx, crop, exclusions, false, previewViewBox());
+  drawTankZones(canvas.getContext('2d'), state.drag?.side ? [...state.tankZones, { ...state.drag.box, side: state.drag.side }] : state.tankZones,
+    { x: 0, y: 0 }, canvas.width / Math.max(1, canvas.getBoundingClientRect().width));
+  if (state.corners.length) {
+    const ctx = canvas.getContext('2d');
+    const scale = canvas.width / Math.max(1, canvas.getBoundingClientRect().width);
+    ctx.save(); ctx.strokeStyle = '#f6d979'; ctx.fillStyle = '#f6d979'; ctx.lineWidth = 2 * scale;
+    ctx.beginPath(); state.corners.forEach((p, i) => ctx[i ? 'lineTo' : 'moveTo'](p.x, p.y)); ctx.stroke();
+    for (const p of state.corners) { ctx.beginPath(); ctx.arc(p.x, p.y, 4 * scale, 0, 2 * Math.PI); ctx.fill(); }
+    ctx.restore();
+  }
   preview.drawCalibrationLine(state.drag?.calibration ? state.drag : state.calibrationLine);
 }
 function changeFrames() { return findChangeFrames(visibleResultIndices().map(index => state.reviewFrames[index])); }
@@ -147,8 +161,12 @@ function loadMetadata(file) {
   state.url = URL.createObjectURL(file);
   clearResults();
   state.crop = null;
+  state.corners = [];
+  updateCornerControls();
   state.focusTank = true;
   state.exclusions = [];
+  state.tankZones = [];
+  updateZoneControls();
   $('crop-tool').value = 'crop';
   updateMaskControls();
   state.drag = null;
@@ -204,6 +222,11 @@ video.addEventListener('loadedmetadata', async () => {
     $('clear-crop').disabled = false;
     $('crop-label').textContent = 'Tested tank crop: 420 × 290 px. Drag to adjust.';
   }
+  if (/^single_fish_dark_side/i.test(state.file?.name ?? '')) {
+    $('expected-fish').value = 1;
+    $('filter-frame-count').value = 1;
+    filterCountOverridden = false;
+  }
   setCropInputs(state.crop ?? { x: 0, y: 0, width: video.videoWidth, height: video.videoHeight });
   try {
     await showFirstFrame();
@@ -249,12 +272,14 @@ function commitCrop(box) {
   if (!cropFitsFrame(box, video.videoWidth, video.videoHeight)) {
     throw new Error(`Crop must be at least 30 × 30 px and fit inside ${video.videoWidth} × ${video.videoHeight} px.`);
   }
-  const full = x === 0 && y === 0 && width === video.videoWidth && height === video.videoHeight;
-  state.crop = full ? null : { x, y, width, height };
+  const full = !box.polygon && x === 0 && y === 0 && width === video.videoWidth && height === video.videoHeight;
+  state.crop = full ? null : copyShape(box);
+  state.corners = [];
+  updateCornerControls();
   state.focusTank = !full;
   clearResults();
   $('clear-crop').disabled = full;
-  $('crop-label').textContent = full ? 'Using the full video frame.' : `Tank crop: ${width} × ${height} px at (${x}, ${y}).`;
+  $('crop-label').textContent = full ? 'Using the full video frame.' : `${box.polygon ? 'Four-corner tank' : 'Tank crop'}: ${width} × ${height} px at (${x}, ${y}).`;
   setCropInputs(box);
   drawFrame(null);
   status(full ? 'Using the full video frame.' : 'Tank area selected. Analyze to use the crop.');
@@ -264,7 +289,26 @@ canvas.addEventListener('pointerdown', event => {
   if (!state.file || state.running || video.readyState < 2 || !canvas.width) return;
   if (event.button !== 0 || state.drag) return;
   const point = pointOnCanvas(event);
-  state.drag = { start: point, end: point, calibration: $('crop-tool').value === 'calibrate', exclude: $('crop-tool').value === 'exclude', box: { x: point.x, y: point.y, width: 0, height: 0 } };
+  if ($('selection-shape').value === 'polygon' && $('crop-tool').value !== 'calibrate') {
+    state.corners.push(point);
+    if (state.corners.length === 4) {
+      try {
+        const shape = polygonBox(state.corners);
+        const tool = $('crop-tool').value;
+        if (tool === 'crop') commitCrop(shape);
+        else {
+          if (shape.width < 4 || shape.height < 4) throw new Error('Select a larger area.');
+          if (tool === 'exclude') { state.exclusions.push(shape); updateMaskControls(); }
+          else { state.tankZones.push({ ...shape, side: tool }); updateZoneControls(); }
+          clearResults();
+          state.corners = [];
+          status('Four-corner area selected. Analyze again to apply it.');
+        }
+      } catch (error) { state.corners.pop(); status(error.message, true); }
+    }
+    updateCornerControls(); drawFrame(null); return;
+  }
+  state.drag = { start: point, end: point, side: ['dark', 'light'].includes($('crop-tool').value) ? $('crop-tool').value : null, calibration: $('crop-tool').value === 'calibrate', exclude: $('crop-tool').value === 'exclude', box: { x: point.x, y: point.y, width: 0, height: 0 } };
   canvas.setPointerCapture(event.pointerId);
 });
 canvas.addEventListener('pointermove', event => {
@@ -287,8 +331,18 @@ canvas.addEventListener('pointerup', event => {
     drawFrame(null);
     return;
   }
-  const { box, exclude } = state.drag;
+  const { box, exclude, side } = state.drag;
   state.drag = null;
+  if (side) {
+    if (box.width >= 4 && box.height >= 4) {
+      state.tankZones.push({ ...box, side });
+      clearResults();
+      updateZoneControls();
+      status(`${side === 'dark' ? 'Dark' : 'Light'} region marked. Analyze again to apply it.`);
+    }
+    drawFrame(null);
+    return;
+  }
   if (exclude && box.width >= 4 && box.height >= 4) {
     state.exclusions.push(box);
     clearResults();
@@ -365,6 +419,26 @@ for (const id of ['undo-mask', 'clear-masks']) {
   });
 }
 
+function updateZoneControls() {
+  const zones = state.tankZones;
+  $('zone-count').textContent = zones.length
+    ? `${zones.filter(zone => zone.side === 'dark').length} dark / ${zones.filter(zone => zone.side === 'light').length} light regions.`
+    : 'No light/dark regions marked.';
+  $('undo-zone').disabled = !zones.length;
+  $('clear-zones').disabled = !zones.length;
+}
+for (const id of ['undo-zone', 'clear-zones']) {
+  $(id).addEventListener('click', () => {
+    if (state.running) return;
+    if (id === 'undo-zone') state.tankZones.pop();
+    else state.tankZones = [];
+    clearResults();
+    updateZoneControls();
+    drawFrame(null);
+    status('Tank regions changed. Analyze again to update results.');
+  });
+}
+
 function settings() {
   return createSettings({
     intervalMs: Number($('interval').value),
@@ -376,11 +450,12 @@ function settings() {
     expectedFish: Number($('expected-fish').value),
     preferCenter: $('prefer-center').checked,
     trackFish: $('track-fish').checked,
+    suppressFlicker: $('suppress-flicker').checked,
     confidence: Number($('confidence').value),
     versionText: $('model-version').value.trim(),
     projectSlug: $('model-slug').value.trim(),
     key: $('publishable-key').value.trim()
-  }, state.crop, video.videoWidth, video.videoHeight, state.exclusions);
+  }, state.crop, video.videoWidth, video.videoHeight, state.exclusions, state.tankZones);
 }
 
 let filterCountOverridden = false;
@@ -413,6 +488,11 @@ $('filter-frame-count').addEventListener('change', () => {
   clearResults();
   status(`Analysis will keep frames with exactly ${$('filter-frame-count').value} detected fish.`);
 });
+$('suppress-flicker').addEventListener('change', () => {
+  if (state.running) return;
+  clearResults();
+  status('Background flicker setting changed. Analyze again to apply it.');
+});
 $('track-fish').addEventListener('change', () => {
   if (state.running) return;
   clearResults();
@@ -422,6 +502,7 @@ $('track-fish').addEventListener('change', () => {
 
 $('analyze').addEventListener('click', async () => {
   if (state.running || !state.file) return;
+  if (state.corners.length) { status('Finish the four corners or cancel the unfinished selection before analyzing.', true); return; }
   let config;
   try { config = settings(); } catch (error) { status(error.message, true); return; }
   if (Math.ceil(video.duration * 1000 / config.intervalMs) > 10000) { status('This setting would analyze over 10,000 frames. Increase the frame interval.', true); return; }
@@ -449,6 +530,7 @@ $('analyze').addEventListener('click', async () => {
   $('method').disabled = true;
   $('prefer-center').disabled = true;
   $('track-fish').disabled = true;
+  $('suppress-flicker').disabled = true;
   $('filter-exact-count').disabled = true;
   $('filter-frame-count').disabled = true;
   $('crop-fields').disabled = true;
@@ -510,6 +592,7 @@ $('analyze').addEventListener('click', async () => {
     $('method').disabled = false;
     $('prefer-center').disabled = false;
     $('track-fish').disabled = false;
+    $('suppress-flicker').disabled = false;
     $('filter-exact-count').disabled = false;
     $('filter-frame-count').disabled = !$('filter-exact-count').checked;
     $('crop-fields').disabled = false;
@@ -588,6 +671,7 @@ function updateSelectedFrameDetails() {
   const sizes = frame.metrics.groupSizes;
   const groups = sizes.slice().sort((a, b) => b - a).join('+') || 'none';
   $('frame-groups').textContent = `${frame.detections.length} fish · groups ${groups} · ${frame.metrics.clusterCount} cluster${frame.metrics.clusterCount === 1 ? '' : 's'} · ${frame.metrics.isolatedCount} single${frame.metrics.uncertainPositionCount ? ` · ${frame.metrics.uncertainPositionCount} uncertain centers` : ''}`;
+  if (state.settings.tankZones?.length) $('frame-groups').textContent += ` · ${frame.metrics.darkSideCount} dark / ${frame.metrics.lightSideCount} light / ${frame.metrics.unmarkedSideCount} unmarked`;
   $('frame-groups').hidden = false;
   drawTimeline();
 }
@@ -727,10 +811,28 @@ $('open-scale').addEventListener('click', () => {
   $('calibration-tools').scrollIntoView({ block: 'nearest' });
   $('draw-calibration').focus({ preventScroll: true });
 });
+function updateCornerControls() {
+  const visible = $('selection-shape').value === 'polygon' && $('crop-tool').value !== 'calibrate';
+  for (const id of ['corner-status', 'undo-corner', 'cancel-corners']) $(id).hidden = !visible;
+  $('corner-status').textContent = state.corners.length ? `${state.corners.length}/4 corners. Click around the edge.` : 'Four-corner mode: click each corner in order around the edge.';
+  $('undo-corner').disabled = !state.corners.length;
+  $('cancel-corners').disabled = !state.corners.length;
+}
+for (const id of ['undo-corner', 'cancel-corners']) $(id).addEventListener('click', () => {
+  if (state.running) return;
+  if (id === 'undo-corner') state.corners.pop(); else state.corners = [];
+  updateCornerControls(); drawFrame(null);
+});
+$('selection-shape').addEventListener('change', () => {
+  state.corners = []; state.drag = null; updateCornerControls(); drawFrame(null);
+});
 $('crop-tool').addEventListener('change', () => {
+  state.corners = []; updateCornerControls();
   if ($('crop-tool').value === 'calibrate') $('scale-panel').open = true;
   if ($('crop-tool').value === 'crop') { state.focusTank = false; previewViewport.reset(); }
+  drawFrame(null);
 });
+updateCornerControls();
 $('preview-focus').addEventListener('click', () => { state.focusTank = true; previewViewport.reset(); });
 $('preview-full').addEventListener('click', () => { state.focusTank = false; previewViewport.reset(); });
 

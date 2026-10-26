@@ -53,11 +53,13 @@
           <div class="fields method-settings"><label>Pixels per 0.5-inch square <span class="help">distance calibration for either method</span><input id="grid-pixels" type="number" min="0.000001" step="any" value="15.3"></label></div>
           <div class="fields method-choice"><label>Detection method<select id="method"><option value="background" selected>Background subtraction · fixed tank</option><option value="roboflow">Roboflow model</option></select></label></div>
           <div id="background-settings" class="fields method-settings">
+            <label class="center-option"><input id="suppress-flicker" type="checkbox" checked> Learn background flicker in dark regions</label>
+            <p class="fine-print">Requires changes beyond the usual brightness range of each pixel, reducing flickering ridges and fixtures. Fish can still cross these areas. Turn off if faint fish are missed. Fixed bright details are already part of the background.</p>
             <label class="center-option"><input id="track-fish" type="checkbox" checked> Track fish across nearby frames</label>
             <p class="fine-print">Use intervals of 250 ms or less. T numbers follow provisional paths; identities can swap during overlap. Dashed † centers are uncertain estimates. With the center rule below, recent paths can help separate an overlap for up to one second after a clear observation.</p>
             <label class="center-option"><input id="prefer-center" type="checkbox"> If there are extra candidates, keep those nearest the crop center</label>
             <p class="fine-print">Optional: only discard candidates when the count exceeds the known fish count. Pink × marks show excluded candidates. A real fish at the edge can also be excluded; check the choices in Results. Touching fish are checked before this rule chooses the nearest candidates. Splits can use two visible dark bodies or the preceding observed sample (up to 250 ms apart); † centers remain estimates. The center is the middle of the crop rectangle.</p>
-            <p class="fine-print">Works best with a fixed camera. Include the fish’s swimming area, then mask wall reflections. Fewer than five blobs may mean fish overlap; extra blobs may come from tank edges or reflections.</p>
+            <p class="fine-print">Works best with a fixed camera. Include the fish’s swimming area, then mask wall reflections. Fewer blobs than the known count may mean missed or overlapping fish; extra blobs may come from tank edges or reflections.</p>
           </div>
           <details class="model-settings" id="model-settings" open hidden>
             <summary>Model settings <span>Roboflow InferenceJS</span></summary>
@@ -85,14 +87,21 @@
           <div class="preview-heading"><div><h2 id="preview-title">Tank preview</h2><p id="preview-instruction">Select the swimming area, then check the scale.</p></div><div class="preview-display-controls"><div class="view-mode" aria-label="Preview area"><button id="preview-focus" class="secondary" type="button" aria-pressed="false" disabled>Focus on tank</button><button id="preview-full" class="secondary" type="button" aria-pressed="true">Full frame</button></div><div class="view-controls" aria-label="Preview zoom"><button id="preview-fit" class="secondary" type="button">Fit</button><button id="preview-zoom-out" class="secondary" type="button" aria-label="Zoom out preview">−</button><output id="preview-zoom" aria-live="polite">100%</output><button id="preview-zoom-in" class="secondary" type="button" aria-label="Zoom in preview">+</button></div></div></div>
 
           <div class="canvas-wrap" id="canvas-wrap"><div class="canvas-surface"><canvas id="frame-canvas" aria-label="Analyzed video frame"></canvas></div><div id="empty-preview" class="empty-preview"><span>◎</span><strong>Waiting for footage</strong><small>Your analyzed frames will appear here.</small></div></div>
-          <details id="preview-tools" class="preview-tools"><summary>Tank area, reflection masks &amp; scale</summary>
+          <details id="preview-tools" class="preview-tools"><summary>Tank area, light/dark sides, reflection masks &amp; scale</summary>
           <div class="crop-controls"><span id="crop-label">Drag on the preview to select the tank area.</span><button id="clear-crop" class="secondary" type="button" disabled>Use full frame</button></div>
           <fieldset class="crop-fields" id="mask-tools" disabled>
             <legend>Crop and reflection masks</legend>
-            <label>Drag tool<select id="crop-tool"><option value="crop">Select tank crop</option><option value="exclude">Mask reflection area</option><option value="calibrate">Draw calibration line</option></select></label>
+            <label>Area tool<select id="crop-tool"><option value="crop">Select tank crop</option><option value="exclude">Mask reflection area</option><option value="dark">Mark dark region</option><option value="light">Mark light region</option><option value="calibrate">Draw calibration line</option></select></label>
+            <label>Selection shape<select id="selection-shape"><option value="rectangle">Rectangle · drag</option><option value="polygon">Four corners · click around edge</option></select></label>
+            <button id="undo-corner" class="secondary" type="button" disabled>Undo corner</button>
+            <button id="cancel-corners" class="secondary" type="button" disabled>Cancel corners</button>
+            <span id="corner-status" role="status">Four-corner mode: click each corner in order around the edge.</span>
             <button id="undo-mask" class="secondary" type="button" disabled>Undo last mask</button>
             <button id="clear-masks" class="secondary" type="button" disabled>Clear masks</button>
             <span id="mask-count">No reflection masks.</span>
+            <button id="undo-zone" class="secondary" type="button" disabled>Undo last region</button>
+            <button id="clear-zones" class="secondary" type="button" disabled>Clear light/dark regions</button>
+            <span id="zone-count">No light/dark regions marked.</span>
           </fieldset>
           <details id="scale-panel" class="preview-detail"><summary>Set scale</summary>
           <fieldset id="calibration-tools" class="calibration-tools" disabled>
@@ -105,8 +114,9 @@
             <p class="fine-print">Measure several grid squares near the swimming area for better accuracy. Perspective makes distances approximate. Clearing the line keeps the applied scale.</p>
           </fieldset>
           </details>
+          <p class="fine-print">For a light/dark tank, select Mark dark region and outline the dark side, then Mark light region and outline the light side. Use Four corners for angled areas: click four corners in order around the edge. This also works for the tank crop and reflection masks. Marked regions keep fish in the analysis; reflection masks exclude them. Dark regions detect brighter or darker fish; light and unmarked regions detect darker fish. The last region drawn wins at overlaps. Fish centers outside marked regions are reported as unmarked. Analyze again after changes.</p>
           <details class="preview-detail"><summary>Precise crop</summary>
-          <p class="fine-print">Masks exclude reflections and any real fish that enter those areas. Changing the crop or masks requires analyzing again.</p>
+          <p class="fine-print">Four-corner tank selections analyze only the outlined area; precise crop fields below replace that outline with a rectangle. Masks exclude reflections and any real fish that enter those areas. Changing the crop or masks requires analyzing again.</p>
           <fieldset class="crop-fields" id="crop-fields" disabled><legend>Or enter a precise crop in video pixels</legend><label>X<input id="crop-x" type="number" min="0" step="1"></label><label>Y<input id="crop-y" type="number" min="0" step="1"></label><label>Width<input id="crop-width" type="number" min="30" step="1"></label><label>Height<input id="crop-height" type="number" min="30" step="1"></label><button id="apply-crop" class="secondary" type="button">Apply crop</button></fieldset>
           </details>
           </details>

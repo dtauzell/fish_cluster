@@ -40,3 +40,32 @@ this browser case.
 
 The test's expected centers are approximate manually inspected positions, not
 fish identities or a claim of accuracy across the whole clip.
+
+## Light/dark single-fish recording
+
+`light-dark/` contains grayscale crops from `single_fish_dark_side - 1.mov`
+(720 × 1280, duration 62.13 seconds), decoded with FFmpeg and converted by the
+application's `grayscale()` function. Crop: `(200, 400, 490, 170)`.
+`background.pgm` is the median of 25 samples at `(i + 0.5) * 62.13 / 25`.
+`dark-0s.pgm` shows a bright fish against the dark floor near original-video
+`(533, 509)`; the original darker-only rule misses it. `light-15s.pgm` shows
+a dark fish against the light floor near `(285, 479)`. Tests mark the dark region
+from `x=403` to the crop's right edge and confirm both detections, without
+changing the light-side result. Centers are approximate spot checks, not a claim
+of accuracy throughout the video. Synthetic crossing tests cover a fish spanning
+the region boundary and manual side reassignment. Safari's full-video check at
+200 ms intervals found exactly one candidate in 280 of 311 samples with this
+crop and boundary; the remaining 31 samples require review. Matching the known
+count alone does not validate the position.
+
+`variation-lower.pgm` and `variation-upper.pgm` save the 10th–90th percentile
+range from the same 25 background samples, expanded over a two-pixel neighborhood.
+`ridge-jitter-2s.pgm` is frame 10 (zero-based) of an FFmpeg `fps=5` decode,
+with the same crop and RGBA-to-grayscale conversion. Its selected source frame
+can differ from a direct seek to 2 seconds. It contains five false ridge regions
+near x=530 and one fish near `(489, 516)`. The learned-background core check
+removes those five regions and retains the fish. A companion check preserves the
+complete original fish region at 0 seconds, where the fish crosses the ridge.
+On this full 311-frame FFmpeg decode, the same rectangular crop and regions yield
+279 samples with exactly one candidate without suppression and 288 with it.
+This count comparison is not a manual validation of every detected position.

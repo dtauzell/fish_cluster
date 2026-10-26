@@ -59,6 +59,49 @@ analyze again. Keep masks small: real fish inside them are also excluded. A mask
 cannot distinguish a fish from its reflection when they occupy the same image
 area. Masks appear in human review and are saved in the JSON settings.
 
+For an angled tank, open **Tank area, light/dark sides, reflection masks & scale**,
+choose **Select tank crop** under **Area tool**, and set **Selection shape** to
+**Four corners**. Click four corners in order around the swimming area. The
+fourth click applies the outline; **Undo corner** and **Cancel corners** adjust
+an unfinished selection. Crossed or concave outlines are rejected. The same
+four-corner mode works for light/dark regions and reflection masks. Rectangle
+mode still uses dragging. The detector and manual corrections use the outlined
+area, while decoding and clean PNG/training exports use its rectangular bounding
+box. Coordinates remain in original-video pixels; the image is not rotated or
+stretched. Precise crop inputs replace a four-corner tank outline with a rectangle.
+Full JSON retains the corners. Changing areas requires analyzing again.
+
+For a tank with a dark and a light side, open **Tank area, light/dark sides,
+reflection masks & scale**. Crop to the swimming area, then use the **Area tool**
+to **Mark dark region** and **Mark light region**, outlining each side with a
+rectangle or four corners. You can draw several areas; the last drawn wins at overlaps.
+**Undo last region** and **Clear light/dark regions** adjust these marks.
+Unlike reflection masks, these regions keep fish in the analysis. In dark regions,
+background subtraction accepts both brighter and darker changes; light and
+unmarked areas retain the darker-fish rule. The median background remains local
+to each pixel. Analyze again after editing regions. Results show the region
+outlines and counts under frame details. Detection CSV adds `tank_side`
+(`dark`, `light`, or `unmarked`); frame CSV adds `darkSideCount`, `lightSideCount`,
+and `unmarkedSideCount`. Full JSON includes region shapes and each detection's
+`tankSide`. Classification uses the fish center, including after manual corrections;
+it does not assign a whole straddling fish to both sides. Unmarked areas are not
+silently assigned to either side. These are sampled positions, not continuous
+residence-time estimates. Set **Fish in tank** and the required inclusion
+count to **1** for a single-fish recording. Files named `single_fish_dark_side…`
+start with both counts at one. Calibrate scale for each recording if using inch
+measurements.
+
+For bright ridges and fixtures on the dark side, **Advanced settings → Learn
+background flicker in dark regions** is enabled by default. It learns the usual
+brightness range of each pixel from the background samples, including a two-pixel
+neighborhood to tolerate small ridge shifts. A candidate needs a small core
+(at least five pixels and 8% of its area) that changes beyond that range. The
+whole candidate outline is retained when it passes, so fish can still cross a
+ridge. This does not change the dark/light side classification. Fixed bright
+objects are already part of the median background. Turn the option off and
+reanalyze if faint fish are missed. Reflection masks remain an option for areas
+to exclude, but also exclude fish swimming through them.
+
 Background mode also offers **If there are extra candidates, keep those nearest
 the crop center**. This is off by default. When enabled, a frame with more
 candidates than the known fish count keeps only that many nearest the middle of
@@ -174,6 +217,7 @@ calculate measurements, compare manual annotations, and format exports.
 | [dist/tracking.mjs](dist/tracking.mjs), [dist/point-assignment.mjs](dist/point-assignment.mjs) | Follow provisional fish paths, match centers one-to-one, and supply bounded overlap evidence without treating estimates as fresh observations. |
 | [dist/blob-splitting.mjs](dist/blob-splitting.mjs) | Estimates two centers inside unusually large regions, including touching pairs hidden by a full candidate count. |
 | [dist/model.mjs](dist/model.mjs) | Loads and reuses the optional Roboflow model worker and explains model errors. |
+| [dist/geometry.mjs](dist/geometry.mjs), [dist/tank-zones.mjs](dist/tank-zones.mjs) | Four-corner geometry, area drawing, side classification, and dark-region pixel maps. |
 | [dist/region.mjs](dist/region.mjs) | Defines the usable crop area, translates reflection masks, and splits the unmasked area for random sampling. |
 | [dist/candidate-selection.mjs](dist/candidate-selection.mjs) | Optionally ranks excess candidates by distance from the crop center, retaining rejected candidates for review. |
 | [dist/settings.mjs](dist/settings.mjs) | Validates settings, copies the selected crop, and converts calibrated inches to pixels. |

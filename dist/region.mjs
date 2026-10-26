@@ -1,7 +1,8 @@
+import { insidePolygon } from './geometry.mjs';
 /** Rectangles and points use original-video pixels unless explicitly translated. */
 export function insideCrop(point, crop) {
   return point.x >= crop.x && point.x <= crop.x + crop.width &&
-    point.y >= crop.y && point.y <= crop.y + crop.height;
+    point.y >= crop.y && point.y <= crop.y + crop.height && (!crop.polygon || insidePolygon(point, crop.polygon));
 }
 
 export function insideAnalysisArea(point, crop, exclusions = []) {
@@ -9,7 +10,8 @@ export function insideAnalysisArea(point, crop, exclusions = []) {
 }
 
 export function localExclusions(crop, exclusions = []) {
-  return exclusions.map(box => ({ ...box, x: box.x - crop.x, y: box.y - crop.y }));
+  return exclusions.map(box => ({ ...box, x: box.x - crop.x, y: box.y - crop.y,
+    ...(box.polygon ? { polygon: box.polygon.map(p => ({ x: p.x - crop.x, y: p.y - crop.y })) } : {}) }));
 }
 
 /** Remove excluded pixels before cleanup, and again before finding connected regions. */
@@ -20,7 +22,10 @@ export function maskExcludedPixels(mask, width, height, exclusions = []) {
     const top = Math.max(0, Math.ceil(box.y));
     const bottom = Math.min(height, Math.floor(box.y + box.height) + 1);
     if (left >= right || top >= bottom) continue;
-    for (let y = top; y < bottom; y++) mask.fill(0, y * width + left, y * width + right);
+    for (let y = top; y < bottom; y++) {
+      if (!box.polygon) mask.fill(0, y * width + left, y * width + right);
+      else for (let x = left; x < right; x++) if (insideCrop({ x, y }, box)) mask[y * width + x] = 0;
+    }
   }
 }
 
@@ -47,4 +52,16 @@ export function usableRectangles(crop, exclusions = []) {
     if (y < crop.y + crop.height) rectangles.push({ x: left, y, width: right - left, height: crop.y + crop.height - y });
   }
   return rectangles;
+}
+
+/** Combined raster used before and after morphology, including angled tank edges. */
+export function analysisPixelMask(crop, exclusions = []) {
+  const mask = new Uint8Array(crop.width * crop.height).fill(1);
+  if (crop.polygon) {
+    for (let y = 0; y < crop.height; y++) for (let x = 0; x < crop.width; x++) {
+      if (!insideCrop({ x: crop.x + x, y: crop.y + y }, crop)) mask[y * crop.width + x] = 0;
+    }
+  }
+  maskExcludedPixels(mask, crop.width, crop.height, localExclusions(crop, exclusions));
+  return mask;
 }

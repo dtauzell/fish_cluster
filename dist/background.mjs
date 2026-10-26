@@ -28,6 +28,42 @@ export function medianBackground(samples) {
   return result;
 }
 
+/** Robust background range ignores isolated fish visits while learning fixture flicker. */
+export function backgroundVariation(samples, width, height) {
+  if (!samples.length || samples.some(sample => sample.length !== samples[0].length)) {
+    throw new Error('Background samples must have matching dimensions.');
+  }
+  const lower = new Uint8Array(samples[0].length), upper = new Uint8Array(lower.length);
+  const values = new Uint8Array(samples.length);
+  const low = Math.floor((samples.length - 1) * 0.1), high = Math.ceil((samples.length - 1) * 0.9);
+  for (let pixel = 0; pixel < lower.length; pixel++) {
+    for (let i = 0; i < samples.length; i++) values[i] = samples[i][pixel];
+    values.sort();
+    lower[pixel] = values[low]; upper[pixel] = values[high];
+  }
+  if (width && height) {
+    if (width * height !== lower.length) throw new Error('Background variation dimensions do not match.');
+    // Nearby reference pixels account for a ridge moving a pixel or two due to
+    // camera vibration, water refraction, or decoding. Keep this tolerance local.
+    const horizontalLow = lower.slice(), horizontalHigh = upper.slice();
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      for (let dx = Math.max(0, x - 2); dx <= Math.min(width - 1, x + 2); dx++) {
+        horizontalLow[i] = Math.min(horizontalLow[i], lower[y * width + dx]);
+        horizontalHigh[i] = Math.max(horizontalHigh[i], upper[y * width + dx]);
+      }
+    }
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      for (let dy = Math.max(0, y - 2); dy <= Math.min(height - 1, y + 2); dy++) {
+        lower[i] = Math.min(lower[i], horizontalLow[dy * width + x]);
+        upper[i] = Math.max(upper[i], horizontalHigh[dy * width + x]);
+      }
+    }
+  }
+  return { lower, upper };
+}
+
 // Erosion shrinks the mask: keep a pixel only when its four neighbors are also set.
 function erode3(mask, width, height) {
   const result = new Uint8Array(mask.length);
@@ -58,23 +94,42 @@ function dilate3(mask, width, height) {
 }
 
 // A mask is one byte per pixel: 1 means a possible fish, 0 means background.
-function darkPixelMask(frame, background, width, height, threshold, exclusions) {
+function darkPixelMask(frame, background, width, height, threshold, exclusions, darkZones, analysisMask) {
   let mask = new Uint8Array(frame.length);
   for (let y = 0; y < height; y++) {
     const row = y * width;
     for (let x = 0; x < width; x++) {
       const index = row + x;
-      if (background[index] - frame[index] >= threshold) mask[index] = 1;
+      const difference = background[index] - frame[index];
+      // A pale fish can brighten a dark floor; preserve the original rule elsewhere.
+      if ((darkZones?.[index] ? Math.abs(difference) : difference) >= threshold) mask[index] = 1;
     }
   }
+  if (analysisMask) for (let i = 0; i < mask.length; i++) if (!analysisMask[i]) mask[i] = 0;
   maskExcludedPixels(mask, width, height, exclusions);
   // Opening (shrink then grow) removes isolated specks. Closing (grow then
   // shrink) fills small gaps. The two growth steps preserve the trial's tuning.
   mask = dilate3(erode3(mask, width, height), width, height);
   mask = dilate3(dilate3(mask, width, height), width, height);
   mask = erode3(erode3(mask, width, height), width, height);
+  if (analysisMask) for (let i = 0; i < mask.length; i++) if (!analysisMask[i]) mask[i] = 0;
   maskExcludedPixels(mask, width, height, exclusions);
   return mask;
+}
+
+// Verify whole regions instead of eroding a fish away where it crosses a ridge.
+// A region needs a small core beyond the background's ordinary variation.
+function hasStableForegroundEvidence(blob, frame, background, threshold, options) {
+  const variation = options.backgroundVariation;
+  if (!variation || !options.darkZones) return true;
+  let touchesDark = false, evidence = 0;
+  for (const pixel of blob.pixels) {
+    if (options.darkZones[pixel]) {
+      touchesDark = true;
+      if (frame[pixel] <= variation.lower[pixel] - threshold || frame[pixel] >= variation.upper[pixel] + threshold) evidence++;
+    } else if (background[pixel] - frame[pixel] >= threshold) evidence++;
+  }
+  return !touchesDark || evidence >= Math.max(5, Math.ceil(blob.area * 0.08));
 }
 
 // Ignore tank borders where reflections and fixed hardware often look like fish.
@@ -115,7 +170,7 @@ function recoverEdgeFish(blobs, frame, background, width, height, options, edges
 }
 
 /**
- * Find dark moving regions in a cropped grayscale frame.
+ * Find moving regions in a cropped grayscale frame, using either contrast sign in marked dark zones.
  * Input arrays are row-major: pixel (x, y) is at y * width + x, brightness 0–255.
  * Returned centers and bounding-box sizes are in crop pixels. These are candidate
  * fish, not tracked identities. Defaults reproduce the original tank experiment.
@@ -128,9 +183,10 @@ export function detectBackgroundFish(frame, background, width, height, options =
   const edgeX = options.edgeX ?? Math.round(width * 12 / 420);
   const edgeTop = options.edgeTop ?? options.edgeY ?? Math.round(height * 10 / 290);
   const edgeBottom = options.edgeBottom ?? options.edgeY ?? Math.round(height * 20 / 290);
-  const mask = darkPixelMask(frame, background, width, height, threshold, options.exclusions);
+  const mask = darkPixelMask(frame, background, width, height, threshold, options.exclusions, options.darkZones, options.analysisMask);
   excludeBorders(mask, width, height, edgeX, edgeTop, edgeBottom);
-  const blobs = connectedRegions(mask, width, height, { minArea, maxArea, minLength: 10 });
+  const blobs = connectedRegions(mask, width, height, { minArea, maxArea, minLength: 10 })
+    .filter(blob => hasStableForegroundEvidence(blob, frame, background, threshold, options));
   recoverEdgeFish(blobs, frame, background, width, height, options, { edgeX, edgeTop, edgeBottom }, minArea);
   const trackingSeeds = options.overlapSeedsFor?.(blobs) ?? new Map();
   splitLargeBlobs(blobs, width, height, { minArea, expectedFish: options.expectedFish, preferCenter: options.preferCenter,

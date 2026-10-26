@@ -1,4 +1,4 @@
-import { usableRectangles } from './region.mjs';
+import { usableRectangles, insideAnalysisArea } from './region.mjs';
 
 // Geometry and statistics on point coordinates. These functions never read image pixels.
 // Distances ending in Px are in original-video pixels; absent distances are null.
@@ -149,12 +149,22 @@ export function analyzeFrame(detections, thresholdPx) {
 export function randomSpacingReference(count, crop, samples = 399, exclusions = []) {
   if (count < 2 || !crop?.width || !crop?.height) return null;
   const origin = { ...crop, x: crop.x ?? 0, y: crop.y ?? 0 };
-  const rectangles = usableRectangles(origin, exclusions);
+  // Polygon runs use uniform rejection from the bounding box. Keep the original
+  // rectangle sequence unchanged for existing recordings and regression results.
+  const polygonArea = Boolean(crop.polygon || exclusions.some(box => box.polygon));
+  const rectangles = usableRectangles(origin, exclusions.filter(box => !box.polygon));
   const area = rectangles.reduce((sum, box) => sum + box.width * box.height, 0);
   if (!area) return null;
   let seed = (Math.imul(count, 2654435761) ^ Math.imul(crop.width, 2246822519) ^ Math.imul(crop.height, 3266489917)) >>> 0;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
   function randomPoint() {
+    if (polygonArea) {
+      for (let attempt = 0; attempt < 10000; attempt++) {
+        const point = { x: origin.x + random() * crop.width, y: origin.y + random() * crop.height };
+        if (insideAnalysisArea(point, origin, exclusions)) return point;
+      }
+      return null;
+    }
     // Preserve the original reference sequence when there are no exclusions.
     if (!exclusions.length) return { x: random() * crop.width, y: random() * crop.height };
     let target = random() * area;
@@ -168,6 +178,7 @@ export function randomSpacingReference(count, crop, samples = 399, exclusions = 
   const distances = [];
   for (let sample = 0; sample < samples; sample++) {
     const points = Array.from({ length: count }, randomPoint);
+    if (points.some(point => !point)) return null;
     const nearest = Array(count).fill(Infinity);
     for (let i = 0; i < count; i++) for (let j = i + 1; j < count; j++) {
       const distance = Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y);
