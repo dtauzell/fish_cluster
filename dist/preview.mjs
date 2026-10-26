@@ -6,7 +6,7 @@ import { drawCandidateSharpness } from './sharpness-ui.mjs';
 export function createPreview(canvas, video) {
   const ctx = canvas.getContext('2d');
   function drawFrame(frame, threshold, crop, exclusions = [], showSharpness = false,
-    view = { x: 0, y: 0, width: video.videoWidth || canvas.width, height: video.videoHeight || canvas.height }) {
+    view = { x: 0, y: 0, width: video.videoWidth || canvas.width, height: video.videoHeight || canvas.height }, testType = 'shoaling') {
     if (canvas.width !== view.width) canvas.width = view.width;
     if (canvas.height !== view.height) canvas.height = view.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -15,7 +15,7 @@ export function createPreview(canvas, video) {
     if (video.readyState >= 2) ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
     if (!frame) { drawCrop(crop); drawExclusions(ctx, exclusions); return; }
     const dots = frame.detections;
-    drawFrameGroups(ctx, frame, threshold, { x: 0, y: 0 }, canvas.width / Math.max(1, canvas.getBoundingClientRect().width));
+    drawFrameGroups(ctx, frame, threshold, { x: 0, y: 0 }, canvas.width / Math.max(1, canvas.getBoundingClientRect().width), testType);
     drawCrop(crop);
     drawExclusions(ctx, exclusions);
     drawRejectedCandidates(ctx, frame.rejectedDetections ?? [], { x: 0, y: 0 }, canvas.width / Math.max(1, canvas.getBoundingClientRect().width));
@@ -63,14 +63,15 @@ export function createPreview(canvas, video) {
 }
 
 /** Group colors and links are shared by setup previews and the results editor. */
-export function drawFrameGroups(ctx, frame, threshold, view, scale) {
+export function drawFrameGroups(ctx, frame, threshold, view, scale, testType = 'shoaling') {
+  const shoaling = testType !== 'light-dark';
   const groupColors = ['#8ce6ce', '#f6d979', '#f4a7b9', '#9ab9ff', '#d3a9f0', '#ffba87'];
   ctx.save();
   ctx.translate(-view.x, -view.y);
   const dots = frame.detections;
   ctx.lineWidth = scale;
   for (let i = 0; i < dots.length; i++) for (let j = i + 1; j < dots.length; j++) {
-    if (Math.hypot(dots[i].x - dots[j].x, dots[i].y - dots[j].y) <= threshold) {
+    if (shoaling && Math.hypot(dots[i].x - dots[j].x, dots[i].y - dots[j].y) <= threshold) {
       ctx.strokeStyle = groupColors[frame.metrics.groupIds[i] % groupColors.length];
       ctx.beginPath();
       ctx.moveTo(dots[i].x, dots[i].y);
@@ -81,7 +82,7 @@ export function drawFrameGroups(ctx, frame, threshold, view, scale) {
   const radius = 4 * scale;
   for (const [i, dot] of dots.entries()) {
     const group = frame.metrics.groupIds[i];
-    const color = frame.metrics.groupSizes[group] === 1 ? '#cad1d0' : groupColors[group % groupColors.length];
+    const color = !shoaling ? '#8ce6ce' : frame.metrics.groupSizes[group] === 1 ? '#cad1d0' : groupColors[group % groupColors.length];
     ctx.beginPath();
     ctx.arc(dot.x, dot.y, radius + 3 * scale, 0, Math.PI * 2);
     ctx.fillStyle = '#071a22';
@@ -90,6 +91,7 @@ export function drawFrameGroups(ctx, frame, threshold, view, scale) {
     ctx.arc(dot.x, dot.y, radius, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
+    if (!shoaling) continue;
     ctx.font = `bold ${12 * scale}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.lineWidth = 3 * scale;

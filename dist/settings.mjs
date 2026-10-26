@@ -1,10 +1,14 @@
 import { copyShape, polygonBox } from './geometry.mjs';
 import { analysisPixelMask, usableRectangles } from './region.mjs';
 import { inchesToPixels } from './analysis.mjs';
+import { darkZoneMask } from './tank-zones.mjs';
 
 /** Validate plain values and snapshot the crop so later edits cannot change a run. */
 export function createSettings(values, selectedCrop, frameWidth, frameHeight, selectedExclusions = [], selectedTankZones = []) {
-  const { intervalMs, thresholdInches, gridPixels, method, confidence, expectedFish, versionText, projectSlug, key } = values;
+  const { intervalMs, thresholdInches, gridPixels, method, confidence, versionText, projectSlug, key } = values;
+  const testType = values.testType;
+  if (testType != null && !['shoaling', 'light-dark'].includes(testType)) throw new Error('Choose a shoaling or light-dark test.');
+  const expectedFish = testType === 'light-dark' ? 1 : values.expectedFish;
   const version = Number(versionText);
   if (!Number.isInteger(intervalMs) || intervalMs < 1) throw new Error('Frame interval must be at least 1 ms.');
   if (!Number.isFinite(thresholdInches) || thresholdInches < 0.01) throw new Error('Close distance must be at least 0.01 inches.');
@@ -17,6 +21,7 @@ export function createSettings(values, selectedCrop, frameWidth, frameHeight, se
   }
   if (!usableRectangles(crop, exclusions.filter(box => !box.polygon)).length) throw new Error('Reflection masks cover the entire crop. Leave room to detect fish.');
   const tankZones = selectedTankZones.map(copyShape);
+  if (testType === 'light-dark' && !tankZones.some(zone => zone.side === 'dark')) throw new Error('Mark the dark tank region for the light-dark test.');
   if (tankZones.some(zone => !['dark', 'light'].includes(zone.side) ||
     ![zone.x, zone.y, zone.width, zone.height].every(Number.isFinite) || zone.width <= 0 || zone.height <= 0)) {
     throw new Error('Tank regions must be light or dark rectangles with positive dimensions.');
@@ -32,8 +37,13 @@ export function createSettings(values, selectedCrop, frameWidth, frameHeight, se
   if ((crop.polygon || exclusions.some(box => box.polygon)) && !analysisPixelMask(crop, exclusions).some(Boolean)) {
     throw new Error('Masks cover the entire tank area. Leave room to detect fish.');
   }
+  if (testType === 'light-dark') {
+    const dark = darkZoneMask(crop, tankZones), usable = analysisPixelMask(crop, exclusions);
+    if (!dark.some((value, index) => value && usable[index])) throw new Error('Mark a dark region inside the usable tank area.');
+  }
   // Each grid square is half an inch, so two squares span one inch.
   const common = {
+    ...(testType ? { testType } : {}),
     method,
     expectedFish,
     intervalMs,
@@ -45,9 +55,9 @@ export function createSettings(values, selectedCrop, frameWidth, frameHeight, se
     exclusions,
     tankZones,
     filterExactCount: values.filterExactCount === true,
-    filterFrameCount: values.filterExactCount === true ? values.filterFrameCount : null
+    filterFrameCount: values.filterExactCount === true ? (testType === 'light-dark' ? 1 : values.filterFrameCount) : null
   };
-  if (values.filterExactCount && (!Number.isInteger(values.filterFrameCount) || values.filterFrameCount < 1)) {
+  if (testType !== 'light-dark' && values.filterExactCount && (!Number.isInteger(values.filterFrameCount) || values.filterFrameCount < 1)) {
     throw new Error('Required fish per frame must be a whole number of at least one.');
   }
   if (method === 'background') {

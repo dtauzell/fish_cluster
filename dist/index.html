@@ -10,8 +10,8 @@
   <link rel="stylesheet" href="./style.css?v=29">
   <link rel="stylesheet" href="./about.css?v=1">
   <link rel="stylesheet" href="./labeling.css?v=1">
-  <link rel="stylesheet" href="./workspace.css?v=7">
-  <script type="module" src="./app.mjs?v=42"></script>
+  <link rel="stylesheet" href="./workspace.css?v=8">
+  <script type="module" src="./app.mjs?v=44"></script>
 </head>
 <body>
   <div class="shell">
@@ -21,12 +21,16 @@
       <nav class="workflow-nav" aria-label="Analysis workflow">
         <a id="nav-setup" href="#analysis" aria-current="page">Setup</a>
         <a id="nav-results" href="#results" aria-disabled="true">Results</a>
-        <span id="workflow-summary">Add a video to begin</span>
+        <span id="test-name"></span><button id="change-test" class="secondary" type="button" hidden>Change test</button><span id="workflow-summary">Add a video to begin</span>
         <details class="tools-menu"><summary>Tools</summary><div><button id="open-labeler" class="secondary" type="button" disabled>Label training frames</button><p class="fine-print">Uses your video, crop, and sampling interval.</p></div></details>
       </nav>
       <div class="top-links"><a href="#about">About the analysis</a><a href="https://github.com/dtauzell/fish_cluster" target="_blank" rel="noopener">Source code ↗</a></div>
     </header>
     <main>
+      <section id="test-chooser" class="test-chooser panel" aria-labelledby="test-choice-title">
+        <h1 id="test-choice-title">Choose your test</h1><p>Select the analysis for this experiment.</p>
+        <div class="test-options"><button id="choose-shoaling" class="secondary" type="button"><strong>Shoaling</strong><span>Measure fish spacing, groups, and clustering.</span></button><button id="choose-light-dark" class="secondary" type="button"><strong>Light / dark</strong><span>Track one fish’s time on each side, switches, and speed.</span></button></div>
+      </section>
       <div id="workspace" class="workspace">
         <section class="panel setup" aria-labelledby="setup-title">
           <div class="section-heading"><span class="step">01</span><div><h2 id="setup-title">Set up analysis</h2><p>Choose footage and sampling settings.</p></div></div>
@@ -38,15 +42,15 @@
             <span>or click to browse · MP4, WebM, MOV</span>
           </label>
           <div id="video-meta" class="video-meta" hidden></div>
-          <div class="fields basic-settings">
+          <details class="experiment-tools"><summary>Saved tank setups</summary><div id="saved-setups"></div></details><p class="light-dark-only fine-print">One fish. Mark the dark region in Tank area tools. Any usable tank area outside marked regions is light; masked and uncertain positions are unknown.</p><div class="fields basic-settings">
             <label>Fish in tank<input id="expected-fish" type="number" min="1" step="1" value="5"></label>
             <label>Sample ms<input id="interval" type="number" min="1" step="1" value="200"></label>
             <p id="sampling-summary" class="fine-print">Every 0.2 seconds · 5 samples/sec</p>
-            <label>Link distance <span class="help">inches</span><input id="threshold" type="number" min="0.01" step="0.01" value="1.5"></label>
+            <label class="shoaling-only">Link distance <span class="help">inches</span><input id="threshold" type="number" min="0.01" step="0.01" value="1.5"></label>
           </div>
           <button id="open-scale" class="scale-summary secondary" type="button">Set scale <span id="scale-summary">30.6 px/in</span></button>
           <details class="advanced-settings"><summary>Advanced settings</summary>
-          <div class="fields frame-filter">
+          <div class="fields frame-filter shoaling-only">
             <label class="center-option"><input id="filter-exact-count" type="checkbox" checked> Only include frames with exactly</label>
             <label>Required count (override)<input id="filter-frame-count" type="number" min="1" step="1" value="5"></label>
           </div>
@@ -57,6 +61,7 @@
             <p class="fine-print">Requires changes beyond the usual brightness range of each pixel, reducing flickering ridges and fixtures. Fish can still cross these areas. Turn off if faint fish are missed. Fixed bright details are already part of the background.</p>
             <label class="center-option"><input id="track-fish" type="checkbox" checked> Track fish across nearby frames</label>
             <p class="fine-print">Use intervals of 250 ms or less. T numbers follow provisional paths; identities can swap during overlap. Dashed † centers are uncertain estimates. With the center rule below, recent paths can help separate an overlap for up to one second after a clear observation.</p>
+            <p class="fine-print">With one fish expected, background detection keeps the strongest foreground contrast instead of weaker reflections. Similar candidates remain uncertain; review the pink × marks and correct the center when needed.</p>
             <label class="center-option"><input id="prefer-center" type="checkbox"> If there are extra candidates, keep those nearest the crop center</label>
             <p class="fine-print">Optional: only discard candidates when the count exceeds the known fish count. Pink × marks show excluded candidates. A real fish at the edge can also be excluded; check the choices in Results. Touching fish are checked before this rule chooses the nearest candidates. Splits can use two visible dark bodies or the preceding observed sample (up to 250 ms apart); † centers remain estimates. The center is the middle of the crop rectangle.</p>
             <p class="fine-print">Works best with a fixed camera. Include the fish’s swimming area, then mask wall reflections. Fewer blobs than the known count may mean missed or overlapping fish; extra blobs may come from tank edges or reflections.</p>
@@ -148,7 +153,7 @@
               <div id="sharpness-candidates" class="sharpness-table"></div>
               <p id="sharpness-comparison" aria-live="polite"></p>
               <button id="sharpness-export" class="secondary" type="button">Export sharpness comparison CSV ↓</button>
-              <p>Label candidates as fish or reflections to compare their scores across frames. Labels stay in this tab until results are cleared or the tab reloads; export them to keep them. Labels do not filter detections. Pink × marks and “No (outer)” identify candidates excluded by the optional center rule.</p>
+              <p>Label candidates as fish or reflections to compare their scores across frames. Labels stay in this tab until results are cleared or the tab reloads; export them to keep them. Labels do not filter detections. Pink × marks identify excluded candidates. The table distinguishes weaker contrast, ambiguous single-fish choices, and outer candidates.</p>
             </details>
             </div>
           </div>
@@ -166,12 +171,13 @@
             </div>
       <section id="results" class="results" hidden>
         <div class="results-head"><div><h2>Results summary</h2><p id="results-inclusion" class="human-help" role="status"></p></div></div>
-        <div class="stat-grid">
+        <div class="stat-grid shoaling-only">
           <article class="stat"><span>Average detections / frame</span><strong id="stat-fish">—</strong></article>
           <article class="stat"><span>Average pair distance</span><strong id="stat-distance">—</strong><small id="distance-note">center to center · approximate inches</small></article>
           <article class="stat"><span>Detections near another</span><strong id="stat-close">—</strong><small>within chosen distance</small></article>
           <article class="stat"><span>Average clusters / frame</span><strong id="stat-clusters">—</strong><small>groups of at least 2</small></article>
         </div>
+        <div class="light-dark-only light-dark-summary"><h3>Light / dark observations</h3><div class="stat-grid"><article class="stat"><span>Time dark</span><strong id="ld-dark">—</strong></article><article class="stat"><span>Time light</span><strong id="ld-light">—</strong></article><article class="stat"><span>Time unknown</span><strong id="ld-unknown">—</strong></article><article class="stat"><span>Observed zone switches</span><strong id="ld-switches">—</strong></article><article class="stat"><span>Average speed</span><strong id="ld-speed">—</strong></article></div><p id="ld-coverage" class="human-help"></p><p class="human-help">Time spans the first through last sampled frame. Crossing intervals are split equally between sides. Missing, ambiguous, or estimated positions leave unknown time. Speed averages measured distance over measured time.</p></div>
         <section id="velocity-panel" class="velocity-panel" hidden aria-labelledby="velocity-title">
           <h3 id="velocity-title">Single-fish velocity</h3>
           <label class="velocity-toggle"><input id="show-velocity" type="checkbox"> Show velocity tracker</label>
@@ -189,8 +195,9 @@
             <p class="human-help">Speed is center displacement divided by elapsed time. Missing, multiple, excluded, estimated, or ambiguous detections leave gaps. Corrections and scale changes update this view. The yellow line marks the selected frame. Curved motion between samples is not measured.</p>
           </div>
         </section>
-        <details id="results-exports" class="result-exports"><summary>Export results</summary><div class="downloads"><button id="download-csv" class="secondary">Export detections CSV ↓</button><button id="download-frames" class="secondary">Export frames CSV ↓</button><button id="download-json" class="secondary">Export all JSON ↓</button></div></details>
-        <details class="chart-panel"><summary>Explore groups &amp; link distance</summary>
+        <details id="results-exports" class="result-exports"><summary>Export results</summary><div class="downloads"><button id="download-csv" class="secondary shoaling-only">Export detections CSV ↓</button><button id="download-frames" class="secondary">Export frames CSV ↓</button><button id="download-summary" class="secondary light-dark-only">Export summary CSV ↓</button><a id="csv-guide" href="./csv-guide.html#shoaling" target="_blank" rel="noopener">Frames CSV guide ↗</a><button id="download-json" class="secondary">Export all JSON ↓</button></div></details>
+        <details class="experiment-tools light-dark-only"><summary>Trial results across fish</summary><div id="batch-results"></div></details>
+        <details class="chart-panel shoaling-only"><summary>Explore groups &amp; link distance</summary>
         <div class="cluster-explorer">
           <div><h3>Explore the groups</h3><p>Adjust the distance to see when groups join. The chart shows the selected frame.</p></div>
           <label for="cluster-distance">Link distance <strong id="cluster-distance-label">—</strong></label>
@@ -200,11 +207,11 @@
           <p id="random-summary" class="random-summary"></p>
         </div>
         </details>
-        <details class="method"><summary>How metrics work</summary><p>Each detection center is a candidate fish position. Centers within the link distance form connected groups; a chain of links can join fish farther apart. Single fish are shown separately. The random comparison places the same number of points uniformly inside the selected tank crop, excluding reflection masks, 399 times and compares mean nearest-neighbor distance. A low percentile means tighter spacing than those random placements in that frame; adjacent video frames are not independent tests. Inch estimates use the paper-grid calibration and are approximate. When the detected count is low, the detector checks close to the crop edge, then may split a large joined region. These estimates are marked in the raw export. Reflections can create extras. Background tracking follows provisional paths across nearby frames; dashed † positions are uncertain and need review. <a href="#about">Read the full method</a>.</p></details>
+        <details class="method shoaling-only"><summary>How metrics work</summary><p>Each detection center is a candidate fish position. Centers within the link distance form connected groups; a chain of links can join fish farther apart. Single fish are shown separately. The random comparison places the same number of points uniformly inside the selected tank crop, excluding reflection masks, 399 times and compares mean nearest-neighbor distance. A low percentile means tighter spacing than those random placements in that frame; adjacent video frames are not independent tests. Inch estimates use the paper-grid calibration and are approximate. When the detected count is low, the detector checks close to the crop edge, then may split a large joined region. These estimates are marked in the raw export. Reflections can create extras. Background tracking follows provisional paths across nearby frames; dashed † positions are uncertain and need review. <a href="#about">Read the full method</a>.</p></details>
       </section>
 
 <details class="review-options"><summary>Display &amp; correction options</summary>
-            <div class="human-frame-actions"><label><input id="human-show-full" type="checkbox"> Show full frame</label><label><input id="human-show-auto" type="checkbox"> Show automatic centers</label><label><input id="human-show-sharpness" type="checkbox"> Show candidate IDs and sharpness (S)</label><label><input id="human-show-nearest" type="checkbox"> Show nearest detected fish distances (inches)</label><button id="human-undo" class="secondary" type="button" disabled>Undo mark</button><button id="human-start-current" class="secondary" type="button" disabled>Start from current centers</button><button id="human-clear" class="secondary" type="button">Clear draft centers</button></div>
+            <div class="human-frame-actions"><label><input id="human-show-full" type="checkbox"> Show full frame</label><label><input id="human-show-auto" type="checkbox"> Show automatic centers</label><label><input id="human-show-sharpness" type="checkbox"> Show candidate IDs and sharpness (S)</label><label class="shoaling-only"><input id="human-show-nearest" type="checkbox"> Show nearest detected fish distances (inches)</label><button id="human-undo" class="secondary" type="button" disabled>Undo mark</button><button id="human-start-current" class="secondary" type="button" disabled>Start from current centers</button><button id="human-clear" class="secondary" type="button">Clear draft centers</button></div>
             <div class="human-frame-actions"><button id="human-restore-auto" class="secondary" type="button" disabled>Restore automatic centers</button></div>
             <p id="human-correction-status" class="human-help" aria-live="polite"></p>
             </details>

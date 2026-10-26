@@ -50,13 +50,14 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     const markedReviewed = new Set([...state.human.reviewed].filter(index => state.human.marks.has(index)));
     const { countMatches, centerMatches, groupMatches } = summarizeReview(state.reviewFrames, state.human.marks, markedReviewed, state.settings);
     $('human-validation-summary').textContent = markedReviewed.size
-      ? `Of ${markedReviewed.size} reviewed frames with center marks: ${countMatches} count matches, ${centerMatches} complete center matches, ${groupMatches} group-size matches.`
+      ? `Of ${markedReviewed.size} reviewed frames with center marks: ${countMatches} count matches, ${centerMatches} complete center matches${state.settings.testType === 'light-dark' ? '' : `, ${groupMatches} group-size matches` }.`
       : 'Review status records inspection. Enable Edit centers to add marks for a center-by-center comparison.';
     return { complete, remaining: indices.length - done };
   }
 
   function updateReviewFilter() {
-    state.human.filter ??= state.frames.length ? 'included' : 'all';
+    state.human.filter ??= state.settings.testType === 'light-dark' ? 'all' : state.frames.length ? 'included' : 'all';
+    if (state.settings.testType === 'light-dark') state.human.expectedFish = 1;
     state.human.expectedFish ??= state.settings.expectedFish ?? state.settings.filterFrameCount ?? 5;
     const indices = visibleIndices();
     const mismatches = reviewFrameIndices(state.reviewFrames, 'mismatches', state.human.expectedFish).length;
@@ -115,7 +116,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     const frame = state.reviewFrames[index];
     const screenScale = view.width / Math.max(1, displayWidth);
     if (!editing) {
-      drawFrameGroups(humanCtx, frame, state.settings.thresholdPx, view, screenScale);
+      drawFrameGroups(humanCtx, frame, state.settings.thresholdPx, view, screenScale, state.settings.testType);
       drawUncertainCenters(humanCtx, frame.detections, view, screenScale);
       drawRejectedCandidates(humanCtx, frame.rejectedDetections ?? [], view, screenScale);
     }
@@ -144,7 +145,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     }
     const marks = editing ? state.human.marks.get(index) ?? [] : [];
     humanCanvas.style.cursor = editing ? 'crosshair' : 'default';
-    humanCanvas.setAttribute('aria-label', editing ? 'Click a center to remove it or an empty position to add one' : 'Analyzed frame with fish groups; enable Edit centers to correct positions');
+    humanCanvas.setAttribute('aria-label', editing ? 'Click a center to remove it or an empty position to add one' : state.settings.testType === 'light-dark' ? 'Analyzed fish position; enable Edit centers to correct it' : 'Analyzed frame with fish groups; enable Edit centers to correct positions');
     humanCtx.textAlign = 'center';
     humanCtx.font = `bold ${14 * screenScale}px sans-serif`;
     for (const [number, dot] of marks.entries()) {
@@ -253,11 +254,11 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
       <div><span>Original candidates (all)</span><strong>${automaticCandidateCount(frame)}</strong></div>
       <div><span>Centers used in results</span><strong>${frame.detections.length}${frame.manualCorrectionApplied ? ' (manual)' : ''}</strong></div>
       <div><span>Split estimates kept</span><strong>${frame.detections.filter(point => point.splitFromBlob).length}</strong></div>
-      <div><span>Excluded outer candidates</span><strong>${frame.rejectedDetections?.length ?? 0}</strong></div>
+      <div><span>Excluded candidates</span><strong>${frame.rejectedDetections?.length ?? 0}</strong></div>
       <div><span>Centers matched</span><strong>${matched}/${manual.fishCount}</strong></div>
-      <div><span>Your groups of 2+</span><strong>${manual.clusterCount}</strong></div>
-      <div><span>Automatic groups of 2+</span><strong>${automatic.clusterCount}</strong></div>
-      <p>Your group sizes: ${[...manual.groupSizes].sort((a, b) => b - a).join('+') || 'none'}<br>Automatic group sizes: ${groupSignature({ metrics: automatic }) || 'none'}</p>`;
+      <div class="shoaling-only"><span>Your groups of 2+</span><strong>${manual.clusterCount}</strong></div>
+      <div class="shoaling-only"><span>Automatic groups of 2+</span><strong>${automatic.clusterCount}</strong></div>
+      <p class="shoaling-only">Your group sizes: ${[...manual.groupSizes].sort((a, b) => b - a).join('+') || 'none'}<br>Automatic group sizes: ${groupSignature({ metrics: automatic }) || 'none'}</p>`;
   }
 
   function selectHumanFrame(index) {

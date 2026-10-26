@@ -1,12 +1,13 @@
 import { analysisTankSide, usesSingleFishSides } from './tank-zones.mjs';
 import { framePassesCountFilter } from './frame-selection.mjs';
+import { hasAmbiguousRejectedCandidates } from './candidate-selection.mjs';
 
 export const SIDE_TRACKING_METHOD = 'single-fish-marked-dark-complement-light-v1';
 
 /** Known sampled side, distinct from the geometric side of an uncertain center. */
 export function observedFishSide(frame, config) {
   if (!usesSingleFishSides(config) || !framePassesCountFilter(frame, config) || frame.detections.length !== 1 ||
-    (!frame.manualCorrectionApplied && frame.rejectedDetections?.length)) return 'unknown';
+    (!frame.manualCorrectionApplied && hasAmbiguousRejectedCandidates(frame))) return 'unknown';
   const point = frame.detections[0];
   if (!Number.isFinite(point.x) || !Number.isFinite(point.y) || point.positionUncertain || point.splitFromBlob ||
     (point.positionSource && !['observed', 'manual'].includes(point.positionSource))) return 'unknown';

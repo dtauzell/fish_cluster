@@ -84,11 +84,11 @@ export function createSharpnessReview(state) {
       const rows = candidates.map((candidate, index) => `<tr>
         <th scope="row">#${candidate.detectionId}${candidate.splitFromBlob ? '†' : ''}</th>
         <td>${candidate.trackId ? `T${candidate.trackId}` : '—'}</td>
-        <td>${candidate.splitFromBlob ? 'Uncertain estimate' : 'Observed'}</td>
+        <td>${candidate.positionUncertain || candidate.splitFromBlob ? 'Uncertain estimate' : 'Observed'}</td>
         <td>${fmt(candidate.sharpness)}${candidate.sharpnessClipped ? '*' : ''}</td>
         <td>${fmt(candidate.localContrast)}</td>
         <td>${fmt(candidate.distanceFromCenterPx)}</td>
-        <td>${candidate.rejectionReason ? 'No (outer)' : 'Yes'}</td>
+        <td>${candidate.rejectionReason === 'weaker-foreground-contrast' ? 'No (weaker contrast)' : candidate.rejectionReason === 'ambiguous-single-fish' ? 'No (ambiguous)' : candidate.rejectionReason ? 'No (outer)' : 'Yes'}</td>
         <td><select data-candidate-index="${index}" aria-label="Label candidate ${candidate.detectionId}">
           <option value="">Unsure</option><option value="fish">Fish</option><option value="reflection">Reflection</option>
         </select></td>

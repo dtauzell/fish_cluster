@@ -1,5 +1,38 @@
 # Reading and changing the analyzer
 
+The initial test chooser in `app.mjs` sets `testType` to `shoaling` or
+`light-dark`. `settings.mjs` snapshots that choice, enforces one expected fish
+for light/dark, and requires a dark region inside the usable tank. Legacy callers
+without a test type retain the earlier behavior. The detector is shared; the
+interface and exports select the relevant measurements.
+
+`light-dark.mjs` combines conservative side observations and single-fish speed
+into interval-based occupancy totals. It consumes all original review frames,
+so count filtering cannot hide tracking gaps or invent crossings. Each interval
+is stored on its ending sample, with zero time on the first sample. Unreliable
+endpoints and invalid continuity make the entire interval unknown; a valid
+crossing splits elapsed time equally. The window ends at the last analyzed
+sample, including for stopped runs. `exports.mjs` formats its frame and summary
+CSVs; `csv-guide.html` documents both test schemas.
+
+For background runs with `expectedFish === 1`, `background.mjs` measures median
+foreground contrast over the original threshold-passing blob pixels, excluding
+the padding introduced by morphology. `candidate-selection.mjs` caps the result
+at one and marks insufficient separation uncertain. `pipeline.mjs` applies this
+before tracking, so ambiguous choices cannot create or refresh observed tracks.
+Side and velocity calculations accept rejected weaker candidates only when the
+versioned contrast-selection rule passed; geometric and ambiguous rejections
+still invalidate automatic intervals. All candidates and scores remain auditable.
+
+`experiment-storage.mjs` validates and snapshots named setups and per-fish
+results, persists compact records, and calculates equal-weight means by trial
+and exposure. `experiment-ui.mjs` owns the corresponding controls. Before loading
+a replacement video, the app refreshes the setup snapshot; after metadata loads,
+the tools can reapply it only for matching dimensions and test type. Applying a
+setup clears stale results. Batch snapshots survive video changes and update
+only through explicit add/replace actions. Storage failures leave in-memory data
+available; unreadable stored data disables subsequent writes to preserve it.
+
 This app has no build step. `dist/` contains the source code as well as the files
 served to the browser. Start with `npm run dev`; run automated checks with
 `npm test`. The Python code in `experiments/` is a separate exploratory detector,

@@ -1,3 +1,6 @@
+import { lightDarkReport } from './light-dark.mjs';
+import { createExperimentTools } from './experiment-ui.mjs';
+import { lightDarkFramesCsv, lightDarkSummaryCsv } from './exports.mjs';
 import { trackSingleFishSides, visibleSideChanges } from './side-tracking.mjs';
 import { createVelocityView } from './velocity-ui.mjs';
 import { polygonBox, copyShape } from './geometry.mjs';
@@ -27,6 +30,8 @@ const video = $('source-video');
 const canvas = $('frame-canvas');
 const humanCanvas = $('human-canvas');
 const state = {
+  testType: null,
+  analysisComplete: false,
   file: null,
   url: null,
   frames: [],
@@ -72,7 +77,7 @@ function drawFrame(frame) {
   previewViewport.resize();
   const crop = state.drag && !state.drag.exclude && !state.drag.calibration && !state.drag.side ? state.drag.box : state.crop;
   const exclusions = state.drag?.exclude ? [...state.exclusions, state.drag.box] : state.exclusions;
-  preview.drawFrame(frame, state.settings?.thresholdPx, crop, exclusions, false, previewViewBox());
+  preview.drawFrame(frame, state.settings?.thresholdPx, crop, exclusions, false, previewViewBox(), state.testType);
   drawTankZones(canvas.getContext('2d'), state.drag?.side ? [...state.tankZones, { ...state.drag.box, side: state.drag.side }] : state.tankZones,
     { x: 0, y: 0 }, canvas.width / Math.max(1, canvas.getBoundingClientRect().width));
   if (state.corners.length) {
@@ -85,7 +90,7 @@ function drawFrame(frame) {
   }
   preview.drawCalibrationLine(state.drag?.calibration ? state.drag : state.calibrationLine);
 }
-function sideTracking() { return trackSingleFishSides(state.reviewFrames, state.settings); }
+function sideTracking() { return state.testType === 'light-dark' ? trackSingleFishSides(state.reviewFrames, state.settings) : null; }
 function changeFrames() {
   const indices = visibleResultIndices();
   const sides = sideTracking();
@@ -154,6 +159,7 @@ function clearResults() {
   state.frames = [];
   state.reviewFrames = [];
   state.resultsReady = false;
+  state.analysisComplete = false;
   resetHuman();
   $('results').hidden = true;
   updateWorkflow();
@@ -164,6 +170,7 @@ function clearResults() {
 
 function loadMetadata(file) {
   if (!file || state.running) return;
+  if (state.file) experimentTools.refresh();
   labeling.reset();
   ++state.previewToken;
   if (state.url) URL.revokeObjectURL(state.url);
@@ -210,7 +217,6 @@ function updateMethod() {
   if (state.file && !state.running) status(background ? 'Video ready. Check the tank crop, then analyze.' : 'Video ready. The Roboflow model will load when you analyze.');
 }
 $('method').addEventListener('change', updateMethod);
-updateMethod();
 const dropzone = $('dropzone');
 for (const type of ['dragenter', 'dragover']) dropzone.addEventListener(type, e => { e.preventDefault(); dropzone.classList.add('dragging'); });
 for (const type of ['dragleave', 'drop']) dropzone.addEventListener(type, e => { e.preventDefault(); dropzone.classList.remove('dragging'); });
@@ -233,7 +239,7 @@ video.addEventListener('loadedmetadata', async () => {
     $('clear-crop').disabled = false;
     $('crop-label').textContent = 'Tested tank crop: 420 × 290 px. Drag to adjust.';
   }
-  if (/^single_fish_dark_side/i.test(state.file?.name ?? '')) {
+  if (state.testType === 'light-dark') {
     $('expected-fish').value = 1;
     $('filter-frame-count').value = 1;
     filterCountOverridden = false;
@@ -459,13 +465,14 @@ for (const id of ['undo-zone', 'clear-zones']) {
 
 function settings() {
   return createSettings({
+    testType: state.testType,
     intervalMs: Number($('interval').value),
     filterExactCount: $('filter-exact-count').checked,
     filterFrameCount: Number($('filter-frame-count').value),
     thresholdInches: Number($('threshold').value),
     gridPixels: Number($('grid-pixels').value),
     method: $('method').value,
-    expectedFish: Number($('expected-fish').value),
+    expectedFish: state.testType === 'light-dark' ? 1 : Number($('expected-fish').value),
     preferCenter: $('prefer-center').checked,
     trackFish: $('track-fish').checked,
     suppressFlicker: $('suppress-flicker').checked,
@@ -519,7 +526,7 @@ $('track-fish').addEventListener('change', () => {
 });
 
 $('analyze').addEventListener('click', async () => {
-  if (state.running || !state.file) return;
+  if (state.running || !state.file || !state.testType) return;
   if (state.corners.length) { status('Finish the four corners or cancel the unfinished selection before analyzing.', true); return; }
   let config;
   try { config = settings(); } catch (error) { status(error.message, true); return; }
@@ -530,6 +537,7 @@ $('analyze').addEventListener('click', async () => {
   ++state.previewToken;
   updateWorkflow();
   state.stopped = false;
+  state.analysisComplete = false;
   state.settings = config;
   state.frames = [];
   state.reviewFrames = [];
@@ -582,9 +590,10 @@ $('analyze').addEventListener('click', async () => {
       drawFrame(frame);
       $('empty-preview').hidden = true;
       status(config.method === 'background'
-        ? `Analyzed ${frame.frameIndex + 1} of ${total} frames · ${frame.detections.length} fish candidates (known count ${config.expectedFish})${frame.rejectedDetections.length ? ` · ${frame.rejectedDetections.length} outer candidates excluded` : ''}`
+        ? `Analyzed ${frame.frameIndex + 1} of ${total} frames · ${frame.detections.length} fish candidates (known count ${config.expectedFish})${frame.rejectedDetections.length ? ` · ${frame.rejectedDetections.length} candidates excluded` : ''}`
         : `Analyzed ${frame.frameIndex + 1} of ${total} frames · ${frame.detections.length} fish in current frame (${frame.rawPredictionCount} model boxes)`);
     }
+    state.analysisComplete = !state.stopped;
     if (state.reviewFrames.length) showResults();
     const maxRawCount = Math.max(0, ...state.frames.map(frame => frame.rawPredictionCount));
     status(state.settings.filterExactCount && !state.frames.length && !state.stopped
@@ -617,6 +626,8 @@ $('analyze').addEventListener('click', async () => {
     $('mask-tools').disabled = false;
     $('calibration-tools').disabled = video.readyState < 2;
     for (const id of ['expected-fish', 'interval', 'threshold', 'grid-pixels', 'model-slug', 'model-version', 'confidence', 'publishable-key']) $(id).disabled = false;
+    updateTestControls();
+    experimentTools.refresh();
     updateWorkflow();
     if (state.resultsReady && !analysisFailed && ['', '#analysis'].includes(location.hash)) location.hash = '#results';
   }
@@ -644,6 +655,15 @@ function showResults(preserveSelection = false) {
   $('stat-close').textContent = Number.isFinite(summary.meanCloseFishFraction) ? `${fmt(summary.meanCloseFishFraction * 100, 0)}%` : '—';
   $('stat-clusters').textContent = fmt(summary.meanClusterCount);
   $('results-inclusion').textContent = `${state.frames.length} of ${state.reviewFrames.length} samples included${!state.frames.length ? '. Choose All sampled frames or Count mismatches to correct excluded samples.' : '. Corrections update these measurements and exports.'}`;
+  if (state.testType === 'light-dark') {
+    const report = lightDarkReport(state.reviewFrames, state.settings);
+    for (const [id,key] of [['ld-dark','darkTimeSeconds'],['ld-light','lightTimeSeconds'],['ld-unknown','unknownTimeSeconds']]) $(id).textContent = `${fmt(report[key], 2)} s`;
+    $('ld-switches').textContent = report.zoneSwitchCount;
+    $('ld-speed').textContent = report.averageSpeedPxPerSecond == null ? '—' : `${fmt(report.averageSpeedPxPerSecond, 2)} px/s · ${fmt(report.averageSpeedInchesPerSecond, 2)} in/s`;
+    $('ld-coverage').textContent = `${fmt(report.observedDurationSeconds, 2)} s sampled window · ${fmt((report.coverageFraction ?? 0) * 100, 1)}% side coverage · ${fmt(report.velocityDurationSeconds, 2)} s measured for speed${state.analysisComplete ? '' : ' · Partial analysis'}.`;
+    $('results-inclusion').textContent = `All ${state.reviewFrames.length} sampled frames contribute to this report. Unknown intervals remain in the time totals. Corrections update measurements and exports.`;
+    updateSelectedFrameDetails(); drawTimeline(); experimentTools.refresh(); return;
+  }
   if (!preserveSelection) {
     const cropDiagonalInches = Math.hypot(state.settings.crop.width, state.settings.crop.height) / state.settings.pixelsPerInch;
     $('cluster-distance').max = Math.max(5, Math.min(cropDiagonalInches, state.settings.thresholdInches * 2), state.settings.thresholdInches);
@@ -718,6 +738,11 @@ function drawTimeline() {
 function updateSelectedFrameDetails() {
   const frame = selectedResultFrame();
   if (!frame) { $('frame-groups').hidden = true; drawTimeline(); return; }
+  if (state.testType === 'light-dark') {
+    const sample = sideTracking()?.samples[state.human.index];
+    $('frame-groups').textContent = `${frame.detections.length} detected · ${sample?.side ?? 'unknown'} side`;
+    $('frame-groups').hidden = false; drawTimeline(); return;
+  }
   const sizes = frame.metrics.groupSizes;
   const groups = sizes.slice().sort((a, b) => b - a).join('+') || 'none';
   $('frame-groups').textContent = `${frame.detections.length} fish · groups ${groups} · ${frame.metrics.clusterCount} cluster${frame.metrics.clusterCount === 1 ? '' : 's'} · ${frame.metrics.isolatedCount} single${frame.metrics.uncertainPositionCount ? ` · ${frame.metrics.uncertainPositionCount} uncertain centers` : ''}`;
@@ -727,6 +752,7 @@ function updateSelectedFrameDetails() {
 }
 
 function drawClusterChart() {
+  if (state.testType === 'light-dark') { $('cluster-chart').replaceChildren(); return; }
   const frame = selectedResultFrame();
   if (!frame) { $('cluster-chart').replaceChildren(); return; }
   const maxInches = Number($('cluster-distance').max);
@@ -917,7 +943,8 @@ function showPage() {
   if (activeView) viewScroll.set(activeView, window.scrollY);
   activeView = nextView;
   const results = nextView === 'results', about = nextView === 'about', label = nextView === 'label';
-  $('workspace').hidden = nextView !== 'analysis';
+  $('test-chooser').hidden = Boolean(state.testType) || about || label;
+  $('workspace').hidden = nextView !== 'analysis' || !state.testType;
   $('workspace').dataset.view = 'setup';
   document.querySelector('.setup').hidden = nextView !== 'analysis';
   $('results').hidden = !results;
@@ -939,13 +966,70 @@ function showPage() {
 }
 window.addEventListener('hashchange', showPage);
 
+function updateTestControls() {
+  const lightDark = state.testType === 'light-dark';
+  if (state.testType) document.documentElement.dataset.testType = state.testType;
+  else delete document.documentElement.dataset.testType;
+  $('test-name').textContent = state.testType ? (lightDark ? 'Light / dark' : 'Shoaling') : '';
+  $('change-test').hidden = !state.testType;
+  $('change-test').disabled = state.running;
+  $('expected-fish').disabled = state.running || lightDark;
+  $('human-expected-fish').disabled = lightDark;
+  if (lightDark) { $('expected-fish').value = 1; $('filter-frame-count').value = 1; $('human-show-nearest').checked = false; }
+  $('csv-guide').href = `./csv-guide.html#${state.testType ?? 'shoaling'}`;
+  $('setup-title').textContent = lightDark ? 'Set up light / dark test' : 'Set up shoaling test';
+  $('preview-tools').querySelector('summary').textContent = lightDark ? 'Tank area, light/dark sides, reflection masks & scale' : 'Tank area, reflection masks & scale';
+  for (const value of ['dark','light']) $('crop-tool').querySelector(`option[value="${value}"]`).hidden = !lightDark;
+  for (const id of ['undo-zone','clear-zones','zone-count']) $(id).hidden = !lightDark;
+}
+function chooseTest(testType) {
+  if (state.running) return;
+  const previous = state.testType;
+  state.testType = testType;
+  state.drag = null; state.corners = [];
+  if (testType === 'shoaling' && ['dark', 'light'].includes($('crop-tool').value)) { $('crop-tool').value = 'crop'; state.areaTool = 'crop'; }
+  updateCornerControls();
+  if (testType === 'shoaling' && previous !== 'shoaling') { $('expected-fish').value = 5; $('filter-frame-count').value = 5; }
+  state.settings = null; clearResults(); updateTestControls();
+  if (testType === 'light-dark') { $('preview-tools').open = true; }
+  location.hash = '#analysis'; showPage(); experimentTools.refresh();
+}
+$('choose-shoaling').addEventListener('click', () => chooseTest('shoaling'));
+$('choose-light-dark').addEventListener('click', () => chooseTest('light-dark'));
+$('change-test').addEventListener('click', () => {
+  if (state.running) return;
+  clearResults(); state.testType = null; state.settings = null; updateTestControls(); showPage();
+});
+const experimentTools = createExperimentTools({
+  getContext: () => ({ fileName: state.file?.name, frameWidth: video.videoWidth, frameHeight: video.videoHeight,
+    crop: state.crop, exclusions: state.exclusions, tankZones: state.tankZones, gridPixels: Number($('grid-pixels').value), testType: state.testType }),
+  isRunning: () => state.running,
+  getReport: () => state.resultsReady ? { fileName: state.file?.name, testType: state.testType, complete: state.analysisComplete,
+    partial: !state.analysisComplete, summary: state.testType === 'light-dark' ? lightDarkReport(state.reviewFrames, state.settings) : summarizeFrames(state.frames) } : null,
+  applySetup: setup => {
+    if (state.running) throw new Error('Stop analysis before applying a setup.');
+    if (setup.frameWidth !== video.videoWidth || setup.frameHeight !== video.videoHeight) throw new Error('Setup dimensions do not match this video.');
+    if (setup.testType !== state.testType) chooseTest(setup.testType);
+    state.crop = setup.crop ? copyShape(setup.crop) : null;
+    state.exclusions = (setup.exclusions ?? []).map(copyShape); state.tankZones = (setup.tankZones ?? []).map(copyShape);
+    state.calibrationLine = null; state.drag = null; state.corners = []; state.focusTank = Boolean(state.crop);
+    $('grid-pixels').value = setup.gridPixels; setCropInputs(state.crop ?? { x:0,y:0,width:video.videoWidth,height:video.videoHeight });
+    $('clear-crop').disabled = !state.crop; $('crop-label').textContent = state.crop ? 'Saved tank crop applied.' : 'Using the full video frame.';
+    clearResults(); updateMaskControls(); updateZoneControls(); updateCornerControls(); updateCalibrationControls(); updateScaleSummary(); previewViewport.reset(); drawFrame(null);
+    status('Saved setup applied. Check the geometry, then analyze.');
+  }
+});
+video.addEventListener('loadedmetadata', () => experimentTools.onVideoLoaded());
+$('download-summary').addEventListener('click', () => download(`${baseName(state.file?.name)}-summary.csv`, lightDarkSummaryCsv(lightDarkReport(state.reviewFrames, state.settings)), 'text/csv'));
+updateMethod();
+updateTestControls();
 showPage();
 
 $('download-csv').addEventListener('click', () => {
-  download(`${baseName(state.file?.name)}-detections.csv`, detectionsCsv(state.frames), 'text/csv');
+  download(`${baseName(state.file?.name)}-detections.csv`, detectionsCsv(state.testType === 'light-dark' ? state.reviewFrames : state.frames), 'text/csv');
 });
 $('download-frames').addEventListener('click', () => {
-  download(`${baseName(state.file?.name)}-frames.csv`, framesCsv(state.frames), 'text/csv');
+  download(`${baseName(state.file?.name)}-frames.csv`, state.testType === 'light-dark' ? lightDarkFramesCsv(state.reviewFrames, state.settings) : framesCsv(state.frames), 'text/csv');
 });
 $('download-json').addEventListener('click', () => {
   const velocityReport = velocity.exportReport();
@@ -958,9 +1042,11 @@ $('download-json').addEventListener('click', () => {
     trackingMethod: state.settings.trackFish ? TRACKING_METHOD : null,
     sharpnessLabels: exportedSharpnessLabels(state.human.candidateLabels),
     settings: exportedSettings(state.settings, video.videoWidth, video.videoHeight),
-    summary: summarizeFrames(state.frames),
-    frames: state.frames,
-    excludedFrames: state.reviewFrames.filter(frame => !framePassesCountFilter(frame, state.settings))
+    testType: state.testType,
+    analysisComplete: state.analysisComplete,
+    summary: state.testType === 'light-dark' ? lightDarkReport(state.reviewFrames, state.settings) : summarizeFrames(state.frames),
+    frames: state.testType === 'light-dark' ? state.reviewFrames.map(({ metrics, ...frame }) => frame) : state.frames,
+    excludedFrames: state.testType === 'light-dark' ? [] : state.reviewFrames.filter(frame => !framePassesCountFilter(frame, state.settings))
   };
   download(`${baseName(state.file?.name)}-analysis.json`, JSON.stringify(result, null, 2), 'application/json');
 });

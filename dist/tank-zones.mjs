@@ -11,7 +11,7 @@ export function tankSide(point, zones = []) {
 
 /** Single-fish light/dark experiments treat the remaining usable tank as light. */
 export function usesSingleFishSides(config) {
-  return config?.expectedFish === 1 && Boolean(config.tankZones?.some(zone => zone.side === 'dark'));
+  return config?.testType !== 'shoaling' && config?.expectedFish === 1 && Boolean(config.tankZones?.some(zone => zone.side === 'dark'));
 }
 
 export function analysisTankSide(point, config) {

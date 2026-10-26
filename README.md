@@ -12,6 +12,54 @@ Open <http://localhost:8000>. No install or build is required. Tests: `npm test`
 
 ## Use
 
+Start by choosing **Shoaling** or **Light / dark**. Shoaling retains the spacing
+and cluster analysis described below. Light/dark fixes the count at one fish and
+shows time in dark, time in light, unknown time, observed zone switches, and
+average scalar speed, without pair-distance or cluster controls. Mark the dark
+region; the rest of the usable tank is light. The **Frames CSV column guide**
+beside the export buttons explains every column for each test.
+
+With one fish expected, background analysis keeps at most one candidate, choosing
+the strongest foreground contrast against the median background. This favors a
+dark fish over a faint reflection on the light floor, while still supporting a
+pale fish on the dark floor. A competing candidate is excluded as weaker contrast
+only when the winner has at least 1.5 times its contrast and an eight-level lead;
+close choices remain uncertain and do not contribute known zone time or speed.
+This is a selection heuristic, not proof that the winner is the fish. Rejected
+candidates remain visible as pink crosses and in the JSON and diagnostic review.
+The light/dark frames CSV includes the original candidate count, rejected count,
+selected foreground contrast, selection method, and automatic selection status.
+Manual corrections override the automatic choice. Reanalyze existing recordings
+to apply the rule. Multi-fish and Roboflow detection retain their existing rules.
+
+Light/dark totals use every analyzed sample, including samples excluded by the
+count filter. The measured window runs from the first sample to the last, with
+no extrapolation into the unsampled video tail. Adjacent reliable observations
+on the same side assign their elapsed time to that side; a crossing splits it
+equally. An interval with an unknown endpoint, a sample gap, or an unexplained
+track change is unknown. Average speed is total valid displacement divided by
+valid time. Coverage and speed duration accompany the totals; a stopped run is
+marked partial. Applied frame corrections update these results and exports.
+
+In **Saved tank setups**, save a named crop, masks, light/dark regions and scale
+in this browser. **Reuse current setup for next video** is enabled initially.
+Reused and saved setups require exactly matching video dimensions and preserve
+four-corner geometry. Check the alignment when loading each video. Named setups
+remain available after reload; videos themselves are not stored by this feature.
+
+In light/dark Results, **Trial results across fish** collects reviewed summaries.
+Enter a trial, exposure label and fish ID, then **Add current fish**. Load the next
+video and repeat. The same trial/exposure/fish key cannot be added twice;
+**Replace matching fish** explicitly updates its saved snapshot after further
+corrections. Download one per-fish CSV and one group-means CSV, both readable in
+Excel. Means are calculated separately for each trial and exposure, weighting
+each fish equally and reporting a valid count for each metric. Progress targets
+ten fish per group; exposure labels are free text, so all three exposure levels
+can share the same collection. Dark/light fractions use known zone time, while
+coverage reports the known fraction of the full analyzed window. Partial runs
+are identified in the table and exports. These summaries persist in this browser;
+export CSVs to keep a portable copy.
+
 1. Add a tank video the browser can decode.
 2. Drag a rectangle around the tank in the preview if the fish occupy only part of the video, or open **Tank area, reflection masks & scale → Precise crop** to enter exact X/Y/width/height values. The preview fits both the available width and height. **Focus on tank** enlarges the selected tank crop, especially useful for portrait footage; **Full frame** shows the whole image for adjusting the crop. Fit resets zoom, and +/− zoom within the preview; scroll inside a zoomed image to reach its edges. For this repository's `fish.mov` (540 × 960), the tested 420 × 290 tank crop is selected automatically. Exported x/y coordinates remain in the original video frame. Set the frame interval, close distance in inches, and paper-grid calibration in pixels per 0.5-inch square. The calibration applies to both detection methods. About 15.3 px per square and a 1.5-inch close distance are prefilled for this video. To measure your own scale, open **Set scale** and click **Draw calibration line**, drag along a known distance, enter the line length in inches, and click **Use this scale**. The app uses original-video pixels to update the calibration and any existing distance results. Measure several grid squares near the swimming area for better accuracy; clearing the line keeps the applied scale. By default, analysis keeps only samples with exactly five detected fish; change the count or turn off **Only include frames with exactly** to keep every sample. Skipped samples still help tracking across neighboring frames.
 3. Background subtraction is the default method. It samples 25 points across the video to build a median tank background, then finds dark connected regions in each selected frame. Enter the known fish count. For this video, five fish are prefilled. The grid scale is approximate; nearby fish can merge into one blob and reflections can create false detections.

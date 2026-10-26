@@ -1,4 +1,5 @@
 import { analysisTankSide } from './tank-zones.mjs';
+import { lightDarkReport } from './light-dark.mjs';
 import { frameCandidates } from './candidate-selection.mjs';
 import { insideAnalysisArea } from './region.mjs';
 // Plain-data export formatting. These functions have no browser or page-state dependencies.
@@ -76,6 +77,37 @@ function framesRows(frames) {
 export function framesCsv(frames) {
   return csv(framesRows(frames), ['frame_index', 'timestamp_ms', 'rawPredictionCount', 'fishCount', 'countDifference', 'pairCount', 'meanPairDistancePx', 'meanPairDistanceInches', 'meanNearestDistancePx', 'meanNearestDistanceInches', 'closeFishFraction', 'clusterCount', 'isolatedCount', 'groupSizes', 'groupChanged', 'randomSpacingPercentile', 'randomSpacingUnavailableReason', 'rejectedCandidateCount', 'splitCandidateCount', 'uncertainPositionCount', 'manualPositionCount', 'manualCorrectionApplied', 'automaticFishCount', 'darkSideCount', 'lightSideCount', 'unmarkedSideCount']);
 }
+
+export const lightDarkFrameColumns = ['frame_index', 'timestamp_ms', 'fish_count', 'included_in_results',
+  'side', 'zone_switch', 'interval_seconds', 'dark_time_seconds', 'light_time_seconds', 'unknown_time_seconds',
+  'x_px', 'y_px', 'speed_px_per_second', 'speed_inches_per_second', 'position_source', 'position_uncertain', 'manual_correction_applied',
+  'automatic_candidate_count', 'rejected_candidate_count', 'foreground_contrast', 'selection_method', 'selection_confident'];
+export const lightDarkSummaryColumns = ['darkTimeSeconds', 'lightTimeSeconds', 'unknownTimeSeconds',
+  'observedDurationSeconds', 'zoneSwitchCount', 'averageSpeedPxPerSecond', 'averageSpeedInchesPerSecond',
+  'velocityDurationSeconds', 'coverageFraction'];
+
+/** Every original sample remains visible, including count-filtered and unknown observations. */
+export function lightDarkFramesCsv(frames, config) {
+  const report = lightDarkReport(frames, config);
+  const speeds = new Map((report.velocity?.intervals ?? []).map(interval => [interval.endFrameIndex, interval]));
+  return csv(frames.map((frame, index) => {
+    const sample = report.samples[index], speed = speeds.get(frame.frameIndex);
+    const point = frame.detections.length === 1 ? frame.detections[0] : null;
+    return { frame_index: frame.frameIndex, timestamp_ms: frame.timestampMs, fish_count: frame.detections.length,
+      included_in_results: framePassesCountFilter(frame, config), side: sample.side, zone_switch: sample.changed,
+      interval_seconds: sample.intervalSeconds, dark_time_seconds: sample.darkTimeSeconds,
+      light_time_seconds: sample.lightTimeSeconds, unknown_time_seconds: sample.unknownTimeSeconds,
+      x_px: point?.x, y_px: point?.y, speed_px_per_second: speed?.speedPxPerSecond,
+      speed_inches_per_second: speed?.speedInchesPerSecond, position_source: point ? positionFields(point).position_source : null,
+      position_uncertain: point ? positionFields(point).position_uncertain : null,
+      manual_correction_applied: frame.manualCorrectionApplied ?? false,
+      automatic_candidate_count: automaticCandidateCount(frame), rejected_candidate_count: frame.rejectedDetections?.length ?? 0,
+      foreground_contrast: point?.foregroundContrast, selection_method: frame.selectionMethod,
+      selection_confident: frame.selectionConfident };
+  }), lightDarkFrameColumns);
+}
+
+export function lightDarkSummaryCsv(report) { return csv([report], lightDarkSummaryColumns); }
 
 function humanRows(frames, marksByFrame, reviewed, config) {
   return frames.flatMap((frame, index) => {

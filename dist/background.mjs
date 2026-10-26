@@ -188,6 +188,17 @@ export function detectBackgroundFish(frame, background, width, height, options =
   const blobs = connectedRegions(mask, width, height, { minArea, maxArea, minLength: 10 })
     .filter(blob => hasStableForegroundEvidence(blob, frame, background, threshold, options));
   recoverEdgeFish(blobs, frame, background, width, height, options, { edgeX, edgeTop, edgeBottom }, minArea);
+  // Score real foreground pixels, excluding pixels introduced by morphology.
+  // Absolute contrast supports pale fish on dark floors; light floors use darkening.
+  for (const blob of blobs) {
+    const evidence = (blob.pixels ?? []).map(index => options.darkZones?.[index]
+      ? Math.abs(background[index] - frame[index]) : background[index] - frame[index])
+      .filter(value => value >= threshold).sort((a, b) => a - b);
+    const middle = Math.floor(evidence.length / 2);
+    blob.foregroundContrast = evidence.length ? (evidence.length % 2 ? evidence[middle]
+      : (evidence[middle - 1] + evidence[middle]) / 2) : null;
+    blob.supportPixelCount = evidence.length;
+  }
   const trackingSeeds = options.overlapSeedsFor?.(blobs) ?? new Map();
   splitLargeBlobs(blobs, width, height, { minArea, expectedFish: options.expectedFish, preferCenter: options.preferCenter,
     frame, background, threshold, previousDetections: options.previousDetections,

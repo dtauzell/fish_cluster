@@ -69,3 +69,13 @@ complete original fish region at 0 seconds, where the fish crosses the ridge.
 On this full 311-frame FFmpeg decode, the same rectangular crop and regions yield
 279 samples with exactly one candidate without suppression and 288 with it.
 This count comparison is not a manual validation of every detected position.
+
+`competing-candidates.pgm` is zero-based sample 27 (5.4 seconds) from FFmpeg's
+`fps=5` decode, cropped and converted to grayscale as above. It contains the fish
+near original `(249, 499)` and a weaker wall reflection near `(215, 477)`.
+With the saved background and variation, their foreground contrasts are 80 and
+33 respectively. This tests single-fish selection without discarding the rejected
+reflection from the audit trail. `single-5.6s.pgm` is a direct FFmpeg seek to 5.6
+seconds and contains one detected fish near `(250, 507)`; it checks preservation
+of an already unambiguous observation. Sample numbering and browser decoding can
+differ; these are nearby regressions for the reported sample-29 reflection.

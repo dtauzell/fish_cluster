@@ -72,6 +72,7 @@ export function createFishTracker(expectedFish) {
     expire(timestampMs);
     const unmatchedCost = TRACKING_METHOD.maxMatchDistancePx;
     const costs = tracks.map(track => detections.map(point => {
+      if (point.positionUncertain && !point.splitFromBlob) return unmatchedCost + 1;
       if (point.sourceTrackIds && !point.sourceTrackIds.includes(track.id)) return unmatchedCost + 1;
       return distance(predict(track, timestampMs), point);
     }));
@@ -79,7 +80,7 @@ export function createFishTracker(expectedFish) {
     const matched = new Set();
     const output = detections.map(point => ({ ...point,
       positionSource: point.splitFromBlob ? 'overlap-estimate' : 'observed',
-      positionUncertain: Boolean(point.splitFromBlob) }));
+      positionUncertain: Boolean(point.positionUncertain || point.splitFromBlob) }));
     for (const [index, track] of tracks.entries()) {
       const column = assignment[index];
       if (column < 0) continue;

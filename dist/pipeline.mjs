@@ -1,5 +1,5 @@
 import { analysisTankSide, darkZoneMask } from './tank-zones.mjs';
-import { selectCentralCandidates } from './candidate-selection.mjs';
+import { selectCentralCandidates, selectSingleFishCandidate } from './candidate-selection.mjs';
 import { candidateSharpness } from './sharpness.mjs';
 import { insideAnalysisArea, localExclusions, analysisPixelMask } from './region.mjs';
 import { normalizePredictions, sampleTimes } from './analysis.mjs';
@@ -64,7 +64,7 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
       // Estimated/split centers are never fed back as fresh observations.
       const canReferencePrevious = previousFrame && timestampMs - previousFrame.timestampMs <= 250 &&
         previousFrame.detections.length === config.expectedFish &&
-        previousFrame.detections.every(point => !point.splitFromBlob);
+        previousFrame.detections.every(point => !point.splitFromBlob && !point.positionUncertain);
       const previousDetections = canReferencePrevious ? previousFrame.detections.map(point => ({
         ...point, x: point.x - crop.x, y: point.y - crop.y
       })) : [];
@@ -102,12 +102,12 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
       tankSide: analysisTankSide({ x: point.x + crop.x, y: point.y + crop.y }, config) }));
     // A split region's estimated center must also fall in the usable area.
     detections = detections.filter(point => insideAnalysisArea(point, crop, config.exclusions));
-    const selected = selectCentralCandidates(detections, crop,
-      backgroundMode && config.preferCenter ? config.expectedFish : null);
+    const selected = backgroundMode && config.expectedFish === 1 ? selectSingleFishCandidate(detections, crop)
+      : selectCentralCandidates(detections, crop, backgroundMode && config.preferCenter ? config.expectedFish : null);
     selected.detections = tracker ? tracker.update(selected.detections, timestampMs)
       : selected.detections.map(point => ({ ...point,
         positionSource: point.splitFromBlob ? 'overlap-estimate' : 'observed',
-        positionUncertain: Boolean(point.splitFromBlob) }));
+        positionUncertain: Boolean(point.positionUncertain || point.splitFromBlob) }));
     const frame = { frameIndex, timestampMs, rawPredictionCount, ...selected,
       metrics: frameMetrics(selected.detections, config, selected.rejectedDetections.length) };
     previousFrame = frame;

@@ -29,3 +29,27 @@ export function frameCandidates(frame) {
   return [...(frame.automaticDetections ?? frame.detections), ...(frame.rejectedDetections ?? [])]
     .sort((a, b) => a.detectionId - b.detectionId);
 }
+
+export const SINGLE_FISH_SELECTION_METHOD = 'foreground-contrast-margin-v1';
+
+/** Cap single-fish runs without presenting a near-tie as a reliable observation. */
+export function selectSingleFishCandidate(candidates, crop) {
+  const measured = selectCentralCandidates(candidates, crop).detections;
+  const ranked = [...measured].sort((a, b) => (b.foregroundContrast ?? -Infinity) - (a.foregroundContrast ?? -Infinity));
+  const winner = ranked[0], runnerUp = ranked[1];
+  const supported = point => Number.isFinite(point?.foregroundContrast) && point.supportPixelCount >= 5 &&
+    !point.splitFromBlob && !point.positionUncertain;
+  const confident = Boolean(winner && supported(winner) && (!runnerUp ||
+    (ranked.slice(1).every(supported) && winner.foregroundContrast >= runnerUp.foregroundContrast * 1.5 &&
+      winner.foregroundContrast - runnerUp.foregroundContrast >= 8)));
+  return { selectionMethod: SINGLE_FISH_SELECTION_METHOD, selectionConfident: confident,
+    detections: winner ? [{ ...winner, positionUncertain: !confident || Boolean(winner.positionUncertain) }] : [],
+    rejectedDetections: measured.filter(point => point !== winner).map(point => ({ ...point,
+      rejectionReason: confident ? 'weaker-foreground-contrast' : 'ambiguous-single-fish' })) };
+}
+
+/** Only a scored, clear contrast margin resolves automatic extra candidates. */
+export function hasAmbiguousRejectedCandidates(frame) {
+  return Boolean(frame.rejectedDetections?.length) && !(frame.selectionMethod === SINGLE_FISH_SELECTION_METHOD &&
+    frame.selectionConfident === true && frame.rejectedDetections.every(point => point.rejectionReason === 'weaker-foreground-contrast'));
+}

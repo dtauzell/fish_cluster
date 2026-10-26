@@ -4,7 +4,7 @@ export function createVelocityView({ getFrames, getSettings, getSelectedTime }) 
   const $ = id => document.getElementById(id);
   let report = null;
   function draw() {
-    const enabled = Boolean(report && $('show-velocity').checked);
+    const enabled = Boolean(report && (getSettings()?.testType === 'light-dark' || $('show-velocity').checked));
     $('velocity-details').hidden = !enabled;
     if (!enabled) { $('velocity-chart').innerHTML = ''; return; }
     const inches = $('velocity-units').value === 'inches';
@@ -27,10 +27,11 @@ export function createVelocityView({ getFrames, getSettings, getSelectedTime }) 
     const calibrated = Boolean(report?.pixelsPerInch);
     $('velocity-units').querySelector('option[value="inches"]').disabled = !calibrated;
     if (!calibrated) $('velocity-units').value = 'pixels';
+    $('show-velocity').closest('label').hidden = getSettings()?.testType === 'light-dark';
     draw();
   }
   $('show-velocity').addEventListener('change', refresh);
   $('velocity-units').addEventListener('change', draw);
   return { refresh, select: draw,
-    exportReport: () => report && $('show-velocity').checked ? report : null };
+    exportReport: () => report && (getSettings()?.testType === 'light-dark' || $('show-velocity').checked) ? report : null };
 }

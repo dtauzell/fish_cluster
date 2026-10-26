@@ -1,10 +1,11 @@
 import { framePassesCountFilter } from './frame-selection.mjs';
+import { hasAmbiguousRejectedCandidates } from './candidate-selection.mjs';
 
 export const VELOCITY_METHOD = 'single-fish-adjacent-centers-v1';
 
 function observedCenter(frame, config) {
   if (!framePassesCountFilter(frame, config) || frame.detections.length !== 1 ||
-    (!frame.manualCorrectionApplied && frame.rejectedDetections?.length)) return null;
+    (!frame.manualCorrectionApplied && hasAmbiguousRejectedCandidates(frame))) return null;
   const point = frame.detections[0];
   if (!Number.isFinite(point.x) || !Number.isFinite(point.y) || point.positionUncertain || point.splitFromBlob ||
     (point.positionSource && !['observed', 'manual'].includes(point.positionSource))) return null;

@@ -96,6 +96,7 @@ test('velocity view is optional, single-fish only, and refreshes after correctio
   class Control extends EventTarget {
     constructor() { super(); Object.assign(this, { hidden: false, checked: false, value: 'pixels', textContent: '', innerHTML: '' }); }
     querySelector() { return this.option ??= {}; }
+    closest() { return this.label ??= { hidden: false }; }
   }
   const controls = new Map();
   const $ = id => { if (!controls.has(id)) controls.set(id, new Control()); return controls.get(id); };
@@ -123,6 +124,21 @@ test('velocity view is optional, single-fish only, and refreshes after correctio
     frames = [frame(0, 0), frame(1, 20)]; view.refresh();
     assert.equal($('velocity-average').textContent, '5.00 in/s');
     assert.equal(view.exportReport().averagePxPerSecond, 100);
+    settings = { ...settings, testType: 'light-dark' };
+    $('show-velocity').checked = false;
+    view.refresh();
+    assert.equal($('show-velocity').closest('label').hidden, true);
+    assert.equal($('velocity-details').hidden, false);
+    assert.match($('velocity-chart').innerHTML, /<path/);
+    assert.equal(view.exportReport().averagePxPerSecond, 100);
+    $('show-velocity').dispatchEvent(new Event('change'));
+    assert.equal(view.exportReport().averagePxPerSecond, 100);
+    settings = { ...settings, testType: 'shoaling' }; view.refresh();
+    assert.equal($('show-velocity').closest('label').hidden, false);
+    assert.equal($('velocity-details').hidden, true);
+    assert.equal(view.exportReport(), null);
+
+    $('show-velocity').checked = true;
     settings = { ...settings, expectedFish: 5 }; view.refresh();
     assert.equal($('velocity-panel').hidden, true);
     assert.equal(view.exportReport(), null);

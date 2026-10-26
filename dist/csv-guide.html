@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Frames CSV column guide — Fish Cluster</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css?v=29">
+  <link rel="stylesheet" href="./about.css?v=1">
+  <style>
+    .csv-guide{max-width:1100px;margin:auto;padding:32px 20px 80px;line-height:1.6}.csv-guide h1{font-size:clamp(28px,5vw,46px)}
+    .csv-guide section{scroll-margin-top:24px;margin-top:48px}.csv-guide nav{display:flex;flex-wrap:wrap;gap:24px}
+    .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #365760;padding:12px}th{color:#8ce6ce}td code{white-space:nowrap}p{max-width:900px}caption{text-align:left;padding:12px 0;color:#acc4c0}
+    @media print{body{background:white;color:black}th,a{color:black}nav{display:none}}
+  </style>
+</head>
+<body><main class="csv-guide">
+  <a href="./index.html">Fish Cluster</a>
+  <h1>Frames CSV column guide</h1>
+  <p>Each row describes one sampled video frame. A sample is not an independent fish or trial. Coordinates use the original video: X increases rightward and Y downward. Pixels and timestamps are independent of preview zoom. Blank numeric cells mean unavailable, not zero. Inches depend on your distance calibration.</p>
+  <nav aria-label="Column guides"><a href="#shoaling">Shoaling frames</a><a href="#light-dark">Light/dark frames</a><a href="#summaries">Light/dark and group summaries</a></nav>
+  <section id="shoaling"><h2>Shoaling frames</h2>
+    <p>The shoaling frames export contains samples included by the count filter, with applied manual corrections. It does not change when you switch the review view. Group IDs apply within one frame; they do not identify individual fish across time.</p>
+    <div class="table-wrap"><table><caption>Columns in export order</caption><thead><tr><th>Column</th><th>Meaning</th></tr></thead><tbody>
+      <tr><td><code>frame_index</code></td><td>Zero-based sample index, not the source video's native frame number.</td></tr>
+      <tr><td><code>timestamp_ms</code></td><td>Requested sample time in milliseconds from the start of the video.</td></tr>
+      <tr><td><code>rawPredictionCount</code></td><td>Automatic candidate count before final selection and manual corrections.</td></tr>
+      <tr><td><code>fishCount</code></td><td>Number of current centers used for this frame's measurements.</td></tr>
+      <tr><td><code>countDifference</code></td><td>Current count minus expected fish count in background mode. Blank when unavailable.</td></tr>
+      <tr><td><code>pairCount</code></td><td>Number of unique pairs: n × (n − 1) / 2.</td></tr>
+      <tr><td><code>meanPairDistancePx</code></td><td>Mean center-to-center distance across all unique pairs, in pixels; blank with fewer than two fish.</td></tr>
+      <tr><td><code>meanPairDistanceInches</code></td><td>The same mean pair distance, converted to approximate inches.</td></tr>
+      <tr><td><code>meanNearestDistancePx</code></td><td>Mean of each fish's distance to its nearest other fish, in pixels; blank with fewer than two fish.</td></tr>
+      <tr><td><code>meanNearestDistanceInches</code></td><td>The same nearest-neighbor mean in approximate inches.</td></tr>
+      <tr><td><code>closeFishFraction</code></td><td>Fraction (0–1) of fish with another fish within the selected link distance.</td></tr>
+      <tr><td><code>clusterCount</code></td><td>Number of connected groups containing at least two fish. Chains of links form one group.</td></tr>
+      <tr><td><code>isolatedCount</code></td><td>Number of single fish with no neighbor within the link distance.</td></tr>
+      <tr><td><code>groupSizes</code></td><td>Group sizes sorted largest first, joined by +; for example, 3+1+1.</td></tr>
+      <tr><td><code>groupChanged</code></td><td>Whether the group-size pattern differs from the preceding exported row. False on the first row. Excluded samples can lie between these rows.</td></tr>
+      <tr><td><code>randomSpacingPercentile</code></td><td>Nearest-neighbor spacing percentile (0–1) against 399 random placements in the usable tank. A small value means tighter spacing. This is a per-frame comparison, not a trial-wide significance test.</td></tr>
+      <tr><td><code>randomSpacingUnavailableReason</code></td><td>Reason the comparison was suppressed: center-selection or temporal-overlap-estimate. May be blank even when no comparison exists, such as fewer than two centers.</td></tr>
+      <tr><td><code>rejectedCandidateCount</code></td><td>Automatic candidates excluded by the center-selection or single-fish contrast rule.</td></tr>
+      <tr><td><code>splitCandidateCount</code></td><td>Current centers produced by splitting a joined blob.</td></tr>
+      <tr><td><code>uncertainPositionCount</code></td><td>Current centers marked uncertain or estimated from a split blob. These can still contribute to shoaling distances.</td></tr>
+      <tr><td><code>manualPositionCount</code></td><td>Current centers supplied by an applied manual correction.</td></tr>
+      <tr><td><code>manualCorrectionApplied</code></td><td>True when current results use an applied correction. Unapplied drafts do not affect exports.</td></tr>
+      <tr><td><code>automaticFishCount</code></td><td>Original automatic center count before manual correction.</td></tr>
+      <tr><td><code>darkSideCount</code></td><td>Current centers geometrically inside marked dark regions.</td></tr>
+      <tr><td><code>lightSideCount</code></td><td>Current centers geometrically inside marked light regions.</td></tr>
+      <tr><td><code>unmarkedSideCount</code></td><td>Current centers outside marked regions. Shoaling does not infer light from the complement of dark.</td></tr>
+    </tbody></table></div>
+  </section>
+  <section id="light-dark"><h2>Light/dark frames</h2>
+    <p>This export includes <strong>all analyzed samples</strong>, including excluded or uncertain observations. Mark the dark region; the remaining usable tank is light. Reflection masks are excluded. A reliable side requires exactly one observed or manually corrected center, no ambiguity, and a passing count filter.</p>
+    <p>Time is estimated over the interval from the first analyzed sample to the last. Each row reports the interval ending at that row. Consecutive reliable positions on the same side assign the whole interval to that side. If the side changes, half goes to each side. Missing or uncertain positions, nonconsecutive samples, excessive time gaps, and unexplained track changes assign the whole interval to unknown. No time is extrapolated before or after the analyzed samples, including the unsampled video tail.</p>
+    <div class="table-wrap"><table><caption>Columns in export order</caption><thead><tr><th>Column</th><th>Meaning</th></tr></thead><tbody>
+      <tr><td><code>frame_index</code></td><td>Zero-based sample index, preserved even for excluded samples.</td></tr>
+      <tr><td><code>timestamp_ms</code></td><td>Sample time in milliseconds from the video's start.</td></tr>
+      <tr><td><code>fish_count</code></td><td>Current number of detected or corrected centers.</td></tr>
+      <tr><td><code>included_in_results</code></td><td>Whether the sample passes the count filter. Passing alone does not guarantee a reliable position.</td></tr>
+      <tr><td><code>side</code></td><td>dark, light, or unknown for the current observation.</td></tr>
+      <tr><td><code>zone_switch</code></td><td>True for an observed change from the preceding reliable adjacent sample. Gaps do not create switches. Crossings between samples can be missed.</td></tr>
+      <tr><td><code>interval_seconds</code></td><td>Elapsed seconds since the preceding analyzed sample. Zero on the first row.</td></tr>
+      <tr><td><code>dark_time_seconds</code></td><td>Portion of this interval assigned to dark. Sum this column for total estimated dark time.</td></tr>
+      <tr><td><code>light_time_seconds</code></td><td>Portion assigned to light. Sum for total estimated light time.</td></tr>
+      <tr><td><code>unknown_time_seconds</code></td><td>Portion without reliable zone attribution. Dark + light + unknown equals the reported interval.</td></tr>
+      <tr><td><code>x_px</code></td><td>Current center's original-video X coordinate when exactly one center exists. Can be present even when side is unknown.</td></tr>
+      <tr><td><code>y_px</code></td><td>Current center's original-video Y coordinate when exactly one center exists.</td></tr>
+      <tr><td><code>speed_px_per_second</code></td><td>Straight-line displacement divided by time over the preceding valid interval. Blank for unavailable intervals or the first row.</td></tr>
+      <tr><td><code>speed_inches_per_second</code></td><td>The same scalar speed in approximate inches/second using the calibration.</td></tr>
+      <tr><td><code>position_source</code></td><td>How the single center was obtained, such as observed, manual, or overlap-estimate. Blank without a single center.</td></tr>
+      <tr><td><code>position_uncertain</code></td><td>Whether that center is flagged uncertain. Such positions do not contribute valid speed or zone intervals.</td></tr>
+      <tr><td><code>manual_correction_applied</code></td><td>True when current results use an applied correction.</td></tr>
+      <tr><td><code>automatic_candidate_count</code></td><td>Original automatic count before selecting one fish, including rejected candidates.</td></tr>
+      <tr><td><code>rejected_candidate_count</code></td><td>Number of candidates excluded from the automatic result. Their original positions remain in the JSON and review.</td></tr>
+      <tr><td><code>foreground_contrast</code></td><td>Median foreground brightness difference from the background, in grayscale levels (0–255). Light regions use darkening; dark regions allow either contrast direction. Blank for manual or unavailable measurements.</td></tr>
+      <tr><td><code>selection_method</code></td><td>Versioned automatic selection rule, when applied.</td></tr>
+      <tr><td><code>selection_confident</code></td><td>Whether automatic selection passed the contrast separation rule. This is a heuristic, not a probability. Close competing candidates stay uncertain and do not contribute zone time or speed until corrected.</td></tr>
+    </tbody></table></div>
+  </section>
+  <section id="summaries"><h2>Light/dark and group summaries</h2>
+    <p>The per-video summary uses the following fields. Batch exports add trial, exposure, fish ID, source filename and completion status. Saved batch entries are snapshots; after correcting a video, replace its entry to update the group results.</p>
+    <div class="table-wrap"><table><thead><tr><th>Field</th><th>Meaning</th></tr></thead><tbody>
+      <tr><td><code>darkTimeSeconds</code></td><td>Total estimated time in dark, in seconds.</td></tr>
+      <tr><td><code>lightTimeSeconds</code></td><td>Total estimated time in light, in seconds.</td></tr>
+      <tr><td><code>unknownTimeSeconds</code></td><td>Time without reliable zone attribution.</td></tr>
+      <tr><td><code>observedDurationSeconds</code></td><td>Analyzed time span, including unknown time; not necessarily full video duration.</td></tr>
+      <tr><td><code>zoneSwitchCount</code></td><td>Total observed adjacent-sample zone changes.</td></tr>
+      <tr><td><code>averageSpeedPxPerSecond</code></td><td>Total measured displacement divided by total valid interval time. This is scalar speed, often called velocity in the interface; it is not net directional velocity.</td></tr>
+      <tr><td><code>averageSpeedInchesPerSecond</code></td><td>The same average in calibrated inches/second. Curved movement between samples is not measured.</td></tr>
+      <tr><td><code>velocityDurationSeconds</code></td><td>Total duration contributing valid speed measurements.</td></tr>
+      <tr><td><code>coverageFraction</code></td><td>(Dark time + light time) / analyzed duration, from 0 to 1. Blank if no elapsed interval exists.</td></tr>
+    </tbody></table></div>
+    <p>Exposure averages are grouped by trial and exposure label, with each saved fish given equal weight. A missing metric is omitted from that metric's average, not counted as zero; the corresponding N reports how many fish contributed. The expected group size is ten, but incomplete groups can be exported. Compare coverage and duration as well as means, especially for partial runs.</p>
+  </section>
+</main></body></html>
