@@ -33,6 +33,7 @@ export function frameCandidates(frame) {
 export const SINGLE_FISH_SELECTION_METHOD = 'foreground-contrast-margin-v1';
 export const TRACKED_SINGLE_FISH_SELECTION_METHOD = 'foreground-track-continuity-v1';
 export const BOUNDARY_SINGLE_FISH_SELECTION_METHOD = 'foreground-boundary-margin-v1';
+export const MOTION_SINGLE_FISH_SELECTION_METHOD = 'foreground-motion-continuity-v1';
 
 // A long, very thin region running along a tank wall is weak identity evidence,
 // even when its brightness changes more than a faint fish farther inside.
@@ -71,6 +72,20 @@ export function selectSingleFishCandidate(candidates, crop, options = {}) {
         rejectedDetections: measured.filter(point => point !== winner).map(point => ({ ...point,
           rejectionReason: 'weaker-track-continuity' })) };
     }
+    const predicted = options.predictedPoint;
+    if (nearby.length > 1 && Number.isFinite(predicted?.x) && Number.isFinite(predicted?.y)) {
+      const motion = nearby.map(({ point }) => ({ point,
+        distance: Math.hypot(point.x - predicted.x, point.y - predicted.y) }))
+        .sort((a, b) => a.distance - b.distance);
+      if (motion[0].distance <= (options.maxTrackDistancePx ?? 45) && motion[1].distance - motion[0].distance >= 8) {
+        const winner = motion[0].point;
+        return { selectionMethod: MOTION_SINGLE_FISH_SELECTION_METHOD, selectionConfident: true,
+          selectionPrediction: { ...predicted },
+          detections: [{ ...winner, positionUncertain: false }],
+          rejectedDetections: measured.filter(point => point !== winner).map(point => ({ ...point,
+            rejectionReason: 'weaker-motion-continuity' })) };
+      }
+    }
   }
   const wallRegions = new Set(measured.filter(point => supported(point) && followsTankWall(point, crop)));
   const interior = measured.filter(point => !wallRegions.has(point));
@@ -95,6 +110,7 @@ export function hasAmbiguousRejectedCandidates(frame) {
   if (!frame.rejectedDetections?.length) return false;
   const reasons = frame.selectionMethod === SINGLE_FISH_SELECTION_METHOD ? ['weaker-foreground-contrast']
     : frame.selectionMethod === TRACKED_SINGLE_FISH_SELECTION_METHOD ? ['weaker-track-continuity']
+    : frame.selectionMethod === MOTION_SINGLE_FISH_SELECTION_METHOD ? ['weaker-motion-continuity']
     : frame.selectionMethod === BOUNDARY_SINGLE_FISH_SELECTION_METHOD ? ['wall-like-boundary-region', 'weaker-foreground-contrast'] : [];
   return !(reasons.length && frame.selectionConfident === true &&
     frame.rejectedDetections.every(point => reasons.includes(point.rejectionReason)));

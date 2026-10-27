@@ -26,6 +26,17 @@ export function createFishTracker(expectedFish) {
     return { x: track.position.x + track.velocity.x * elapsed, y: track.position.y + track.velocity.y * elapsed };
   }
 
+  /** A motion hint needs consecutive observations, never a carried estimate. */
+  function selectionPrediction(timestampMs) {
+    expire(timestampMs);
+    if (expectedFish !== 1 || tracks.length !== 1) return null;
+    const track = tracks[0];
+    if (track.observations < 2 || !track.motionReady || track.pending.length ||
+      timestampMs <= track.seenAt || timestampMs - track.seenAt > TRACKING_METHOD.maxSampleGapMs ||
+      track.observedAt !== track.seenAt) return null;
+    return { ...predict(track, timestampMs), referenceTimestampMs: track.observedAt };
+  }
+
   /** Recent separately observed fish provide a size baseline when several pairs merge at once. */
   function sizeReference(timestampMs) {
     expire(timestampMs);
@@ -90,6 +101,7 @@ export function createFishTracker(expectedFish) {
       point.trackLastObservedTimestampMs = track.observedAt;
       if (!point.positionUncertain) {
         const elapsed = timestampMs - track.observedAt;
+        track.motionReady = elapsed > 0 && elapsed <= TRACKING_METHOD.maxSampleGapMs && track.pending.length === 0;
         const velocity = { x: (point.x - track.observed.x) / elapsed, y: (point.y - track.observed.y) / elapsed };
         const speed = Math.hypot(velocity.x, velocity.y);
         const factor = speed > .15 ? .15 / speed : 1; // At most 30 pixels per 200 ms.
@@ -105,7 +117,7 @@ export function createFishTracker(expectedFish) {
         track.observations++;
         track.area = point.area ?? track.area;
         point.trackLastObservedTimestampMs = timestampMs;
-      } else track.pending.push(point);
+      } else { track.pending.push(point); track.motionReady = false; }
       track.position = { x: point.x, y: point.y };
       track.seenAt = timestampMs;
     }
@@ -120,7 +132,7 @@ export function createFishTracker(expectedFish) {
       }
       const track = { id: nextId++, position: { x: point.x, y: point.y },
         observed: { x: point.x, y: point.y }, observedAt: timestampMs, seenAt: timestampMs,
-        velocity: { x: 0, y: 0 }, observations: 1, area: point.area ?? 0, pending: [] };
+        velocity: { x: 0, y: 0 }, observations: 1, motionReady: false, area: point.area ?? 0, pending: [] };
       tracks.push(track);
       assignment.push(index);
       point.trackId = track.id;
@@ -130,5 +142,5 @@ export function createFishTracker(expectedFish) {
     return output;
   }
 
-  return { overlapSeeds, sizeReference, update };
+  return { overlapSeeds, sizeReference, selectionPrediction, update };
 }

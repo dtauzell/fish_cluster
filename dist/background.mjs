@@ -29,7 +29,7 @@ export function medianBackground(samples) {
 }
 
 /** Robust background range ignores isolated fish visits while learning fixture flicker. */
-export function backgroundVariation(samples, width, height) {
+export function backgroundVariation(samples, width, height, { excludeForegroundRuns = false } = {}) {
   if (!samples.length || samples.some(sample => sample.length !== samples[0].length)) {
     throw new Error('Background samples must have matching dimensions.');
   }
@@ -40,6 +40,32 @@ export function backgroundVariation(samples, width, height) {
     for (let i = 0; i < samples.length; i++) values[i] = samples[i][pixel];
     values.sort();
     lower[pixel] = values[low]; upper[pixel] = values[high];
+    if (excludeForegroundRuns && samples.length >= 5) {
+      // A dwelling fish can occupy a pixel in more than 10% of the references.
+      // Find the compact majority range, then remove a distant tail only when
+      // its samples form one sustained visit. Scattered flicker stays learned.
+      const count = Math.ceil(values.length * .6);
+      let start = 0, span = Infinity;
+      for (let i = 0; i <= values.length - count; i++) {
+        const distance = values[i + count - 1] - values[i];
+        if (distance < span) { start = i; span = distance; }
+      }
+      const floorLow = values[start], floorHigh = values[start + count - 1];
+      let brightCount = 0, brightRun = 0, longestBright = 0;
+      let darkCount = 0, darkRun = 0, longestDark = 0;
+      let stableLow = 255, stableHigh = 0;
+      for (const sample of samples) {
+        const value = sample[pixel];
+        if (value >= floorHigh + 8) {
+          brightCount++; brightRun++; longestBright = Math.max(longestBright, brightRun);
+        } else { brightRun = 0; stableHigh = Math.max(stableHigh, value); }
+        if (value <= floorLow - 8) {
+          darkCount++; darkRun++; longestDark = Math.max(longestDark, darkRun);
+        } else { darkRun = 0; stableLow = Math.min(stableLow, value); }
+      }
+      if (longestBright >= 3 && longestBright >= brightCount * .75) upper[pixel] = Math.min(upper[pixel], stableHigh);
+      if (longestDark >= 3 && longestDark >= darkCount * .75) lower[pixel] = Math.max(lower[pixel], stableLow);
+    }
   }
   if (width && height) {
     if (width * height !== lower.length) throw new Error('Background variation dimensions do not match.');
@@ -148,6 +174,11 @@ function recoverLowContrastFish(blobs, frame, background, width, height, options
   if (options.expectedFish !== 1 || options.threshold != null || options.recoverLowContrast === false ||
     !options.backgroundVariation || !options.darkZones?.some(Boolean)) return;
   const weakThreshold = threshold * .5, coreThreshold = threshold * .75;
+  const previous = options.previousDetections?.length === 1 ? options.previousDetections[0] : null;
+  const recentPrevious = previous && !previous.positionUncertain && !previous.splitFromBlob &&
+    previous.area > 0 && previous.width > 0 && previous.height > 0 &&
+    Number.isFinite(options.timestampMs) && Number.isFinite(options.previousTimestampMs) &&
+    options.timestampMs > options.previousTimestampMs && options.timestampMs - options.previousTimestampMs <= 250;
   const darkAnalysisMask = options.darkZones.map((value, index) =>
     value && (!options.analysisMask || options.analysisMask[index]) ? 1 : 0);
   const mask = darkPixelMask(frame, background, width, height, weakThreshold,
@@ -158,13 +189,9 @@ function recoverLowContrastFish(blobs, frame, background, width, height, options
   for (const candidate of candidates) {
     let requiredCore = coreThreshold;
     if (!hasStableForegroundEvidence(candidate, frame, background, requiredCore, options)) {
-      const previous = options.previousDetections?.length === 1 ? options.previousDetections[0] : null;
       // A recent observed path can support a faint body, but only where current
       // pixels still exceed the learned range and have compatible size/motion.
-      if (!previous || previous.positionUncertain || previous.splitFromBlob ||
-        !Number.isFinite(options.timestampMs) || !Number.isFinite(options.previousTimestampMs) ||
-        options.timestampMs <= options.previousTimestampMs || options.timestampMs - options.previousTimestampMs > 250 ||
-        !(previous.area > 0) || !(previous.width > 0) || !(previous.height > 0) ||
+      if (!recentPrevious ||
         Math.hypot(candidate.x - previous.x, candidate.y - previous.y) > 45 ||
         candidate.area < previous.area * .35 || candidate.area > previous.area * 3 ||
         Math.hypot(candidate.width, candidate.height) > Math.hypot(previous.width, previous.height) * 2 ||
@@ -176,13 +203,19 @@ function recoverLowContrastFish(blobs, frame, background, width, height, options
     if (original.length) {
       if (seeds.length !== 1) continue;
       const seed = seeds[0];
-      if (candidate.area <= seed.area || candidate.area > seed.area * 5 ||
-        Math.hypot(candidate.width, candidate.height) > Math.hypot(seed.width, seed.height) * 3 ||
+      const matchesPreviousBody = recentPrevious &&
+        Math.hypot(candidate.x - previous.x, candidate.y - previous.y) <= 15 &&
+        candidate.area >= previous.area * .5 && candidate.area <= previous.area * 2 &&
+        Math.hypot(candidate.width, candidate.height) <= Math.hypot(previous.width, previous.height) * 1.5;
+      if (candidate.area <= seed.area ||
+        (!matchesPreviousBody && (candidate.area > seed.area * 5 ||
+          Math.hypot(candidate.width, candidate.height) > Math.hypot(seed.width, seed.height) * 3)) ||
         seed.pixels.filter(pixel => pixels.has(pixel)).length < seed.area * .8) continue;
       const contrasts = seed.pixels.map(pixel => Math.abs(frame[pixel] - background[pixel]))
         .filter(value => value >= threshold).sort((a, b) => a - b);
-      // Ordinary high-contrast detections keep their original segmentation.
-      if (!contrasts.length || contrasts[Math.floor(contrasts.length / 2)] > threshold * 1.25) continue;
+      // A bright core can be only a small part of a previously observed body.
+      // Otherwise ordinary high-contrast detections keep their segmentation.
+      if (!contrasts.length || (!matchesPreviousBody && contrasts[Math.floor(contrasts.length / 2)] > threshold * 1.25)) continue;
     }
     const recovered = { ...candidate, lowContrastRecovered: true,
       foregroundThreshold: weakThreshold, foregroundCoreThreshold: requiredCore,

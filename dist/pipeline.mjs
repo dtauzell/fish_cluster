@@ -45,7 +45,8 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
     }
     yield { type: 'status', progress: 10, message: 'Finding the median tank background…' };
     background = medianBackground(samples);
-    if (config.suppressFlicker !== false && darkZones.some(Boolean)) variation = backgroundVariation(samples, crop.width, crop.height);
+    if (config.suppressFlicker !== false && darkZones.some(Boolean)) variation = backgroundVariation(samples, crop.width, crop.height,
+      { excludeForegroundRuns: config.expectedFish === 1 });
   } else {
     yield { type: 'status', progress: 0, message: 'Preparing Roboflow model in this browser…' };
     model = await prepareModel(config);
@@ -108,7 +109,8 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
       previousFrame.detections[0].positionSource !== 'overlap-estimate'
       ? previousFrame.detections[0] : undefined;
     const selected = backgroundMode && config.expectedFish === 1
-      ? selectSingleFishCandidate(detections, crop, { previousPoint: previousTrackPoint })
+      ? selectSingleFishCandidate(detections, crop, { previousPoint: previousTrackPoint,
+        predictedPoint: previousTrackPoint ? tracker?.selectionPrediction(timestampMs) : undefined })
       : selectCentralCandidates(detections, crop, backgroundMode && config.preferCenter ? config.expectedFish : null);
     selected.detections = tracker ? tracker.update(selected.detections, timestampMs)
       : selected.detections.map(point => ({ ...point,

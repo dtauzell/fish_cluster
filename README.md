@@ -26,7 +26,9 @@ pale fish on the dark floor. A competing candidate is excluded as weaker contras
 only when the winner has at least 1.5 times its contrast and an eight-level lead;
 close choices remain uncertain and do not contribute known zone time or speed.
 An unambiguous match to the previous observed position can resolve competing
-candidates. Otherwise, a supported fish away from the tank boundary takes
+candidates. When distances to that position are close, motion from consecutive
+observations can resolve the choice; missing or uncertain samples break that
+evidence. Otherwise, a supported fish away from the tank boundary takes
 precedence over a long, very thin region following that boundary. The diagnostic
 table identifies these rejected regions as **No (tank wall)**. This uses the
 actual polygon edges for four-corner crops.
@@ -172,9 +174,14 @@ neighborhood to tolerate small ridge shifts. A candidate needs a small core
 (at least five pixels and 8% of its area) that changes beyond that range. The
 whole candidate outline is retained when it passes, so fish can still cross a
 ridge. This does not change the dark/light side classification. Fixed bright
-objects are already part of the median background. Turn the option off and
-reanalyze if faint fish are missed. Reflection masks remain an option for areas
+objects are already part of the median background. Reflection masks remain an option for areas
 to exclude, but also exclude fish swimming through them.
+
+For single-fish recordings, learning also excludes sustained foreground visits
+from that brightness range. This keeps a fish that rests over embossed lettering
+from being learned as ordinary flicker. A faint body connected to a bright core
+can retain its recent observed extent, so the tracker does not shrink to a tiny
+patch and lose the fish on the following sample.
 
 With one fish expected and learned background flicker enabled, the marked dark
 region gets a second pass for faint fish. A core must exceed the learned range

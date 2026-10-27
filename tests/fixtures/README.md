@@ -2,7 +2,7 @@
 
 ## Low-contrast fish in the lighter dark-side recording
 
-`lighter-dark-low-contrast/` contains samples 1 and 7–10 (one-based) of
+`lighter-dark-low-contrast/` contains samples 1, 7–10, and 142–145 (one-based) of
 `single_fish_lighter_dark_part.mov` (1280 × 720, duration 63.33 seconds).
 Tank crop: `(452, 111, 491, 182)`; dark region: `(686, 118, 256, 169)`.
 Decode uses `crop=491:182:452:111:exact=1`, raw RGBA, and the app's
@@ -39,6 +39,44 @@ and samples 1, 33–35, and 63–65 from the same crop. Samples 34 and 64 need a
 checks centers near `(821, 239)` and `(809, 177)`, continuous track IDs, and known
 dark-side observations. Controls reject stale or uncertain history, incompatible
 size or motion, and pixels within ordinary background variation.
+
+Samples 142–145 are direct FFmpeg seeks to 28.2–28.8 seconds, decoded with the
+same crop and background. The user identified the true fish near `(810.7, 168.6)`
+and a competing center `(786.2, 144)` at sample 144. This FFmpeg decode yields
+the fish near `(807, 167)` but does not reproduce the extra competing region.
+The motion regression combines the recorded fish trajectory with the reported
+competing position and deliberately stronger synthetic evidence scores. It
+checks that observed motion breaks the ambiguous previous-position match in
+favor of the fish while preserving the path through sample 145. The competing
+region's scores and shape are stress inputs, not measured Safari evidence.
+
+## Fish resting over embossed lettering, samples 172–264
+
+`lighter-dark-lettering/` stores two gzip-compressed sequences of concatenated
+lossless PGM images (each image has header `P5\n100 115\n255\n`).
+`background-samples.pgm.gz` contains 25 reference samples at
+`(i + 0.5) * 63.33 / 25` seconds. `samples-169-266.pgm.gz` contains 98 samples,
+including three preceding samples and two following samples around the reported
+93-sample interval. Video: `single_fish_lighter_dark_part.mov`, same tank and dark
+polygons as the angled-crop first-frame regression.
+
+To keep the data compact, these images preserve original video rectangle
+`(800, 160, 100, 115)`, containing the fish, embossed letters, and surrounding
+floor. Tests place it at crop-local `(348, 49)` in the shared `491 × 182` median
+background; pixels outside this rectangle are held at that median. Pixels inside
+the rectangle remain unmodified. Samples were decoded as raw RGBA, converted
+with `grayscale()`, and selected every sixth native frame using
+`select=not(mod(n\,6))` in the 30 fps recording.
+
+`stationary-fish.test.mjs` checks observed positions and one track ID throughout
+all 93 samples, plus dark-side occupancy with no unknown gap. Background reference
+10 (26.5986 seconds) shows the fish outside this rectangle and supplies an empty
+lettering control. Synthetic tests retain rapid ridge flicker in the learned
+range and bound bright-core expansion by a recent observed body. In the full
+unmodified-frame replay, detections in samples 172–264 increased from 5 of 93 to
+93 of 93; both the full replay and focused fixture keep observed image positions
+rather than carried estimates. This is a sequence regression, not manual
+validation of every center across the complete recording.
 
 ## Single fish crossing tank markings, sample 61
 

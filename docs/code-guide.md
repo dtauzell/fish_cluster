@@ -20,13 +20,37 @@ foreground contrast over the original threshold-passing blob pixels, excluding
 the padding introduced by morphology. `candidate-selection.mjs` caps the result
 at one and marks insufficient separation uncertain. `pipeline.mjs` applies this
 before tracking, so ambiguous choices cannot create or refresh observed tracks.
+For single-fish runs, `backgroundVariation()` receives `excludeForegroundRuns`.
+It finds the narrowest range containing 60% of reference values at each pixel.
+Brightness excursions at least eight levels outside that range are excluded
+from the learned bounds only when a run of at least three consecutive references
+accounts for at least 75% of the excursions of that polarity. Remaining reference
+values retain their full range up to the usual percentile bounds. The two-pixel
+spatial expansion still runs afterward. This prevents a dwelling fish from
+inflating the flicker range while preserving scattered ridge flicker.
+
+Faint-body expansion can use a complete observation from at most 250 ms earlier
+when the new region is within 15 pixels, its area is between half and twice the
+previous area, and its bounding diagonal is at most 1.5 times the previous one.
+This permits a small bright core to retain its connected body without treating
+an estimate as a new observation.
+
 Side and velocity calculations accept rejected candidates only when the recorded,
 versioned selection rule confidently resolves them. Ambiguous choices and generic
 center-distance filtering still invalidate automatic intervals. All candidates
 and scores remain auditable.
 
 Single-fish selection first permits an unambiguous recent observed path to
-resolve competitors. Without that evidence, `foreground-boundary-margin-v1`
+resolve competitors. If multiple supported candidates lie within 45 pixels and
+their distances to the last observation differ by less than 8 pixels, recent
+motion can resolve the tie. `tracking.mjs` supplies a prediction only after two
+consecutive observations, with a maximum 250 ms sample gap and existing velocity
+cap. Gaps, uncertain samples, and overlap estimates cannot supply this evidence;
+reacquisition needs another fresh observation first. A motion choice requires an
+8-pixel lead in prediction distance, records `foreground-motion-continuity-v1`
+and `selectionPrediction`, and retains rejects as `weaker-motion-continuity`.
+
+Without temporal evidence, `foreground-boundary-margin-v1`
 prefers a supported alternative over a wall-like region that is at most 6 pixels
 thick, at least 40 pixels long, has an aspect ratio of at least 10, lies within
 8 pixels of a crop edge, and runs parallel to that edge (absolute axis dot
