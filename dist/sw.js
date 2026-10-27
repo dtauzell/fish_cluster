@@ -6,6 +6,10 @@ const scope = self.registration.scope;
 const prefix = `fish-cluster-offline:${scope}:`;
 const cacheName = `${prefix}${revision}`;
 const assetURLs = new Set(assets.map(asset => new URL(asset, scope).href));
+// Cloudflare Pages redirects index.html to its directory and other HTML to
+// extensionless URLs. Both spellings must work without asking the server.
+const htmlAliases = new Map([...assetURLs].filter(url => url.endsWith('.html'))
+  .map(url => [url.endsWith('/index.html') ? url.slice(0, -10) : url.slice(0, -5), url]));
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
@@ -35,10 +39,17 @@ self.addEventListener('fetch', event => {
   // Existing CSS/entry-point version queries resolve to the same release asset.
   url.search = '';
   url.hash = '';
-  if (url.href === scope) url.pathname += 'index.html';
-  if (!assetURLs.has(url.href)) return;
+  const assetURL = assetURLs.has(url.href) ? url.href : htmlAliases.get(url.href);
+  if (!assetURL) return;
   event.respondWith((async () => {
     const cache = await caches.open(cacheName);
-    return await cache.match(url.href) || fetch(event.request);
+    const cached = await cache.match(assetURL);
+    if (!cached) return fetch(event.request);
+    // A precache fetch may follow a host redirect. Navigation requests use
+    // redirect: 'manual' and reject responses carrying that redirect history.
+    // Rebuild the final response while preserving its body, status, and headers.
+    return cached.redirected ? new Response(cached.body, {
+      status: cached.status, statusText: cached.statusText, headers: cached.headers,
+    }) : cached;
   })());
 });
