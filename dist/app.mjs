@@ -22,6 +22,8 @@ import { analyzeVideo } from './pipeline.mjs';
 import { createLabeling } from './labeling-ui.mjs';
 import { initializeInputHelp } from './input-help.mjs';
 import { framePassesCountFilter } from './frame-selection.mjs';
+import { createDistanceControls, distanceFromInches, distanceToInches } from './distance-controls.mjs';
+import { createTestChooser } from './test-chooser.mjs';
 
 initializeInputHelp();
 
@@ -401,7 +403,7 @@ $('apply-calibration').addEventListener('click', () => {
   if (state.running || !state.calibrationLine) return;
   try {
     const { start, end } = state.calibrationLine;
-    const length = Number($('calibration-length').value) / ($('distance-units').value === 'cm' ? 2.54 : 1);
+    const length = distanceToInches($('calibration-length').value, $('distance-units').value);
     const scale = calibrationFromLine(start, end, length);
     $('grid-pixels').value = Number(scale.gridPixels.toPrecision(12));
     $('grid-pixels').dispatchEvent(new Event('change'));
@@ -466,14 +468,17 @@ for (const id of ['undo-zone', 'clear-zones']) {
   });
 }
 
+const distanceControls = createDistanceControls({ input: $('threshold'), units: $('distance-units'), slider: $('cluster-distance'),
+  getSettings: () => state.reviewFrames.length ? state.settings : null, isRunning: () => state.running,
+  refresh: refreshDistanceResults, unitsChanged: updateDistanceUnits });
+
 function settings() {
-  const distanceScale = $('distance-units').value === 'cm' ? 1 / 2.54 : 1;
   return createSettings({
     testType: state.testType,
     intervalMs: Number($('interval').value),
     filterExactCount: $('filter-exact-count').checked,
     filterFrameCount: Number($('filter-frame-count').value),
-    thresholdInches: Number($('threshold').value) * distanceScale,
+    thresholdInches: distanceControls.readInches(),
     gridPixels: Number($('grid-pixels').value),
     method: $('method').value,
     expectedFish: state.testType === 'light-dark' ? 1 : Number($('expected-fish').value),
@@ -489,17 +494,17 @@ function settings() {
 
 function displayDistance(inches, digits = 2) {
   const cm = $('distance-units').value === 'cm';
-  return `${fmt(inches * (cm ? 2.54 : 1), digits)} ${cm ? 'cm' : 'in'}`;
+  return `${fmt(distanceFromInches(inches, $('distance-units').value), digits)} ${cm ? 'cm' : 'in'}`;
 }
-function updateDistanceUnits() {
+function updateDistanceUnits(previousUnits) {
   const cm = $('distance-units').value === 'cm';
   $('threshold-unit').textContent = cm ? 'cm' : 'inches';
   $('threshold').step = cm ? '0.1' : '0.01';
   $('calibration-unit').textContent = cm ? 'cm' : 'inches';
-  $('calibration-length').value = cm ? '1.27' : '0.5';
+  const calibrationInches = distanceToInches($('calibration-length').value, previousUnits);
+  if (Number.isFinite(calibrationInches)) $('calibration-length').value = Number(distanceFromInches(calibrationInches, $('distance-units').value).toPrecision(12));
   $('scale-summary').textContent = `${fmt(Number($('grid-pixels').value) * 2 / (cm ? 2.54 : 1), 2)} px/${cm ? 'cm' : 'in'}`;
   if (state.settings && !state.running && state.reviewFrames.length) {
-    $('threshold').value = (state.settings.thresholdInches * (cm ? 2.54 : 1)).toFixed(2);
     $('cluster-distance').value = state.settings.thresholdInches;
     drawClusterChart();
     $('stat-distance').textContent = Number.isFinite(summarizeFrames(state.frames).meanPairDistanceInches)
@@ -508,7 +513,6 @@ function updateDistanceUnits() {
     refreshHumanFrame();
   }
 }
-$('distance-units').addEventListener('change', updateDistanceUnits);
 
 let filterCountOverridden = false;
 $('expected-fish').addEventListener('change', () => {
@@ -887,19 +891,6 @@ function refreshDistanceResults() {
   refreshHumanFrame();
   if (!$('workspace').hidden) drawFrame(null);
 }
-$('cluster-distance').addEventListener('input', event => {
-  if (!state.settings || state.running || !state.reviewFrames.length) return;
-  state.settings.thresholdInches = Number(event.target.value);
-  $('threshold').value = state.settings.thresholdInches;
-  refreshDistanceResults();
-});
-$('threshold').addEventListener('change', event => {
-  const thresholdInches = Number(event.target.value);
-  if (!Number.isFinite(thresholdInches) || thresholdInches < 0.01 || !state.settings || state.running || !state.reviewFrames.length) return;
-  state.settings.thresholdInches = thresholdInches;
-  $('cluster-distance').max = Math.max(Number($('cluster-distance').max), thresholdInches);
-  refreshDistanceResults();
-});
 $('grid-pixels').addEventListener('change', event => {
   const gridPixels = Number(event.target.value);
   if (!Number.isFinite(gridPixels) || gridPixels <= 0 || !state.settings || state.running || !state.reviewFrames.length) return;
@@ -1076,8 +1067,7 @@ function updateTestControls() {
   for (const value of ['dark','light']) $('crop-tool').querySelector(`option[value="${value}"]`).hidden = !lightDark;
   for (const id of ['undo-zone','clear-zones','zone-count']) $(id).hidden = !lightDark;
 }
-function chooseTest(testType) {
-  if (state.running) return;
+function applyTest(testType) {
   const previous = state.testType;
   state.testType = testType;
   state.drag = null; state.corners = [];
@@ -1088,12 +1078,12 @@ function chooseTest(testType) {
   if (testType === 'light-dark') { $('preview-tools').open = true; }
   location.hash = '#analysis'; showPage(); experimentTools.refresh();
 }
+const testChooser = createTestChooser({ state, dialog: $('test-change-dialog'), trigger: $('change-test'),
+  choices: { shoaling: $('switch-shoaling'), 'light-dark': $('switch-light-dark') },
+  apply: applyTest, confirmChange: message => window.confirm(message) });
+function chooseTest(testType) { return testChooser.select(testType); }
 $('choose-shoaling').addEventListener('click', () => chooseTest('shoaling'));
 $('choose-light-dark').addEventListener('click', () => chooseTest('light-dark'));
-$('change-test').addEventListener('click', () => {
-  if (state.running) return;
-  clearResults(); state.testType = null; state.settings = null; updateTestControls(); showPage();
-});
 const experimentTools = createExperimentTools({
   getContext: () => ({ fileName: state.file?.name, frameWidth: video.videoWidth, frameHeight: video.videoHeight,
     crop: state.crop, exclusions: state.exclusions, tankZones: state.tankZones, gridPixels: Number($('grid-pixels').value), testType: state.testType }),
@@ -1103,7 +1093,7 @@ const experimentTools = createExperimentTools({
   applySetup: setup => {
     if (state.running) throw new Error('Stop analysis before applying a setup.');
     if (setup.frameWidth !== video.videoWidth || setup.frameHeight !== video.videoHeight) throw new Error('Setup dimensions do not match this video.');
-    if (setup.testType !== state.testType) chooseTest(setup.testType);
+    if (setup.testType !== state.testType && !chooseTest(setup.testType)) throw new Error('Test change cancelled. Saved setup was not applied.');
     state.crop = setup.crop ? copyShape(setup.crop) : null;
     state.exclusions = (setup.exclusions ?? []).map(copyShape); state.tankZones = (setup.tankZones ?? []).map(copyShape);
     state.calibrationLine = null; state.drag = null; state.corners = []; state.focusTank = Boolean(state.crop);

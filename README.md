@@ -34,6 +34,8 @@ bottom of the app. It checks for an update, finishes downloading it, activates i
 and reloads. With a video loaded, it asks before discarding the video and unsaved
 analysis or corrections. Saved setups, trial summaries, and labeling progress are
 kept. If the site is unreachable, the current app stays open and you can retry.
+An already downloaded update can be activated while offline; Force refresh uses
+that saved copy without requiring another successful network check.
 For local development, keep `npm run dev` running; the dev server generates the
 offline revision from the current files so Force refresh picks up edits made
 while the server is running. Restart the server after changing server code.
@@ -52,12 +54,21 @@ Copies prepared without Git metadata display **Version unavailable**.
 
 ## Use
 
-Start by choosing **Shoaling** or **Light / dark**. Shoaling retains the spacing
+Start by choosing **Shoaling** or **Light / dark**. **Change test** opens a chooser
+without clearing the current analysis, corrections, or review progress. Cancel,
+Escape, or keeping the same test returns to that session. Choosing a different
+test asks before clearing analyzed results and marks; export them first if needed.
+Shoaling retains the spacing
 and cluster analysis described below. Light/dark fixes the count at one fish and
 shows time in dark, time in light, unknown time, observed zone switches, and
 average scalar speed, without pair-distance or cluster controls. Mark the dark
 region; the rest of the usable tank is light. The **Frames CSV column guide**
 beside the export buttons explains every column for each test.
+
+Changing distance units preserves the physical link distance and calibration
+length. Link-distance edits in Setup and Results use the selected display units;
+recalculation and reanalysis apply the same distance. Exports retain their explicit
+column units.
 
 With one fish expected, background analysis keeps at most one candidate, choosing
 the strongest foreground contrast against the median background. This favors a

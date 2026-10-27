@@ -17,8 +17,12 @@ function waitForState(worker, states) {
 
 /** Download a complete release, activate it, and only then reload the page. */
 export async function refreshApplication(registration, reload) {
-  await registration.update();
-  const worker = registration.installing || registration.waiting;
+  // A complete saved update is usable even when its server is unreachable.
+  if (!registration.waiting) {
+    try { await registration.update(); }
+    catch (error) { if (!registration.waiting) throw error; }
+  }
+  const worker = registration.waiting || registration.installing;
   if (worker) {
     await waitForState(worker, ['installed', 'activating', 'activated']);
     const activated = waitForState(worker, ['activated']);

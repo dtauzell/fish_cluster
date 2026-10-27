@@ -22,7 +22,7 @@
       <nav class="workflow-nav" aria-label="Analysis workflow">
         <a id="nav-setup" href="#analysis" aria-current="page">Setup</a>
         <a id="nav-results" href="#results" aria-disabled="true">Results</a>
-        <span id="test-name"></span><button id="change-test" class="secondary" type="button" hidden>Change test</button><span id="workflow-summary">Add a video to begin</span>
+        <span id="test-name"></span><button id="change-test" class="secondary" type="button" aria-haspopup="dialog" aria-controls="test-change-dialog" hidden>Change test</button><span id="workflow-summary">Add a video to begin</span>
         <details class="tools-menu"><summary>Tools</summary><div><button id="open-labeler" class="secondary" type="button" disabled>Label training frames</button><p class="fine-print">Uses your video, crop, and sampling interval.</p></div></details>
       </nav>
       <div class="top-links"><a href="#about">About the analysis</a><a href="https://github.com/dtauzell/fish_cluster" target="_blank" rel="noopener">Source code ↗</a></div>
@@ -269,6 +269,10 @@
       </section>
       <section id="about-page" hidden aria-label="About the analysis"><div id="about-content" class="about-main">Loading the method guide…</div></section>
     </main>
+    <dialog id="test-change-dialog" class="review-help-dialog test-change-dialog" aria-labelledby="test-change-title" aria-describedby="test-change-help">
+      <div class="review-help-heading"><h2 id="test-change-title">Change test</h2><form method="dialog"><button class="secondary" type="submit" autofocus>Cancel</button></form></div>
+      <div class="test-change-body"><p id="test-change-help">Your current analysis and corrections stay available until you confirm a different test.</p><div class="test-options"><button id="switch-shoaling" class="secondary" type="button">Shoaling</button><button id="switch-light-dark" class="secondary" type="button">Light / dark</button></div></div>
+    </dialog>
     <dialog id="review-help-dialog" class="review-help-dialog" aria-labelledby="review-help-title">
       <header class="review-help-heading">
         <h2 id="review-help-title">Review buttons explained</h2>

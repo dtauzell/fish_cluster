@@ -1128,6 +1128,9 @@ footer {
 .review-help-dialog::backdrop {
   background: #031016bb;
 }
+.test-change-body { padding: 0 20px 20px; overflow: auto; max-height: calc(100dvh - 140px); }
+.test-change-body .test-options { grid-template-columns: repeat(auto-fit,minmax(min(200px,100%),1fr)); margin-top: 16px; }
+.test-change-body .test-options button { padding: 16px; }
 .review-help-heading {
   display: flex;
   align-items: center;

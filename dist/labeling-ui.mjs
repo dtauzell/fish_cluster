@@ -269,7 +269,7 @@ export function createLabeling({ canvas, source, queueSeek, isRunning, storageFa
     message('Every sampled frame is labeled.');
   });
   document.addEventListener('keydown', event => {
-    if (!project || $('label-page').hidden || loading || importing || drag || event.ctrlKey || event.metaKey || event.altKey ||
+    if (!project || $('test-change-dialog')?.open || $('label-page').hidden || loading || importing || drag || event.ctrlKey || event.metaKey || event.altKey ||
       event.target.closest('input,select,textarea,button,a')) return;
     if (event.key === 'ArrowLeft') { event.preventDefault(); $('label-prev').click(); }
     if (event.key === 'ArrowRight') { event.preventDefault(); $('label-next').click(); }

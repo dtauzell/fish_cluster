@@ -8,20 +8,32 @@ class Worker extends EventTarget {
   postMessage(message) { this.messages.push(message); }
 }
 
-test('force refresh checks for a new release and reloads only after its waiting worker activates', async () => {
+test('force refresh activates a saved release offline and reloads only after activation', async () => {
   const worker = new Worker('installed');
   const calls = [];
   worker.postMessage = message => {
     calls.push(message.type);
     queueMicrotask(() => worker.change('activating'));
   };
-  const refresh = refreshApplication({ waiting: worker, update: async () => calls.push('update') },
+  const refresh = refreshApplication({ waiting: worker, update: async () => { calls.push('update'); throw new Error('Offline'); } },
     () => calls.push('reload'));
   await new Promise(resolve => setImmediate(resolve));
-  assert.deepEqual(calls, ['update', 'ACTIVATE_UPDATE']);
+  assert.deepEqual(calls, ['ACTIVATE_UPDATE']);
   worker.change('activated');
   await refresh;
-  assert.deepEqual(calls, ['update', 'ACTIVATE_UPDATE', 'reload']);
+  assert.deepEqual(calls, ['ACTIVATE_UPDATE', 'reload']);
+});
+
+test('force refresh can use an update that finishes saving while a network check fails', async () => {
+  const worker = new Worker('installed');
+  worker.postMessage = () => queueMicrotask(() => worker.change('activated'));
+  let reloaded = false;
+  const registration = { waiting: null, update: async () => {
+    registration.waiting = worker;
+    throw new Error('Network disconnected');
+  } };
+  await refreshApplication(registration, () => { reloaded = true; });
+  assert.equal(reloaded, true);
 });
 
 test('force refresh waits for the complete download before activating an installing worker', async () => {

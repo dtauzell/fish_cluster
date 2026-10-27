@@ -437,7 +437,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     $('results-exports').querySelector('summary').focus({ preventScroll: true });
   });
   document.addEventListener('keydown', event => {
-    if (reviewHelp.open || $('human-page').hidden || state.running || event.defaultPrevented ||
+    if (reviewHelp.open || $('test-change-dialog')?.open || $('human-page').hidden || state.running || event.defaultPrevented ||
         event.target.closest('input,select,textarea,summary,[role="button"],[contenteditable]:not([contenteditable="false"])')) return;
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && !event.shiftKey) {
       if ($('human-edit-centers').checked) { event.preventDefault(); undoMarks(); }
