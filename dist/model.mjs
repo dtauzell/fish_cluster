@@ -20,6 +20,9 @@ export function createModelService() {
         try { await state.model.engine.stopWorker(state.model.workerId); } catch { /* Continue with the new model. */ }
         state.model = null;
       }
+      if (globalThis.navigator?.onLine === false) {
+        throw new Error('Roboflow needs an internet connection to load its model. Choose Background subtraction to analyze offline.');
+      }
       const { InferenceEngine } = await loadInferenceJS();
       const engine = new InferenceEngine();
       const workerId = await engine.startWorker(config.projectSlug, config.version, config.key);

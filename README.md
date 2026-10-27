@@ -10,6 +10,25 @@ npm run dev
 
 Open <http://localhost:8000>. No install or build is required. Tests: `npm test`.
 
+## Work offline
+
+Visit the site over HTTPS (or localhost) and wait for **Ready for offline use**
+above the workspace. You can then disconnect and reopen the same URL in the
+same browser. Background subtraction, both test types, review and correction,
+training labels, CSV/JSON/ZIP exports, and the local help pages work offline.
+Select videos from your computer again after reopening; this feature saves the
+application, not your video files or unsaved analysis results. Saved tank setups,
+trial summaries, and labeling progress retain their existing browser storage.
+
+The optional **Roboflow model** still requires internet to initialize its external
+model. Choose **Background subtraction** for offline analysis. External links such
+as GitHub and Roboflow also need internet. Fonts use the local sans-serif fallback.
+
+An updated app downloads during a later online visit and takes effect after all
+tabs for this app close. Browser site-data clearing or storage eviction removes
+the offline copy; revisit online to restore it. Offline access requires a browser
+with service workers enabled; private browsing may restrict it.
+
 ## Use
 
 Start by choosing **Shoaling** or **Light / dark**. Shoaling retains the spacing
@@ -319,6 +338,13 @@ predictions. Browser storage can be cleared or fill up; keep progress backups.
 step is needed. Run `npm run dev` to serve it locally and `npm test` to run the
 automated checks.
 
+After changing anything in `dist/`, run `npm run offline:prepare` and commit the
+updated `dist/offline-assets.js` with the changes. This records every deployed
+asset and a content-based release revision, so an offline installation includes
+modules and help pages even before they are opened. Tests check that the asset
+list and revision match the current source. The worker keeps each release in a
+separate cache and activates updates after existing app tabs close.
+
 The GUI handles controls and drawing. Separate modules decode video, detect fish,
 calculate measurements, compare manual annotations, and format exports.
 
@@ -339,6 +365,8 @@ calculate measurements, compare manual annotations, and format exports.
 | [dist/tracking.mjs](dist/tracking.mjs), [dist/point-assignment.mjs](dist/point-assignment.mjs) | Follow provisional fish paths, match centers one-to-one, and supply bounded overlap evidence without treating estimates as fresh observations. |
 | [dist/blob-splitting.mjs](dist/blob-splitting.mjs) | Estimates two centers inside unusually large regions, including touching pairs hidden by a full candidate count. |
 | [dist/model.mjs](dist/model.mjs) | Loads and reuses the optional Roboflow model worker and explains model errors. |
+| [dist/offline.mjs](dist/offline.mjs), [dist/sw.js](dist/sw.js) | Saves a complete app release for offline use and reports readiness. |
+| [scripts/offline-assets.mjs](scripts/offline-assets.mjs) | Generates the committed offline asset inventory and content revision. |
 | [dist/geometry.mjs](dist/geometry.mjs), [dist/tank-zones.mjs](dist/tank-zones.mjs) | Four-corner geometry, area drawing, side classification, and dark-region pixel maps. |
 | [dist/region.mjs](dist/region.mjs) | Defines the usable crop area, translates reflection masks, and splits the unmasked area for random sampling. |
 | [dist/candidate-selection.mjs](dist/candidate-selection.mjs) | Optionally ranks excess candidates by distance from the crop center, retaining rejected candidates for review. |
@@ -383,6 +411,7 @@ npx wrangler pages project create fish-cluster --production-branch main
 Test and deploy the current `dist/` directory to production:
 
 ```sh
+npm run offline:prepare
 npm test
 npx wrangler pages deploy dist --project-name fish-cluster --branch main
 ```
@@ -395,4 +424,4 @@ To publish a preview without updating production, use a branch name other than `
 npx wrangler pages deploy dist --project-name fish-cluster --branch preview
 ```
 
-These commands use Cloudflare's [Direct Upload workflow](https://developers.cloudflare.com/pages/get-started/direct-upload/) and [Wrangler Pages commands](https://developers.cloudflare.com/workers/wrangler/commands/pages/). Only `dist/` is uploaded, so the local `fish.mov` stays on your computer. Background mode runs locally without model assets; a live network connection is needed for Roboflow mode and optional web fonts. The prefilled Roboflow publishable key is visible in the deployed source; never put a private API key there.
+These commands use Cloudflare's [Direct Upload workflow](https://developers.cloudflare.com/pages/get-started/direct-upload/) and [Wrangler Pages commands](https://developers.cloudflare.com/workers/wrangler/commands/pages/). Only `dist/` is uploaded, so the local `fish.mov` stays on your computer. Background mode works offline once the app is saved; a live network connection is needed for Roboflow model initialization. The prefilled Roboflow publishable key is visible in the deployed source; never put a private API key there.

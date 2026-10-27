@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="./labeling.css?v=1">
   <link rel="stylesheet" href="./workspace.css?v=8">
   <script type="module" src="./app.mjs?v=44"></script>
+  <script type="module" src="./offline.mjs"></script>
 </head>
 <body>
   <div class="shell">
@@ -27,6 +28,7 @@
       <div class="top-links"><a href="#about">About the analysis</a><a href="https://github.com/dtauzell/fish_cluster" target="_blank" rel="noopener">Source code ↗</a></div>
     </header>
     <main>
+      <p id="offline-status" class="fine-print" role="status" title="Offline use includes background subtraction, review, labeling, and exports. Roboflow requires internet. Videos must be selected again after reopening.">Preparing offline access…</p>
       <section id="test-chooser" class="test-chooser panel" aria-labelledby="test-choice-title">
         <h1 id="test-choice-title">Choose your test</h1><p>Select the analysis for this experiment.</p>
         <div class="test-options"><button id="choose-shoaling" class="secondary" type="button"><strong>Shoaling</strong><span>Measure fish spacing, groups, and clustering.</span></button><button id="choose-light-dark" class="secondary" type="button"><strong>Light / dark</strong><span>Track one fish’s time on each side, switches, and speed.</span></button></div>
@@ -56,7 +58,7 @@
             <label>Required count (override)<input id="filter-frame-count" type="number" min="1" step="1" value="5"></label>
           </div>
           <div class="fields method-settings"><label>Pixels per 0.5-inch square <span class="help">distance calibration for either method</span><input id="grid-pixels" type="number" min="0.000001" step="any" value="15.3"></label></div>
-          <div class="fields method-choice"><label>Detection method<select id="method"><option value="background" selected>Background subtraction · fixed tank</option><option value="roboflow">Roboflow model</option></select></label></div>
+          <div class="fields method-choice"><label>Detection method<select id="method"><option value="background" selected>Background subtraction · fixed tank</option><option value="roboflow">Roboflow model · internet required</option></select></label><p class="fine-print">Background subtraction works offline. Roboflow requires an internet connection to load its model.</p></div>
           <div id="background-settings" class="fields method-settings">
             <label class="center-option"><input id="suppress-flicker" type="checkbox" checked> Learn background flicker in dark regions</label>
             <p class="fine-print">Requires changes beyond the usual brightness range of each pixel, reducing flickering ridges and fixtures. Fish can still cross these areas. Turn off if faint fish are missed. Fixed bright details are already part of the background.</p>
