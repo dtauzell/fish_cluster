@@ -3,6 +3,7 @@ import { requestAppVersion, versionLabel } from './version.mjs';
 import { watchForAppUpdates } from './update-check.mjs';
 
 const indicator = document.getElementById('offline-status');
+const updateBanner = document.getElementById('app-update-banner');
 let readyRegistration = null;
 
 function show(message) {
@@ -10,8 +11,9 @@ function show(message) {
 }
 
 function showReady() {
+  if (updateBanner) updateBanner.hidden = !readyRegistration?.waiting;
   if (readyRegistration?.waiting) {
-    show(document.getElementById('force-refresh')
+    show(updateBanner ? 'App update saved · use Load update to load it' : document.getElementById('force-refresh')
       ? 'App update saved · use Force refresh below to load it'
       : 'App update saved · close all app tabs to use it');
     return;
@@ -44,7 +46,7 @@ async function prepareOffline() {
     readyRegistration = registration;
     showReady();
     const showUpdate = () => {
-      if (registration.waiting) showReady();
+      showReady();
     };
     showUpdate();
     const watchUpdate = () => {
@@ -76,19 +78,27 @@ preparation.then(async registration => {
 });
 
 const refreshButton = document.getElementById('force-refresh');
-refreshButton?.addEventListener('click', async () => {
-  const message = document.getElementById('refresh-status');
+const updateButton = document.getElementById('load-app-update');
+function refreshStatus(text) {
+  for (const id of ['refresh-status', 'update-banner-status']) {
+    const message = document.getElementById(id);
+    if (message) message.textContent = text;
+  }
+}
+async function loadLatestApp() {
   const hasVideo = Boolean(document.getElementById('video-file')?.files?.length ||
     document.getElementById('source-video')?.getAttribute('src'));
   if (hasVideo && !window.confirm('Reload the latest app? This closes your current video and discards unsaved analysis and corrections. Export anything you want to keep first.')) return;
-  refreshButton.disabled = true;
-  message.textContent = 'Checking for the latest app…';
+  for (const button of [refreshButton, updateButton]) if (button) button.disabled = true;
+  refreshStatus('Loading the latest app…');
   try {
     const registration = await preparation;
     if (!registration) throw new Error('Offline updates are unavailable. Reload this page to retry.');
     await refreshApplication(registration, () => window.location.reload());
   } catch (error) {
-    message.textContent = `Could not refresh: ${error.message} Check that the site or local dev server is reachable, then retry.`;
-    refreshButton.disabled = false;
+    refreshStatus(`Could not refresh: ${error.message} Check that the site or local dev server is reachable, then retry.`);
+    for (const button of [refreshButton, updateButton]) if (button) button.disabled = false;
   }
-});
+}
+refreshButton?.addEventListener('click', loadLatestApp);
+updateButton?.addEventListener('click', loadLatestApp);

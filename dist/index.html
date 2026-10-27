@@ -14,6 +14,10 @@
   <script type="module" src="./offline.mjs"></script>
 </head>
 <body>
+  <aside id="app-update-banner" class="app-update-banner" aria-label="App update" hidden>
+    <div><div role="status"><strong>Update available</strong><p>A new version is ready. You can keep working and load it when you’re ready.</p></div><p id="update-banner-status" role="status"></p></div>
+    <button id="load-app-update" class="primary" type="button">Load update</button>
+  </aside>
   <div class="shell">
     <video id="source-video" class="source-video" playsinline preload="auto" muted aria-hidden="true"></video>
     <header class="topbar">

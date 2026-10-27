@@ -398,6 +398,34 @@ footer {
   letter-spacing: .1em;
 }
 
+.app-update-banner {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  width: min(900px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 2px solid #8ce6ce;
+  border-radius: 12px;
+  background: #102832;
+  color: #eaf7f6;
+  box-shadow: 0 8px 32px #0009;
+}
+.app-update-banner strong { color: #8ce6ce; font-size: 17px; }
+.app-update-banner p { margin: 4px 0 0; font-size: 13px; line-height: 1.4; }
+.app-update-banner p:empty { display: none; }
+.app-update-banner button { flex: none; width: auto; margin: 0; white-space: nowrap; }
+.app-update-banner > div { min-width: 0; }
+body:has(#app-update-banner:not([hidden])) { padding-bottom: 120px; }
+@media (max-width: 560px) {
+  .app-update-banner { flex-wrap: wrap; padding: 12px; gap: 10px; }
+  body:has(#app-update-banner:not([hidden])) { padding-bottom: 180px; }
+}
 .refresh-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 0 0 24px; }
 .refresh-tools button:disabled { opacity: .5; cursor: wait; }
 /* Review uses a fixed image area; secondary information can be expanded. */
