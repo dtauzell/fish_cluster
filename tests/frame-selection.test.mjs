@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { framePassesCountFilter, reviewFrameIndices, automaticCandidateCount } from '../dist/frame-selection.mjs';
+import { framePassesCountFilter, reviewFrameIndices, automaticCandidateCount, reviewFrameFlags } from '../dist/frame-selection.mjs';
 import { applyManualCenters, restoreAutomaticCenters } from '../dist/review.mjs';
 import { frameMetrics } from '../dist/measurements.mjs';
 import { humanCsv } from '../dist/exports.mjs';
@@ -10,6 +10,36 @@ const config = { method: 'background', expectedFish: 5, filterExactCount: true, 
 const points = count => Array.from({ length: count }, (_, i) => ({ detectionId: i + 1, x: 10 + i * 10, y: 40 }));
 const frame = (index, count) => ({ frameIndex: index, timestampMs: index * 200,
   detections: points(count), rejectedDetections: [], metrics: frameMetrics(points(count), config) });
+
+test('issue filters distinguish missing, ambiguous and uncertain frames and deduplicate their union', () => {
+  const frames = [frame(0, 1), { ...frame(1, 0), selectionConfident: false },
+    { ...frame(2, 1), selectionConfident: false },
+    { ...frame(3, 1), detections: [{ ...points(1)[0], positionUncertain: true }] },
+    { ...frame(4, 1), selectionConfident: false, detections: [{ ...points(1)[0], positionUncertain: true }] },
+    { ...frame(5, 1), detections: [{ ...points(1)[0], splitFromBlob: true }] },
+    { ...frame(6, 1), detections: [{ ...points(1)[0], positionSource: 'overlap-estimate' }] }];
+  assert.deepEqual(reviewFrameIndices(frames, 'missing', 1), [1]);
+  assert.deepEqual(reviewFrameIndices(frames, 'ambiguous', 1), [2, 4]);
+  assert.deepEqual(reviewFrameIndices(frames, 'uncertain', 1), [3, 4, 5, 6]);
+  assert.deepEqual(reviewFrameIndices(frames, 'flagged', 1), [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(reviewFrameIndices(frames, 'all', 1), [0, 1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(reviewFrameIndices([], 'flagged', 1), []);
+});
+
+test('resolved rejected candidates do not flag a frame, and applied manual centers clear automatic ambiguity', () => {
+  const resolved = { ...frame(0, 1), selectionMethod: 'foreground-contrast-margin-v1', selectionConfident: true,
+    rejectedDetections: [{ ...points(2)[1], rejectionReason: 'weaker-foreground-contrast' }] };
+  assert.equal(reviewFrameFlags(resolved).flagged, false);
+  const ambiguous = { ...resolved, selectionConfident: false,
+    rejectedDetections: [{ ...points(2)[1], rejectionReason: 'ambiguous-single-fish' }],
+    detections: [{ ...points(1)[0], positionUncertain: true }] };
+  const corrected = applyManualCenters(ambiguous, [{ x: 35, y: 40 }], config);
+  assert.equal(reviewFrameFlags(corrected).flagged, false);
+  assert.equal(reviewFrameFlags(restoreAutomaticCenters(corrected, config)).flagged, true);
+  const removed = applyManualCenters(ambiguous, [], config);
+  assert.deepEqual(reviewFrameFlags(removed), { missing: true, ambiguous: false, uncertain: false, flagged: true });
+  assert.equal(automaticCandidateCount(corrected), 2);
+});
 
 test('review exposes low and excess candidate counts, including center-rule exclusions', () => {
   const extra = { ...frame(2, 5), rejectedDetections: [{ ...points(6)[5], rejectionReason: 'farther-from-crop-center' }] };

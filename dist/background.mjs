@@ -145,7 +145,7 @@ function darkPixelMask(frame, background, width, height, threshold, exclusions, 
 
 // Verify whole regions instead of eroding a fish away where it crosses a ridge.
 // A region needs a small core beyond the background's ordinary variation.
-function hasStableForegroundEvidence(blob, frame, background, threshold, options) {
+function hasStableForegroundEvidence(blob, frame, background, threshold, options, minimumFraction = .08) {
   const variation = options.backgroundVariation;
   if (!variation || !options.darkZones) return true;
   let touchesDark = false, evidence = 0;
@@ -155,7 +155,32 @@ function hasStableForegroundEvidence(blob, frame, background, threshold, options
       if (frame[pixel] <= variation.lower[pixel] - threshold || frame[pixel] >= variation.upper[pixel] + threshold) evidence++;
     } else if (background[pixel] - frame[pixel] >= threshold) evidence++;
   }
-  return !touchesDark || evidence >= Math.max(5, Math.ceil(blob.area * 0.08));
+  return !touchesDark || evidence >= Math.max(5, Math.ceil(blob.area * minimumFraction));
+}
+
+// A broad faint outline can dilute the usual percentage check even though a
+// compact core is clearly beyond learned flicker. Temporal recovery may use
+// five connected stable pixels, instead of accepting scattered bright specks.
+function hasConnectedStableCore(blob, frame, width, threshold, options) {
+  const { backgroundVariation: variation, darkZones } = options;
+  if (!variation || !darkZones) return false;
+  const core = new Set(blob.pixels.filter(pixel => darkZones[pixel] &&
+    (frame[pixel] <= variation.lower[pixel] - threshold || frame[pixel] >= variation.upper[pixel] + threshold)));
+  for (const start of core) {
+    const stack = [start];
+    core.delete(start);
+    let count = 0;
+    while (stack.length) {
+      const pixel = stack.pop();
+      if (++count >= 5) return true;
+      const x = pixel % width;
+      const neighbors = [pixel - width, pixel + width];
+      if (x > 0) neighbors.push(pixel - 1);
+      if (x < width - 1) neighbors.push(pixel + 1);
+      for (const next of neighbors) if (core.delete(next)) stack.push(next);
+    }
+  }
+  return false;
 }
 
 // Ignore tank borders where reflections and fixed hardware often look like fish.
@@ -187,21 +212,28 @@ function recoverLowContrastFish(blobs, frame, background, width, height, options
   const candidates = connectedRegions(mask, width, height, { minArea, maxArea, minLength: 10 });
   const original = [...blobs];
   for (const candidate of candidates) {
+    const compatiblePrevious = recentPrevious &&
+      Math.hypot(candidate.x - previous.x, candidate.y - previous.y) <= 45 &&
+      candidate.area >= previous.area * .35 && candidate.area <= previous.area * 3 &&
+      Math.hypot(candidate.width, candidate.height) <= Math.hypot(previous.width, previous.height) * 2;
     let requiredCore = coreThreshold;
     if (!hasStableForegroundEvidence(candidate, frame, background, requiredCore, options)) {
       // A recent observed path can support a faint body, but only where current
       // pixels still exceed the learned range and have compatible size/motion.
-      if (!recentPrevious ||
-        Math.hypot(candidate.x - previous.x, candidate.y - previous.y) > 45 ||
-        candidate.area < previous.area * .35 || candidate.area > previous.area * 3 ||
-        Math.hypot(candidate.width, candidate.height) > Math.hypot(previous.width, previous.height) * 2 ||
+      if (!compatiblePrevious ||
         !hasStableForegroundEvidence(candidate, frame, background, weakThreshold, options)) continue;
       requiredCore = weakThreshold;
     }
     const pixels = new Set(candidate.pixels);
     const seeds = original.filter(blob => blob.pixels?.some(pixel => pixels.has(pixel)));
-    if (original.length) {
-      if (seeds.length !== 1) continue;
+    // An unrelated bright edge must not prevent a faint fish from reaching
+    // selection. Require compatible observed history for this extra candidate;
+    // stable current-image evidence above remains mandatory. If a nearby region
+    // already exists, do not introduce disconnected tail/body alternatives.
+    const alongsideCandidates = original.length > 0 && seeds.length === 0;
+    if (seeds.length > 1 || (alongsideCandidates && (!compatiblePrevious ||
+      original.some(blob => Math.hypot(blob.x - previous.x, blob.y - previous.y) <= 45)))) continue;
+    if (seeds.length === 1) {
       const seed = seeds[0];
       const matchesPreviousBody = recentPrevious &&
         Math.hypot(candidate.x - previous.x, candidate.y - previous.y) <= 15 &&
@@ -219,7 +251,9 @@ function recoverLowContrastFish(blobs, frame, background, width, height, options
     }
     const recovered = { ...candidate, lowContrastRecovered: true,
       foregroundThreshold: weakThreshold, foregroundCoreThreshold: requiredCore,
-      ...(requiredCore < coreThreshold ? { lowContrastReferenceTimestampMs: options.previousTimestampMs } : {}),
+      ...(requiredCore < coreThreshold || alongsideCandidates
+        ? { lowContrastReferenceTimestampMs: options.previousTimestampMs } : {}),
+      ...(alongsideCandidates ? { lowContrastAlongsideCandidates: true } : {}),
       ...(seeds[0]?.edgeRecovered ? { edgeRecovered: true } : {}) };
     if (seeds.length) blobs.splice(blobs.indexOf(seeds[0]), 1, recovered);
     else blobs.push(recovered);
@@ -255,31 +289,58 @@ function recoverNearbyFish(blobs, frame, background, width, height, options, edg
       Math.hypot(index % width - point.x, Math.floor(index / width) - point.y) <= 60) ? 1 : 0);
   const coreThreshold = threshold * .5;
   // Keep the usual 12-level body where possible. Only a bounded temporal search
-  // may retain 8-level body pixels, still requiring a stable 12-level core.
-  // A partial outline first gets the more conservative 10-level retry, then 8.
-  const bodyThresholds = fragment ? [threshold * 5 / 12, threshold / 3] : [threshold * .5, threshold / 3];
-  for (const bodyThreshold of bodyThresholds) {
+  // may retain 8-level body pixels. Most recoveries require a stable 12-level core.
+  // Keep a supported 8-level outline where available. If that region is too
+  // large to match a small previous patch, try the intermediate 10-level body.
+  const bodyThresholds = fragment ? [threshold * 5 / 12, threshold / 3]
+    : [threshold * .5, threshold / 3, threshold * 5 / 12];
+  // Only after the usual body search fails, allow a smaller, strongly supported
+  // head near the selected fish. This covers a body interrupted by tank text.
+  const searches = (fragment || options.minArea != null ? [false] : [false, true])
+    .flatMap(smallCore => bodyThresholds.map(bodyThreshold => ({ smallCore, bodyThreshold })));
+  for (const { smallCore, bodyThreshold } of searches) {
     if (fragment && bodyThreshold >= fragment.foregroundThreshold) continue;
     const mask = darkPixelMask(frame, background, width, height, bodyThreshold,
       options.exclusions, options.darkZones, nearbyMask);
     excludeBorders(mask, width, height, edges.edgeX, edges.edgeTop, edges.edgeBottom);
-    const candidates = connectedRegions(mask, width, height, { minArea, maxArea, minLength: 10 });
+    const candidates = connectedRegions(mask, width, height,
+      { minArea: smallCore ? Math.ceil(minArea * .75) : minArea, maxArea, minLength: 10 });
     for (const candidate of candidates) {
+      if (smallCore && candidate.area >= minArea) continue;
       const pixels = fragment ? new Set(candidate.pixels) : null;
       if (fragment && (candidate.area <= fragment.area ||
         fragment.pixels.filter(pixel => pixels.has(pixel)).length < fragment.area * .8)) continue;
       const matches = references.filter(({ point }) =>
-        Math.hypot(candidate.x - point.x, candidate.y - point.y) <= (fragment ? 15 : 45) &&
-        candidate.area >= point.area * (fragment ? .5 : .35) && candidate.area <= point.area * (fragment ? 2 : 3) &&
+        Math.hypot(candidate.x - point.x, candidate.y - point.y) <= (fragment ? 15 : smallCore ? 20 : 45) &&
+        candidate.area >= point.area * (fragment ? .5 : smallCore ? .2 : .35) && candidate.area <= point.area * (fragment ? 2 : 3) &&
         Math.hypot(candidate.width, candidate.height) <= Math.hypot(point.width, point.height) * (fragment ? 1.5 : 2))
         .sort((a, b) => Math.hypot(candidate.x - a.point.x, candidate.y - a.point.y) -
           Math.hypot(candidate.x - b.point.x, candidate.y - b.point.y));
-      if (!matches.length || !hasStableForegroundEvidence(candidate, frame, background, coreThreshold, options)) continue;
+      if (!matches.length) continue;
+      const stableRegion = hasStableForegroundEvidence(candidate, frame, background, coreThreshold, options, smallCore ? .2 : .08);
+      const reference = stableRegion && !smallCore ? matches[0] : matches.find(item => item.selected);
+      const compactCore = !fragment && reference &&
+        hasConnectedStableCore(candidate, frame, width, coreThreshold, options);
+      // Lettering may obscure the strongest pixels. A close, size-compatible
+      // selected observation can support a 10-level stable core, but retain the
+      // ordinary region-support proportion and require a connected core too.
+      const softerCore = !smallCore && !stableRegion && !compactCore && !fragment && reference?.selected &&
+        Math.hypot(candidate.x - reference.point.x, candidate.y - reference.point.y) <= 15 &&
+        candidate.area >= reference.point.area * .5 && candidate.area <= reference.point.area * 2 &&
+        Math.hypot(candidate.width, candidate.height) <= Math.hypot(reference.point.width, reference.point.height) * 1.5 &&
+        hasStableForegroundEvidence(candidate, frame, background, threshold * 5 / 12, options) &&
+        hasConnectedStableCore(candidate, frame, width, threshold * 5 / 12, options);
+      // These fallbacks require an otherwise missing fish and a selected recent
+      // observation; rejected alternatives alone cannot relax core evidence.
+      if (!stableRegion && !compactCore && !softerCore) continue;
+      if (smallCore && (!stableRegion || !compactCore || !reference?.selected)) continue;
       const recovered = { ...candidate, lowContrastRecovered: true, nearbyFrameRecovered: true,
+        ...(!stableRegion ? { connectedCoreRecovered: true } : {}),
+        ...(smallCore ? { smallCoreRecovered: true } : {}),
         ...(fragment ? { nearbyFrameExpanded: true } : {}),
-        foregroundThreshold: bodyThreshold, foregroundCoreThreshold: coreThreshold,
-        lowContrastReferenceTimestampMs: matches[0].timestampMs,
-        lowContrastReferenceDetectionId: matches[0].point.detectionId };
+        foregroundThreshold: bodyThreshold, foregroundCoreThreshold: softerCore ? threshold * 5 / 12 : coreThreshold,
+        lowContrastReferenceTimestampMs: reference.timestampMs,
+        lowContrastReferenceDetectionId: reference.point.detectionId };
       if (fragment) { blobs.splice(0, 1, recovered); return; }
       blobs.push(recovered);
     }

@@ -8,6 +8,92 @@ test.beforeEach(async ({ page }) => {
   page.on('pageerror', error => { throw error; });
 });
 
+// Exercise Results with known review categories while retaining real video
+// loading, decoded-frame navigation, rendering and correction behavior.
+async function analyzeReviewCases(page) {
+  await page.route('**/pipeline.mjs', async route => {
+    const response = await route.fetch();
+    const source = (await response.text()).replace('export async function* analyzeVideo(', 'async function* analyzeOriginalVideo(');
+    await route.fulfill({ response, body: source + `
+      export async function* analyzeVideo(options) {
+        for await (const event of analyzeOriginalVideo(options)) {
+          const frame = event.frame;
+          if (frame) {
+            if (frame.frameIndex === 1) { frame.detections = []; frame.selectionConfident = false; }
+            if (frame.frameIndex === 3) {
+              frame.selectionConfident = false;
+              frame.detections[0].positionUncertain = true;
+            }
+            if (frame.frameIndex === 5) frame.detections[0].splitFromBlob = true;
+            if (frame.frameIndex === 7) {
+              frame.rejectedDetections = [{ ...frame.detections[0], rejectionReason: 'ambiguous-single-fish' }];
+            }
+            frame.metrics = frameMetrics(frame.detections, options.config, frame.rejectedDetections.length);
+          }
+          yield event;
+        }
+      }
+    ` });
+  });
+  await analyzeVideo(page);
+}
+
+test('Results issue filters show counts and restrict navigation and playback', async ({ page }) => {
+  await analyzeReviewCases(page);
+  const filter = page.locator('#human-frame-filter');
+  for (const [mode, label, count] of [['all', 'All', 12], ['missing', 'Missing', 1],
+    ['ambiguous', 'Ambiguous', 2], ['uncertain', 'Uncertain', 2], ['flagged', 'Flagged', 4]]) {
+    await expect(filter.locator(`option[value="${mode}"]`)).toHaveText(`${label} (${count})`);
+    await filter.selectOption(mode);
+    await expect(page.locator('#human-filter-summary')).toContainText(`${count} of 12 frames`);
+    await expect(page.locator('#human-frame-number')).toHaveAttribute('max', String(count));
+  }
+  await page.locator('#human-frame-number').fill('1');
+  await page.locator('#human-frame-number').press('Enter');
+  await expect(page.locator('#human-frame-time')).toContainText('Sample 2 ·');
+  await expect(page.locator('#human-next')).toBeEnabled();
+  await page.locator('#human-next').click();
+  await expect(page.locator('#human-frame-time')).toContainText('Sample 4 ·');
+  await expect(page.locator('#human-play')).toBeEnabled();
+  await page.locator('#human-playback-speed').selectOption('1');
+  await page.locator('#human-play').click();
+  await expect(page.locator('#human-frame-time')).toContainText('Sample 6 ·');
+  await page.locator('#human-stop').click();
+  await expect(page.locator('#human-progress')).toContainText('0 of 4 frames done');
+  // Changing the view does not narrow the exported analysis.
+  expect((await analysisJSON(page)).frames).toHaveLength(12);
+});
+
+test('correcting filtered frames updates categories and an empty filter can return to All', async ({ page }) => {
+  await analyzeReviewCases(page);
+  const filter = page.locator('#human-frame-filter');
+  await filter.selectOption('ambiguous');
+  await expect(page.locator('#human-frame-time')).toContainText('Sample 4 ·');
+  await expect(page.locator('#human-edit-centers')).toBeEnabled();
+  await page.locator('#human-edit-centers').check();
+  const canvas = page.locator('#human-canvas');
+  let box = await canvas.boundingBox();
+  await canvas.click({ position: { x: box.width * .85, y: box.height * .8 } });
+  await page.locator('#human-apply-centers').click();
+  await expect(filter.locator('option[value="ambiguous"]')).toHaveText('Ambiguous (1)');
+  await expect(page.locator('#human-frame-time')).toContainText('Sample 8 ·');
+  await expect(filter).toHaveValue('ambiguous');
+  await filter.selectOption('missing');
+  await expect(page.locator('#human-frame-time')).toContainText('Sample 2 ·');
+  await expect(page.locator('#human-clear')).toBeEnabled();
+  box = await canvas.boundingBox();
+  await canvas.click({ position: { x: box.width * .5, y: box.height * .5 } });
+  await page.locator('#human-apply-centers').click();
+  await expect(page.locator('#human-empty-filter')).toBeVisible();
+  await expect(page.locator('#human-frame-workspace')).toBeHidden();
+  await expect(filter.locator('option[value="missing"]')).toHaveText('Missing (0)');
+  await expect(filter).toBeVisible();
+  await filter.selectOption('all');
+  await expect(page.locator('#human-frame-workspace')).toBeVisible();
+  await expect(page.locator('#human-frame-time')).toContainText('Sample 1 ·');
+  await expect(page.locator('#human-next')).toBeEnabled();
+});
+
 test('review playback supports speed, stop, and spacebar without marking frames done', async ({ page }) => {
   await analyzeVideo(page);
   const play = page.locator('#human-play');
@@ -40,6 +126,7 @@ test('review playback supports speed, stop, and spacebar without marking frames 
   await page.keyboard.press('Space');
   await expect(stop).toBeDisabled();
   // A held Space must not toggle repeatedly, including with Play focused.
+  await expect(play).toBeEnabled();
   await play.focus();
   await page.keyboard.down('Space');
   await expect(stop).toBeEnabled();

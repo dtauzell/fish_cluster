@@ -17,7 +17,7 @@ const helpText = {
   'crop-width': 'Width of the tank crop in original video pixels, at least 30. Keep the crop inside the frame, then click Apply crop.',
   'crop-height': 'Height of the tank crop in original video pixels, at least 30. Include the swimming area, then click Apply crop.',
   'cluster-distance': 'Adjust the link distance in the selected units to recalculate groups and spacing metrics from the existing centers. The chart shows the selected frame.',
-  'human-frame-filter': 'Show included results, all sampled frames, or frames whose original automatic candidate count differs from the known fish count. Includes frames skipped by the analysis count filter and candidates excluded by the crop-center rule. Corrected frames stay in this subset for checking.',
+  'human-frame-filter': 'Filter the current results by All, Missing (no centers), Ambiguous (unresolved candidate selection), Uncertain (uncertain or estimated positions), or Flagged (any of those issues). Applied corrections update these categories. Included results and original count mismatches remain available. Navigation and playback follow this view; filtering does not change summary or export inclusion.',
   'human-expected-fish': 'Number of real fish in this recording, used to find count mismatches in review. Starts with the known count from setup. Changing this review count does not rerun detection.',
   'human-frame-number': 'Jump to a frame by its position in the current review view, starting at 1. The original sampled-frame number is shown beside the time.',
   'human-slider': 'Move through the current review view to check detections and place your own fish-center marks.',

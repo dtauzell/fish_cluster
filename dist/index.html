@@ -119,7 +119,11 @@
         <h1 id="human-title" class="visually-hidden">Analyze and correct frames</h1>
         <div class="human-layout">
           <div class="human-review-panel">
-
+            <div class="human-review-filter">
+              <label>Frames<select id="human-frame-filter" aria-describedby="human-filter-summary"><option value="all">All</option><option value="missing">Missing</option><option value="ambiguous">Ambiguous</option><option value="uncertain">Uncertain</option><option value="flagged">Flagged</option><option value="included">Included in results</option><option value="mismatches">Count mismatches</option></select></label>
+              <label>Review count (override)<input id="human-expected-fish" type="number" min="1" step="1" value="5"></label>
+              <p id="human-filter-summary" class="human-help" role="status"></p>
+            </div>
             <p id="human-empty-filter" class="human-help" hidden>No samples in this view. Choose another frame filter to continue.</p>
             <div id="human-frame-workspace">
           <div id="timeline" class="timeline" hidden><div class="timeline-head"><strong id="timeline-title">Group changes</strong><span id="change-count">—</span></div><div id="side-timeline-details" hidden><strong id="side-timeline-current"></strong><p id="side-timeline-summary"></p><div class="side-timeline-legend"><span><i class="side-dark"></i>Dark</span><span><i class="side-light"></i>Light</span><span><i class="side-unknown"></i>Unknown</span></div></div><canvas id="change-timeline" width="1200" height="26" aria-label="Timeline of changes in group sizes; click to jump to a change"></canvas><div class="timeline-controls"><button id="previous-change" class="secondary" type="button" aria-label="Previous group change" title="Previous group change">←</button><button id="next-change" class="secondary" type="button" aria-label="Next group change" title="Next group change">→</button></div></div>
@@ -159,24 +163,12 @@
               <button id="human-copy-center-coordinates" class="secondary" type="button">Copy center coordinates</button>
               <span id="human-center-copy-status" class="human-help" role="status" aria-live="polite"></span>
             </div>
-<div class="human-review-filter">
-              <label>Frames<select id="human-frame-filter"><option value="included">Included in results</option><option value="all">All sampled frames</option><option value="mismatches">Count mismatches</option></select></label>
-              <label>Review count (override)<input id="human-expected-fish" type="number" min="1" step="1" value="5"></label>
-              <p id="human-filter-summary" class="human-help" role="status"></p>
-            </div>
             <p id="human-progress" role="status">0 frames done</p>
             <div id="human-review-complete" class="review-complete" role="status" hidden>
               <strong>Review complete for this view ✓</strong>
               <p>Export results to keep your work.</p>
               <button id="review-export-results" class="secondary" type="button">Export results</button>
             </div>
-            <details id="results-crops" class="result-exports">
-              <summary>Copy crop coordinates</summary>
-              <p class="human-help">Coordinates use the original video frame. Copy a crop or region to paste its values elsewhere.</p>
-              <div id="results-crop-list" class="results-crop-list"></div>
-              <button id="copy-all-crops" class="secondary" type="button">Copy all coordinates</button>
-              <span id="crop-copy-status" class="human-help" role="status" aria-live="polite"></span>
-            </details>
       <section id="results" class="results" hidden>
         <div class="results-head"><div><h2>Results summary</h2><p id="results-inclusion" class="human-help" role="status"></p></div></div>
         <div class="stat-grid shoaling-only">
@@ -224,6 +216,13 @@
             <p id="human-correction-status" class="human-help" aria-live="polite"></p>
             </details>
 <details class="review-summary"><summary>Frame details, review &amp; export</summary><button id="human-reviewed" class="secondary" type="button" disabled>Mark for re-review</button><p class="human-help">← / → Navigate · R Done &amp; next<br>Cmd/Ctrl+Z Undo mark</p><div id="human-frame-details" class="human-frame-details">—</div><p id="human-overlap-note" class="human-help" hidden></p><div class="human-legend"><span><i class="human-manual-dot"></i>Your centers</span><span><i class="human-auto-dot"></i>Automatic centers</span></div><p id="human-validation-summary" class="human-validation-summary">—</p><p class="human-help">Centers are matched one-to-one within 0.5 inch. Use the full-frame view to spot fish outside the analyzed crop. Marks outside the crop or inside red reflection masks are exported, but excluded from the comparison. Use Done &amp; next even when no fish are visible.</p><button id="human-export" class="secondary" type="button">Export review CSV ↓</button><p class="human-help">Manual marks stay in this browser tab until you reload it. Export them before leaving.</p></details>
+            <details id="results-crops" class="result-exports">
+              <summary>Copy crop coordinates</summary>
+              <p class="human-help">Coordinates use the original video frame. Copy a crop or region to paste its values elsewhere.</p>
+              <div id="results-crop-list" class="results-crop-list"></div>
+              <button id="copy-all-crops" class="secondary" type="button">Copy all coordinates</button>
+              <span id="crop-copy-status" class="human-help" role="status" aria-live="polite"></span>
+            </details>
           </aside>
         </div>
       </section>
@@ -248,6 +247,7 @@
             <tr><th scope="row">Apply &amp; stay</th><td>Applies pending corrections, updates the summary, and marks the frame done while keeping it on screen. Available when there are unapplied edits.</td></tr>
             <tr><th scope="row">Download frame PNG</th><td>Saves the selected video image at its original resolution. It uses the current crop or full-frame view and leaves out drawn centers and overlays.</td></tr>
             <tr><th scope="row">Play / Stop</th><td>Plays sampled frames in the current view at the selected speed in frames per second. Spacebar starts or stops playback; Stop pauses on the current frame. Playback stops at the last frame; Play or Spacebar then restarts from the first. Navigating or editing stops playback. Playback does not mark frames done or apply edits. Loading may limit the playback speed.</td></tr>
+            <tr><th scope="row">Frames filter</th><td>All shows every sampled frame. Missing shows frames without detected centers. Ambiguous shows unresolved automatic candidate choices. Uncertain shows uncertain or estimated positions. Flagged combines Missing, Ambiguous and Uncertain without duplicates; categories can overlap. Applied corrections update these filters. Filtering changes navigation and playback; summary measurements and exports keep their usual inclusion rules.</td></tr>
           </tbody>
         </table>
         <table>

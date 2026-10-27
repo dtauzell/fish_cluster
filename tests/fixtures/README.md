@@ -1,5 +1,76 @@
 # Fish video regression images
 
+## Native-frame text-overlap sequences
+
+`lighter-dark-corner/` also stores `source-180-212.pgm.gz`,
+`source-370-392.pgm.gz`, and `source-1750-1810.pgm.gz`. They contain full tank
+crops at every native source frame in the named inclusive ranges. Each is a
+gzip-compressed sequence of lossless `P5\n491 182\n255\n` PGM images. Decode
+selects the original zero-based FFmpeg frames with `between(n, first-1, last-1)`,
+then `crop=491:182:452:111:exact=1`, RGBA, and application `grayscale()`, without
+FPS conversion. They share the 25 references documented below.
+
+The user confirmed a visible fish in all remaining missed examples, several
+crossing embossed text. Native frames 138–139, 195–203, 380–382 and 1776–1795
+exposed three gaps: a recovery search that skipped a usable 10-level outline,
+lettering obscuring the strongest core, and a visible head smaller than the
+ordinary 45-pixel region minimum. Tests require current image evidence and
+recent selected history; they never carry an old position through an empty
+frame. The intermediate outline is a fallback after the supported 8-level body,
+so it does not replace an already usable fuller body with a smaller patch.
+
+`single-fish-text-overlap.test.mjs` checks all 34 previously missed native
+frames and controls for stale, distant or rejected-only history, configured
+minimum area, scattered bright pixels, and recorded empty lettering. The latter
+uses the unmodified `(800,160,100,115)` rectangle from reference 10 with the rest
+of the tank held at its median, as in the earlier lettering regressions.
+
+## Faint dark-side sequence, native frames 132–136
+
+`lighter-dark-corner/source-120-145.pgm.gz` adds the full unmodified tank crops
+for native source frames 120–145 (one-based), selected with
+`select=between(n\,119\,144)` before the same exact FFmpeg crop and application
+RGBA-to-grayscale conversion as the corner fixtures below. It uses their shared
+25 reference samples. Each concatenated PGM has header `P5\n491 182\n255\n`.
+
+The user confirmed the visible fish in the dark area in frames 132–136.
+Frame 132's 229-pixel faint outline contains only 15 pixels beyond the learned
+range by 12 gray levels, including a connected patch of 12. This fails the
+normal 8% core requirement (19 pixels). Losing the observation also interrupts
+recovery in following frames. A bounded temporal recovery may now accept five
+connected stable core pixels at the same brightness cutoff, provided a recent
+selected observation matches position and size. Approximate observed body centers
+are `(853, 224)` in frame 132 and `(860, 206)` by frame 136.
+
+`single-fish-dark-gap.test.mjs` checks the recorded sequence and rejects stale,
+uncertain or incompatible history, learned variation, masked or absent fish
+pixels, and scattered bright noise without a connected stable core.
+
+## Faint corner fish with unrelated edge candidates, native frames 20–21
+
+`lighter-dark-corner/` contains full `491 × 182` grayscale tank crops from
+`single_fish_lighter_dark_part.mov`. `source-001-024.pgm.gz` stores the first 24
+native frames at 30 fps, without resampling. `background-samples.pgm.gz` stores
+25 reference images, choosing the nearest original source timestamp to
+`(i + 0.5) * 63.33 / 25`. The zero-based reference indices are
+38, 114, 190, 266, 342, 418, 494, 570, 646, 722, 798, 874, 950, 1026, 1102,
+1178, 1254, 1330, 1406, 1482, 1558, 1634, 1710, 1786, and 1862.
+
+Each gzip file is a sequence of concatenated `P5\n491 182\n255\n` PGM images.
+FFmpeg decodes original RGBA with `crop=491:182:452:111:exact=1` and no FPS
+conversion; the application's `grayscale()` converts the unmodified pixels.
+Tank and dark polygons match the angled-crop regressions below.
+
+The user identified the visible fish in the lower dark corner in native source
+frames 20–21 (0.633–0.667 seconds), around original `(863, 269)`. The earlier
+detector retained only brighter thin regions near the middle boundary and left
+edge. Those unrelated candidates blocked recovery of the faint fish despite
+its observed position in frame 19. The regression requires a current stable
+core and compatible recent observation to recover the body alongside the edge
+candidates, preserving those candidates for selection and the export audit.
+Negative controls reject stale, uncertain, split, distant or incompatible
+history, learned background variation, and images with the fish pixels removed.
+
 ## Low-contrast fish in the lighter dark-side recording
 
 `lighter-dark-low-contrast/` contains samples 1, 7–10, and 142–145 (one-based) of

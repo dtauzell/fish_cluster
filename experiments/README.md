@@ -1,5 +1,10 @@
 # Background subtraction trial
 
+For the current production detector's every-frame single-fish audit, see
+[single-fish-audit-report.md](single-fish-audit-report.md). Run
+`node experiments/audit-single-fish.mjs` to regenerate the local review gallery,
+per-frame CSV/JSON, and a comparison with normal 200 ms sampling.
+
 Run `python3 experiments/background_subtraction.py` from the repository root. It requires `ffmpeg`, NumPy, and SciPy.
 
 The script samples `fish.mov` at 5 frames/second (the app's default 200 ms interval), crops the tank to `(x=50, y=240, width=420, height=290)`, and forms a median grayscale background from all sampled frames. Darker regions with a difference of at least 24 gray levels are cleaned with binary morphology and filtered to areas of 45–2500 pixels. Exported coordinates refer to the original 540 × 960 video.

@@ -443,6 +443,12 @@ footer {
   padding-bottom: 8px;
   flex: none;
 }
+.human-review-panel .human-review-filter {
+  grid-template-columns: minmax(0, 1fr);
+}
+.human-review-panel .human-review-filter[data-mode="mismatches"] {
+  grid-template-columns: minmax(0, 1fr) 150px;
+}
 .human-review-filter input,.human-review-filter select {
   height: 34px;
   margin-top: 4px;

@@ -120,14 +120,20 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     const indices = visibleIndices();
     const mismatches = reviewFrameIndices(state.reviewFrames, 'mismatches', state.human.expectedFish).length;
     $('human-frame-filter').value = state.human.filter;
+    $('human-frame-filter').closest('.human-review-filter').dataset.mode = state.human.filter;
     $('human-expected-fish').closest('label').hidden = state.human.filter !== 'mismatches';
     $('human-expected-fish').value = state.human.expectedFish;
-    $('human-frame-filter').options[0].textContent = `Included in results (${state.frames.length})`;
-    $('human-frame-filter').options[1].textContent = `All sampled frames (${state.reviewFrames.length})`;
-    $('human-frame-filter').options[2].textContent = `Count mismatches (${mismatches})`;
-    $('human-filter-summary').textContent = state.human.filter === 'included'
-      ? `${indices.length} included · ${mismatches} original count mismatches`
-      : `${indices.length} samples · includes frames excluded from results`;
+    const labels = { all: 'All', missing: 'Missing', ambiguous: 'Ambiguous', uncertain: 'Uncertain', flagged: 'Flagged',
+      included: 'Included in results', mismatches: 'Count mismatches' };
+    for (const option of $('human-frame-filter').options) {
+      const count = reviewFrameIndices(state.reviewFrames, option.value, state.human.expectedFish, state.settings).length;
+      option.textContent = `${labels[option.value]} (${count})`;
+    }
+    const descriptions = { all: 'All sampled frames, including those excluded from results.',
+      missing: 'No detected centers in the current result.', ambiguous: 'The automatic choice between candidates is unresolved.',
+      uncertain: 'At least one uncertain or estimated position.', flagged: 'Missing, ambiguous or uncertain; each frame appears once.',
+      included: `${mismatches} original count mismatches.`, mismatches: 'Original candidate count differs from the review count.' };
+    $('human-filter-summary').textContent = `${indices.length} of ${state.reviewFrames.length} frames · ${descriptions[state.human.filter]}`;
     $('human-frame-workspace').hidden = !indices.length;
     $('human-empty-filter').hidden = indices.length > 0;
     $('human-slider').max = Math.max(0, indices.length - 1);
@@ -339,6 +345,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
       ++state.previewToken;
       state.human.index = null;
       state.human.loading = false;
+      updatePlaybackControls();
       $('human-download-frame').disabled = true;
       $('human-frame-details').textContent = 'No frames in this view.';
       $('human-overlap-note').hidden = true;
@@ -577,7 +584,8 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
       humanCsv(state.reviewFrames, state.human.marks, state.human.reviewed, state.settings), 'text/csv');
   });
   function refresh() {
-    updateReviewFilter();
+    const indices = updateReviewFilter();
+    if (!indices.includes(state.human.index)) return selectHumanFrame(state.human.index);
     if (state.human.index == null) return;
     updateHumanDetails();
     drawHumanFrame();

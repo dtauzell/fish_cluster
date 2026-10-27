@@ -15,7 +15,7 @@ class Control extends EventTarget {
   }
   click() { if (!this.disabled) this.dispatchEvent(new Event('click')); }
   setAttribute(key, value) { this.attributes.set(key, value); }
-  closest(selector) { return selector === 'label' ? this : null; }
+  closest(selector) { return ['label', '.human-review-filter'].includes(selector) ? this : null; }
   querySelectorAll() { return []; }
   querySelector() { return new Control(); }
   focus() {}
@@ -38,6 +38,9 @@ async function withReview(run) {
     assert.ok(controls.has(id), `Control ${id} exists in the page`);
     return controls.get(id);
   };
+  const filterHtml = html.match(/<select id="human-frame-filter"[^>]*>([\s\S]*?)<\/select>/)[1];
+  $('human-frame-filter').options = [...filterHtml.matchAll(/<option value="([^"]+)"/g)]
+    .map(match => ({ value: match[1] }));
   const saved = Object.fromEntries(['document', 'window', 'ResizeObserver'].map(key => [key, globalThis[key]]));
   const document = new Control();
   document.getElementById = $;
