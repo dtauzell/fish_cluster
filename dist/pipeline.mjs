@@ -2,7 +2,7 @@ import { analysisTankSide, darkZoneMask } from './tank-zones.mjs';
 import { selectCentralCandidates, selectSingleFishCandidate, selectSingleFishFromNextFrame } from './candidate-selection.mjs';
 import { candidateSharpness } from './sharpness.mjs';
 import { insideAnalysisArea, localExclusions, analysisPixelMask } from './region.mjs';
-import { normalizePredictions, sampleTimes } from './analysis.mjs';
+import { sampleTimes } from './analysis.mjs';
 import { detectBackgroundFish, medianBackground, backgroundVariation } from './background.mjs';
 import { frameMetrics } from './measurements.mjs';
 import { createFishTracker } from './tracking.mjs';
@@ -14,11 +14,11 @@ const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
 /**
  * Run detection without knowing about buttons, charts, or page state.
  *
- * The source supplies decoded pixels; prepareModel supplies an optional model.
+ * The source supplies decoded pixels from the local video.
  * Yield progress messages and completed frames so callers can keep partial results.
  * Crop-local centers become original-video coordinates before any measurements.
  */
-export async function* analyzeVideo({ config, duration, source, prepareModel, isStopped = () => false }) {
+export async function* analyzeVideo({ config, duration, source, isStopped = () => false }) {
   const times = sampleTimes(duration, config.intervalMs);
   const { crop } = config;
   const exclusions = localExclusions(crop, config.exclusions);
@@ -28,30 +28,23 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
   let previousFrame = null;
   let previousCandidates = null;
   let background = null;
-  let model = null;
-  const backgroundMode = config.method === 'background';
-  const tracker = backgroundMode && config.trackFish !== false ? createFishTracker(config.expectedFish) : null;
+  const tracker = config.trackFish !== false ? createFishTracker(config.expectedFish) : null;
 
-  if (backgroundMode) {
-    // At each pixel, the median of these samples estimates the stationary tank.
-    const sampleCount = Math.min(25, Math.max(1, Math.ceil(duration * 2)));
-    const samples = [];
-    for (let i = 0; i < sampleCount; i++) {
-      if (isStopped()) return;
-      await source.seekTo((i + 0.5) * duration / sampleCount);
-      samples.push(source.readGray(crop));
-      yield { type: 'status', progress: (i + 1) / sampleCount * 10,
-        message: `Building tank background · ${i + 1} of ${sampleCount} samples` };
-      await yieldToBrowser();
-    }
-    yield { type: 'status', progress: 10, message: 'Finding the median tank background…' };
-    background = medianBackground(samples);
-    if (config.suppressFlicker !== false && darkZones.some(Boolean)) variation = backgroundVariation(samples, crop.width, crop.height,
-      { excludeForegroundRuns: config.expectedFish === 1 });
-  } else {
-    yield { type: 'status', progress: 0, message: 'Preparing Roboflow model in this browser…' };
-    model = await prepareModel(config);
+  // At each pixel, the median of these samples estimates the stationary tank.
+  const sampleCount = Math.min(25, Math.max(1, Math.ceil(duration * 2)));
+  const samples = [];
+  for (let i = 0; i < sampleCount; i++) {
+    if (isStopped()) return;
+    await source.seekTo((i + 0.5) * duration / sampleCount);
+    samples.push(source.readGray(crop));
+    yield { type: 'status', progress: (i + 1) / sampleCount * 10,
+      message: `Building tank background · ${i + 1} of ${sampleCount} samples` };
+    await yieldToBrowser();
   }
+  yield { type: 'status', progress: 10, message: 'Finding the median tank background…' };
+  background = medianBackground(samples);
+  if (config.suppressFlicker !== false && darkZones.some(Boolean)) variation = backgroundVariation(samples, crop.width, crop.height,
+    { excludeForegroundRuns: config.expectedFish === 1 });
 
   for (const [frameIndex, timestampMs] of times.entries()) {
     if (isStopped()) return;
@@ -60,46 +53,32 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
     let detections;
     let rawPredictionCount;
 
-    if (backgroundMode) {
-      gray = source.readGray(crop);
-      // Only a complete, observed sample within 250 ms can support a merge.
-      // Estimated/split centers are never fed back as fresh observations.
-      const canReferencePrevious = previousFrame && timestampMs - previousFrame.timestampMs <= 250 &&
-        previousFrame.detections.length === config.expectedFish &&
-        previousFrame.detections.every(point => !point.splitFromBlob && !point.positionUncertain);
-      const previousDetections = canReferencePrevious ? previousFrame.detections.map(point => ({
-        ...point, x: point.x - crop.x, y: point.y - crop.y
-      })) : [];
-      const candidates = detectBackgroundFish(gray, background, crop.width, crop.height,
-        { expectedFish: config.expectedFish, preferCenter: config.preferCenter, exclusions, darkZones, analysisMask, backgroundVariation: variation, timestampMs,
-          ...(crop.polygon ? { edgeX: 0, edgeTop: 0, edgeBottom: 0 } : {}),
-          previousDetections, previousTimestampMs: canReferencePrevious ? previousFrame.timestampMs : undefined,
-          previousCandidates: (previousCandidates ?? []).map(point => ({ ...point,
-            x: point.x - crop.x, y: point.y - crop.y })),
-          previousCandidateTimestampMs: previousFrame?.timestampMs,
-          observedSizeReference: tracker?.sizeReference(timestampMs),
-          overlapSeedsFor: tracker && config.preferCenter
-            ? blobs => tracker.overlapSeeds(blobs, crop.width, timestampMs, crop) : undefined });
-      detections = candidates.map((candidate, index) => ({
-        detectionId: index + 1, className: 'fish candidate', confidence: 1, ...candidate
-      }));
-      rawPredictionCount = detections.length;
-    } else {
-      const bitmap = await source.readBitmap(crop);
-      let predictions;
-      try {
-        predictions = await model.engine.infer(model.workerId, bitmap);
-      } finally {
-        bitmap.close();
-      }
-      rawPredictionCount = Array.isArray(predictions) ? predictions.length : (predictions?.predictions?.length ?? 0);
-      detections = normalizePredictions(predictions, crop.width, crop.height, config.confidence);
-    }
+    gray = source.readGray(crop);
+    // Only a complete, observed sample within 250 ms can support a merge.
+    // Estimated/split centers are never fed back as fresh observations.
+    const canReferencePrevious = previousFrame && timestampMs - previousFrame.timestampMs <= 250 &&
+      previousFrame.detections.length === config.expectedFish &&
+      previousFrame.detections.every(point => !point.splitFromBlob && !point.positionUncertain);
+    const previousDetections = canReferencePrevious ? previousFrame.detections.map(point => ({
+      ...point, x: point.x - crop.x, y: point.y - crop.y
+    })) : [];
+    const candidates = detectBackgroundFish(gray, background, crop.width, crop.height,
+      { expectedFish: config.expectedFish, preferCenter: config.preferCenter, exclusions, darkZones, analysisMask, backgroundVariation: variation, timestampMs,
+        ...(crop.polygon ? { edgeX: 0, edgeTop: 0, edgeBottom: 0 } : {}),
+        previousDetections, previousTimestampMs: canReferencePrevious ? previousFrame.timestampMs : undefined,
+        previousCandidates: (previousCandidates ?? []).map(point => ({ ...point,
+          x: point.x - crop.x, y: point.y - crop.y })),
+        previousCandidateTimestampMs: previousFrame?.timestampMs,
+        observedSizeReference: tracker?.sizeReference(timestampMs),
+        overlapSeedsFor: tracker && config.preferCenter
+          ? blobs => tracker.overlapSeeds(blobs, crop.width, timestampMs, crop) : undefined });
+    detections = candidates.map((candidate, index) => ({
+      detectionId: index + 1, className: 'fish candidate', confidence: 1, ...candidate
+    }));
+    rawPredictionCount = detections.length;
 
     // Score the same decoded frame used for detection, in crop coordinates.
-    // Background mode reuses its grayscale image; model mode reads one on demand.
     if (detections.length) {
-      gray ??= source.readGray(crop);
       detections = detections.map(candidate => ({ ...candidate,
         ...candidateSharpness(gray, crop.width, crop.height, candidate, exclusions) }));
     }
@@ -112,14 +91,14 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
       previousFrame.selectionConfident !== false && !previousFrame.detections[0].positionUncertain &&
       previousFrame.detections[0].positionSource !== 'overlap-estimate'
       ? previousFrame.detections[0] : undefined;
-    const selected = backgroundMode && config.expectedFish === 1
+    const selected = config.expectedFish === 1
       ? selectSingleFishCandidate(detections, crop, { previousPoint: previousTrackPoint,
         predictedPoint: previousTrackPoint ? tracker?.selectionPrediction(timestampMs) : undefined })
-      : selectCentralCandidates(detections, crop, backgroundMode && config.preferCenter ? config.expectedFish : null);
+      : selectCentralCandidates(detections, crop, config.preferCenter ? config.expectedFish : null);
     // A unique current observation can disambiguate the preceding sample. Use
     // its original candidates, before selection introduced uncertainty flags.
     // Frames already yielded remain shared objects, as with track reacquisition.
-    if (backgroundMode && config.expectedFish === 1 && previousFrame &&
+    if (config.expectedFish === 1 && previousFrame &&
       frameIndex === previousFrame.frameIndex + 1 && timestampMs > previousFrame.timestampMs &&
       timestampMs - previousFrame.timestampMs <= 250 && previousCandidates?.length > 1 &&
       detections.length === 1 && selected.selectionConfident === true &&
@@ -144,8 +123,7 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
       metrics: frameMetrics(selected.detections, config, selected.rejectedDetections.length) };
     previousFrame = frame;
     previousCandidates = detections;
-    const preparationProgress = backgroundMode ? 10 : 0;
-    const progress = preparationProgress + (frameIndex + 1) / times.length * (100 - preparationProgress);
+    const progress = 10 + (frameIndex + 1) / times.length * 90;
     if (!framePassesCountFilter(frame, config)) {
       yield { type: 'skipped', frame, progress, frameIndex, total: times.length, fishCount: frame.detections.length,
         requiredFishCount: config.filterFrameCount };

@@ -64,24 +64,6 @@ export function matchPointsWithin(manual, automatic, tolerancePx) {
   return matches;
 }
 
-/** Keep fish boxes above the confidence cutoff and give both model response formats one shape. */
-export function normalizePredictions(predictions, width, height, minConfidence = 0) {
-  const list = Array.isArray(predictions) ? predictions : predictions?.predictions;
-  if (!Array.isArray(list)) throw new Error('The model returned an unexpected prediction format.');
-  return list.filter(p => {
-    const label = String(p.class ?? p.className ?? '').toLowerCase();
-    return !label || label.includes('fish');
-  }).map((p, index) => ({
-    detectionId: index + 1,
-    className: String(p.class ?? p.className ?? 'fish'),
-    confidence: Number(p.confidence ?? p.score ?? 1),
-    x: Number(p.bbox?.x ?? p.x), y: Number(p.bbox?.y ?? p.y),
-    width: Number(p.bbox?.width ?? p.width ?? 0), height: Number(p.bbox?.height ?? p.height ?? 0)
-  })).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y) &&
-    p.x >= 0 && p.x <= width && p.y >= 0 && p.y <= height &&
-    Number.isFinite(p.confidence) && p.confidence >= minConfidence);
-}
-
 /**
  * Measure distances and connected groups from detected centers, without image processing.
  * A chain A—B—C is one group when A is close to B and B is close to C,

@@ -67,7 +67,7 @@ window.cropCaptureCheck = await checkCropCapture();
 The `outputSha256` field fingerprints all retained frame data, including
 detections, excluded candidates, tracking metadata, and measurements. The browser
 check compares grayscale bytes across every analysis/background sample, then
-checks grayscale, bitmap, and decoded PNG pixels on several crop sizes and
+checks grayscale and decoded PNG pixels on several crop sizes and
 positions. It uses the included video's dimensions and crop.
 
 After the comparison also remove `dist/profile-video-baseline.mjs` and
@@ -121,7 +121,7 @@ conversion or graphics synchronization work.
 
 This harness times pipeline work and preview drawing. Full-page DOM updates and
 final results charts are not included; the accompanying report includes a
-separate normal-app wall-time measurement. Roboflow inference is not profiled.
+separate normal-app wall-time measurement.
 
 Remove the temporary serving links when finished:
 

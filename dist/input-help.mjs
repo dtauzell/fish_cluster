@@ -4,15 +4,10 @@ const helpText = {
   'filter-exact-count': 'Keep only sampled frames with exactly the selected number of detected fish. Other samples still help tracking, but are left out of results and exports.',
   'filter-frame-count': 'Required number of detected fish for a frame to appear in results. Set this to 5 to keep only five-fish frames.',
   threshold: 'Maximum center-to-center distance, in the selected distance units, for linking two fish. Linked fish form groups, including chains of links.',
-  'grid-pixels': 'Measure the width of one 0.5-inch grid square in the original video, in pixels. This converts pixel distances to approximate inches for either detection method.',
-  method: 'Background subtraction finds fish against a fixed tank background. Mark dark regions to also detect fish brighter than the floor. Roboflow uses the configured trained model and publishable key.',
+  'grid-pixels': 'Measure the width of one 0.5-inch grid square in the original video, in pixels. This converts pixel distances to approximate inches for background subtraction.',
   'expected-fish': 'Number of real fish in the tank. Background mode with one fish keeps the strongest foreground-contrast candidate; close choices remain uncertain. Larger counts guide overlap recovery and the optional crop-center rule.',
   'track-fish': 'Follow provisional fish paths across nearby samples. Identities may swap during overlap; dashed centers marked † are uncertain estimates.',
   'prefer-center': 'When candidates exceed the known fish count, keep those closest to the crop center. With one fish expected, foreground contrast takes precedence. Real fish near the edge may be excluded, so review the pink × marks.',
-  'model-slug': 'Roboflow project identifier, such as zebrafish_in_aquarium. Enter only the slug, without the workspace name or a URL.',
-  'model-version': 'Number of the trained model version from the Roboflow Models or Deploy tab.',
-  confidence: 'Minimum model confidence from 0 to 1. Lower values admit more detections, including possible false positives; higher values may miss fish.',
-  'publishable-key': 'Roboflow workspace publishable key used to load the model in your browser. Use a publishable key, never a private API key.',
   'crop-tool': 'Choose whether selecting on the preview selects the tank crop, marks a light/dark region, adds a reflection mask, or draws a line for distance calibration. Masks exclude those areas from every analyzed frame.',
   'selection-shape': 'Drag a rectangle, or click four corners in order around the edge for an angled tank, light/dark region, or reflection mask. Undo corner and Cancel corners adjust an unfinished selection.',
   'suppress-flicker': 'Learn the usual brightness range at each pixel from background samples. In dark regions, require a change outside that range. This reduces flickering fixtures without excluding fish that cross them. Turn off if faint fish are missed.',
@@ -30,14 +25,6 @@ const helpText = {
   'human-show-auto': 'Overlay the original automatic centers for comparison with edited or applied centers.',
   'human-show-sharpness': 'Show frame-local candidate IDs and sharpness scores. Compare scores within the same recording; they are not probabilities.',
   'human-show-nearest': 'Display each detected fish’s distance to its nearest detected neighbor, in approximate selected units using your grid calibration.',
-  'label-frame-number': 'Jump to a sampled training frame by number, starting at 1. Only frames marked labeled are included in the dataset.',
-  'label-slider': 'Browse the sampled training frames. Navigating past a frame does not mark it labeled.',
-  'label-tool': 'Click to add one box per real fish, or choose Move or resize to adjust existing boxes. Label overlapping fish separately and leave reflections unlabeled.',
-  'label-box-width': 'Width in pixels of the selected fish box, or the default width for new boxes when none is selected.',
-  'label-box-height': 'Height in pixels of the selected fish box, or the default height for new boxes when none is selected.',
-  'label-complete': 'Confirm that every real fish in this frame is boxed. Only confirmed frames enter the dataset; confirm an empty frame only when no real fish are visible.',
-  'label-step': 'Number of sampled frames to move with Previous, Next, or the arrow keys. A larger step lets you label frames farther apart.',
-  'label-progress-import': 'Restore a saved progress JSON for this video, crop, and interval. Restoring replaces this labeling project’s current marks, including drafts.'
 };
 
 let activeHelp;

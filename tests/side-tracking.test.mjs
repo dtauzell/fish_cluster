@@ -84,14 +84,19 @@ test('applied manual corrections update side tracking, exports, and adjacent cha
 });
 
 test('pipeline exports a light position outside the only marked dark region', async () => {
-  const settings = { ...config, crop: { x: 50, y: 100, width: 100, height: 100 }, method: 'roboflow', confidence: .5 };
-  const source = { seekTo: async () => {}, readGray: () => new Uint8Array(10000),
-    readBitmap: async () => ({ close() {} }) };
-  let count = 0;
-  const prepareModel = async () => ({ engine: { infer: async () =>
-    [{ class: 'fish', x: count++ % 2 ? 70 : 20, y: 50, width: 10, height: 10, confidence: 1 }] } });
+  const settings = { ...config, crop: { x: 50, y: 100, width: 100, height: 100 }, method: 'background' };
+  let reads = 0;
+  const source = { seekTo: async () => {}, readGray: () => {
+    const image = new Uint8Array(10000).fill(200);
+    const sample = reads++ - 1; // One background reference for this short clip.
+    if (sample >= 0) {
+      const left = sample % 2 ? 50 : 30;
+      for (let y = 45; y < 57; y++) for (let x = left; x < left + 12; x++) image[y * 100 + x] = 80;
+    }
+    return image;
+  } };
   const frames = [];
-  for await (const event of analyzeVideo({ config: settings, source, prepareModel, duration: .45 })) if (event.frame) frames.push(event.frame);
+  for await (const event of analyzeVideo({ config: settings, source, duration: .45 })) if (event.frame) frames.push(event.frame);
   assert.deepEqual(frames.map(frame => frame.detections[0].tankSide), ['light', 'dark', 'light']);
   assert.deepEqual(frames.map(frame => frame.metrics.lightSideCount), [1, 0, 1]);
   assert.equal(trackSingleFishSides(frames, settings).changes.length, 2);

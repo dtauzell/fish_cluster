@@ -7,6 +7,8 @@ node_modules/
 .wrangler/
 .npm/
 *.log
+playwright-report/
+test-results/
 
 # Local credentials
 .env
@@ -27,3 +29,4 @@ experiments/background_results/
 *.webm
 *.avi
 *.mkv
+!tests/browser/fixtures/moving-fish.webm

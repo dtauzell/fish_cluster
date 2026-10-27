@@ -63,31 +63,6 @@
   white-space: nowrap;
   max-width: 180px;
 }
-.tools-menu {
-  position: relative;
-  margin-left: 12px;
-}
-.tools-menu>summary {
-  font-size: 13px;
-  color: #bcece1;
-  cursor: pointer;
-  padding: 8px;
-}
-.tools-menu>div {
-  position: absolute;
-  right: 0;
-  top: 38px;
-  width: 245px;
-  background: #102832;
-  border: 1px solid #42636a;
-  padding: 14px;
-  border-radius: 10px;
-  box-shadow: 0 8px 30px #0006;
-}
-.tools-menu button {
-  width: 100%;
-  margin-bottom: 10px;
-}
 .workspace {
   grid-template-columns: 300px minmax(0,1fr);
   height: calc(100dvh - 88px);
@@ -208,9 +183,6 @@
 }
 .advanced-settings .fine-print {
   font-size: 12px;
-}
-.advanced-settings .model-settings {
-  margin: 14px 0;
 }
 .preview {
   display: flex;
@@ -645,9 +617,6 @@ footer {
   #workflow-summary {
     display: none;
   }
-  .tools-menu {
-    margin-left: auto;
-  }
   .workspace,.workspace[data-view=results] {
     height: auto;
     min-height: 0;
@@ -728,19 +697,6 @@ footer {
   .preview-detail .crop-fields button {
     grid-column: 1/-1;
   }
-}
-/* The training editor retains its existing canvas sizing. */
-#label-page .human-canvas-wrap {
-  display: grid;
-  place-items: center;
-  min-height: 230px;
-  overflow: hidden;
-}
-#label-page .human-canvas-wrap canvas {
-  width: 100%;
-  height: auto;
-  max-width: 100%;
-  max-height: none;
 }
 .dropzone.has-video {
   min-height: 68px;

@@ -9,7 +9,6 @@
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./style.css?v=29">
   <link rel="stylesheet" href="./about.css?v=1">
-  <link rel="stylesheet" href="./labeling.css?v=1">
   <link rel="stylesheet" href="./workspace.css?v=8">
   <script type="module" src="./app.mjs?v=44"></script>
   <script type="module" src="./offline.mjs"></script>
@@ -23,12 +22,11 @@
         <a id="nav-setup" href="#analysis" aria-current="page">Setup</a>
         <a id="nav-results" href="#results" aria-disabled="true">Results</a>
         <span id="test-name"></span><button id="change-test" class="secondary" type="button" aria-haspopup="dialog" aria-controls="test-change-dialog" hidden>Change test</button><span id="workflow-summary">Add a video to begin</span>
-        <details class="tools-menu"><summary>Tools</summary><div><button id="open-labeler" class="secondary" type="button" disabled>Label training frames</button><p class="fine-print">Uses your video, crop, and sampling interval.</p></div></details>
       </nav>
       <div class="top-links"><a href="#about">About the analysis</a><a href="https://github.com/dtauzell/fish_cluster" target="_blank" rel="noopener">Source code ↗</a></div>
     </header>
     <main>
-      <p id="offline-status" class="fine-print" role="status" title="Offline use includes background subtraction, review, labeling, and exports. Roboflow requires internet. Videos must be selected again after reopening.">Preparing offline access…</p>
+      <p id="offline-status" class="fine-print" role="status" title="Offline use includes background subtraction, review, and exports. Videos must be selected again after reopening.">Preparing offline access…</p>
       <section id="test-chooser" class="test-chooser panel" aria-labelledby="test-choice-title">
         <h1 id="test-choice-title">Choose your test</h1><p>Select the analysis for this experiment.</p>
         <div class="test-options"><button id="choose-shoaling" class="secondary" type="button"><strong>Shoaling</strong><span>Measure fish spacing, groups, and clustering.</span></button><button id="choose-light-dark" class="secondary" type="button"><strong>Light / dark</strong><span>Track one fish’s time on each side, switches, and speed.</span></button></div>
@@ -57,8 +55,7 @@
             <label class="center-option"><input id="filter-exact-count" type="checkbox" checked> Only include frames with exactly</label>
             <label>Required count (override)<input id="filter-frame-count" type="number" min="1" step="1" value="5"></label>
           </div>
-          <div class="fields method-settings"><label>Pixels per 0.5-inch square <span class="help">distance calibration for either method</span><input id="grid-pixels" type="number" min="0.000001" step="any" value="15.3"></label></div>
-          <div class="fields method-choice"><label>Detection method<select id="method"><option value="background" selected>Background subtraction · fixed tank</option><option value="roboflow">Roboflow model · internet required</option></select></label><p class="fine-print">Background subtraction works offline. Roboflow requires an internet connection to load its model.</p></div>
+          <div class="fields method-settings"><label>Pixels per 0.5-inch square <span class="help">distance calibration</span><input id="grid-pixels" type="number" min="0.000001" step="any" value="15.3"></label></div>
           <div id="background-settings" class="fields method-settings">
             <label class="center-option"><input id="suppress-flicker" type="checkbox" checked> Learn background flicker in dark regions</label>
             <p class="fine-print">Requires changes beyond the usual brightness range of each pixel, reducing flickering ridges and fixtures. Fish can still cross these areas. Turn off if faint fish are missed. Fixed bright details are already part of the background.</p>
@@ -69,18 +66,6 @@
             <p class="fine-print">Optional: only discard candidates when the count exceeds the known fish count. Pink × marks show excluded candidates. A real fish at the edge can also be excluded; check the choices in Results. Touching fish are checked before this rule chooses the nearest candidates. Splits can use two visible dark bodies or the preceding observed sample (up to 250 ms apart); † centers remain estimates. The center is the middle of the crop rectangle.</p>
             <p class="fine-print">Works best with a fixed camera. Include the fish’s swimming area, then mask wall reflections. Fewer blobs than the known count may mean missed or overlapping fish; extra blobs may come from tank edges or reflections.</p>
           </div>
-          <details class="model-settings" id="model-settings" open hidden>
-            <summary>Model settings <span>Roboflow InferenceJS</span></summary>
-            <div class="fields">
-              <label>Project slug<input id="model-slug" value="zebrafish_in_aquarium" spellcheck="false"></label>
-              <div class="two fields">
-                <label>Trained model version<input id="model-version" type="number" min="1" step="1" value="9"></label>
-                <label>Min. confidence <span class="help">0–1</span><input id="confidence" type="number" min="0" max="1" step="0.05" value="0.15"></label>
-              </div>
-              <label>Workspace publishable key<input id="publishable-key" type="password" autocomplete="off" value="rf_oMD6Rzqf9eaWxRtuLNa962C0anv1"></label>
-              <p class="fine-print">Using <a href="https://universe.roboflow.com/zebrafish-zxjvh/zebrafish_in_aquarium" target="_blank" rel="noopener">zebrafish_in_aquarium/9</a>, a trained YOLOv8n model for zebrafish. Enter a Roboflow workspace <strong>publishable key</strong>, never a private API key.</p>
-            </div>
-          </details>
           </details>
           </div>
           <div class="setup-actions">
@@ -236,37 +221,6 @@
           </aside>
         </div>
       </section>
-      <section id="label-page" class="human-page" hidden aria-labelledby="label-title">
-        <div class="human-head"><div><div class="eyebrow">TRAINING DATA</div><h1 id="label-title">Label fish in selected frames</h1><p id="label-source"></p><p>Click to place one box per real fish. Adjust each box to enclose the whole fish, including overlapping fish separately. Leave reflections unlabeled. Reflection masks from analysis do not apply here.</p></div><a class="secondary human-back" href="#analysis">← Back to analysis</a></div>
-        <div class="human-layout">
-          <div class="human-review-panel">
-            <div class="human-controls"><button id="label-prev" class="secondary" type="button">← Previous</button><label>Frame <input id="label-frame-number" type="number" min="1" step="1" value="1"></label><span id="label-frame-time">—</span><button id="label-next" class="secondary" type="button">Next →</button></div>
-            <input id="label-slider" type="range" min="0" max="0" value="0" aria-label="Labeling frame">
-            <div class="human-canvas-wrap"><canvas id="label-canvas" tabindex="0" aria-label="Click to add fish boxes; use Move or resize to adjust them"></canvas></div>
-            <div class="label-toolbar">
-              <label>Tool<select id="label-tool"><option value="add">Click to add fish</option><option value="edit">Move or resize boxes</option></select></label>
-              <label>Box width (px)<input id="label-box-width" type="number" min="1" step="1" value="35"></label>
-              <label>Box height (px)<input id="label-box-height" type="number" min="1" step="1" value="35"></label>
-              <button id="label-delete" class="secondary" type="button" disabled>Delete selected fish</button><button id="label-undo" class="secondary" type="button" disabled>Undo box edit</button><button id="label-clear" class="secondary" type="button" disabled>Clear this frame</button>
-            </div>
-            <div id="label-box-list" class="label-box-list" aria-label="Select a fish to edit"></div>
-            <p class="human-help">Choose a fish button to select an overlapping box. In Move or resize mode, drag inside a box to move it or drag a corner to resize it. Width and height also adjust the selected box. Editing a labeled frame makes it a draft until you mark it labeled again.</p>
-          </div>
-          <aside class="human-sidebar">
-            <h2>Choose training frames</h2><p id="label-progress"></p><p id="label-frame-state" aria-live="polite"></p>
-            <label class="label-complete"><input id="label-complete" type="checkbox"> This frame is labeled</label>
-            <button id="label-and-next" class="primary" type="button">Mark labeled &amp; next →</button>
-            <label class="label-step">Navigation step (frames)<input id="label-step" type="number" min="1" step="1" value="1"></label>
-            <button id="label-next-draft" class="secondary" type="button">Next unlabeled frame →</button>
-            <p class="human-help">You can skip any frames. Only explicitly labeled frames enter the dataset. Label an empty frame only when it contains no real fish. Arrow keys navigate; L toggles labeled status when you are not typing in a control.</p>
-            <button id="label-dataset-export" class="secondary" type="button" disabled>Export labeled dataset ZIP ↓</button>
-            <button id="label-progress-export" class="secondary" type="button">Save progress JSON ↓</button>
-            <label class="label-import">Restore progress JSON<input id="label-progress-import" type="file" accept=".json,application/json"></label>
-            <p class="human-help">Dataset ZIP: clean cropped PNGs, YOLO boxes, and a JSON annotation manifest. Skipped and draft frames are excluded. Save progress JSON includes drafts and images for resuming with this video, crop, and interval; restoring it replaces this labeling project's current marks.</p>
-            <p id="label-save-status" class="human-help" role="status"></p><p id="label-status" class="status" role="status" aria-live="polite"></p>
-          </aside>
-        </div>
-      </section>
       <section id="about-page" hidden aria-label="About the analysis"><div id="about-content" class="about-main">Loading the method guide…</div></section>
     </main>
     <dialog id="test-change-dialog" class="review-help-dialog test-change-dialog" aria-labelledby="test-change-title" aria-describedby="test-change-help">
@@ -304,8 +258,8 @@
         <p>Progress above the summary shows how many frames are done in the current view. When it says <strong>Review complete</strong>, export results to keep your work. Editing a completed frame makes it unfinished again.</p>
       </div>
     </dialog>
-    <footer><span>FISHCLUSTER / LOCAL VIDEO ANALYSIS</span><span><a href="#about">About the analysis</a> · <a href="https://github.com/dtauzell/fish_cluster" target="_blank" rel="noopener">Source code ↗</a> · <a href="./background-test.html">Background subtraction test</a> · Optional model: <a href="https://roboflow.com/" target="_blank" rel="noopener">Roboflow InferenceJS</a></span></footer>
-    <div class="refresh-tools"><button id="force-refresh" class="secondary" type="button">Force refresh</button><span id="app-version" class="fine-print" aria-live="polite">Version loading…</span><span id="refresh-status" class="fine-print" role="status" aria-live="polite">Load the latest app version. Saved setups and labeling progress are kept.</span></div>
+    <footer><span>FISHCLUSTER / LOCAL VIDEO ANALYSIS</span><span><a href="#about">About the analysis</a> · <a href="https://github.com/dtauzell/fish_cluster" target="_blank" rel="noopener">Source code ↗</a> · <a href="./background-test.html">Background subtraction test</a></span></footer>
+    <div class="refresh-tools"><button id="force-refresh" class="secondary" type="button">Force refresh</button><span id="app-version" class="fine-print" aria-live="polite">Version loading…</span><span id="refresh-status" class="fine-print" role="status" aria-live="polite">Load the latest app version. Saved setups and trial summaries are kept.</span></div>
   </div>
 </body>
 </html>

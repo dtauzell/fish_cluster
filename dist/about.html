@@ -26,7 +26,7 @@
       </div>
 
       <nav class="about-toc" aria-label="On this page">
-        <a href="#sampling">Sampling</a><a href="#background">Background detection</a><a href="#model">Roboflow detection</a><a href="#positions">Positions and inches</a><a href="#groups">Clusters</a><a href="#validation">Checking results</a>
+        <a href="#sampling">Sampling</a><a href="#background">Background detection</a><a href="#positions">Positions and inches</a><a href="#groups">Clusters</a><a href="#validation">Checking results</a>
       </nav>
 
       <section id="sampling" class="about-section">
@@ -49,13 +49,8 @@
         </div>
       </section>
 
-      <section id="model" class="about-section">
-        <div class="about-number">03 / DETECTION</div>
-        <div><h2>Roboflow model</h2><p>The optional method runs a trained Roboflow model in the browser on the selected crop. The app keeps predictions labeled as fish (or predictions without a label), requires a valid position inside the crop, and applies the chosen minimum confidence. The reported position is the center coordinate provided for the model’s bounding box. The app then adds the crop offset so it matches the original video frame.</p><p>The default project setting points to <a href="https://universe.roboflow.com/zebrafish-zxjvh/zebrafish_in_aquarium" target="_blank" rel="noopener">zebrafish_in_aquarium/9</a>. This option needs the model assets and a publishable key. Its missed boxes and false boxes affect all later measurements. The known fish count is only used by background subtraction.</p></div>
-      </section>
-
       <section id="positions" class="about-section">
-        <div class="about-number">04 / MEASUREMENT</div>
+        <div class="about-number">03 / MEASUREMENT</div>
         <div><h2>From pixels to inches</h2><p>All spacing uses straight-line distance between detection centers: horizontal and vertical pixel differences are combined with the Pythagorean formula. To express that distance in inches, enter how many pixels span one 0.5-inch square of the paper grid.</p>
           <div class="formula"><span>pixels per inch</span><strong>= 2 × pixels per 0.5-inch square</strong><span>distance in inches</span><strong>= center distance in pixels ÷ pixels per inch</strong></div>
           <p>You can also click <strong>Draw calibration line</strong> below the preview, drag along a known distance, enter its actual length in inches, and click <strong>Use this scale</strong>. The app divides the line’s length in original-video pixels by its length in inches and fills in the equivalent half-inch-square calibration. Existing distance results update without rerunning detection. Measuring several squares near the swimming area helps reduce endpoint error.</p>
@@ -64,7 +59,7 @@
       </section>
 
       <section id="groups" class="about-section">
-        <div class="about-number">05 / CLUSTERING</div>
+        <div class="about-number">04 / CLUSTERING</div>
         <div><h2>How groups are counted</h2><p>For one frame, the app checks every pair of detection centers. It draws a link when their distance is at or below the chosen close distance. Fish connected directly <em>or through other fish</em> belong to one group. A group of two or more counts as a cluster; a single unlinked detection counts as isolated.</p>
           <div class="group-example" role="img" aria-label="Three fish form one group because each neighboring pair is linked, even though the outer fish are not directly linked"><span class="fish-dot">A</span><span class="fish-link"></span><span class="fish-dot">B</span><span class="fish-link"></span><span class="fish-dot">C</span></div>
           <p>In this example, A and C can be farther apart than the close distance and still be in the same group through B. The smallest distance that makes every detected fish one group is the longest link needed to connect them all, not the largest pair distance.</p>
@@ -74,16 +69,16 @@
       </section>
 
       <section id="validation" class="about-section">
-        <div class="about-number">06 / INTERPRETATION</div>
+        <div class="about-number">05 / INTERPRETATION</div>
         <div><h2>How to check a result</h2><p>First inspect the colored centers on the video. Count visible fish and check whether each center lands on one fish. Then inspect frames around timeline changes; a brief count change may be a merged fish or reflection. Finally, move the close-distance slider slightly. If the group count changes with a tiny adjustment, that frame sits near the chosen boundary.</p><p>After analysis, the <strong>Results</strong> workspace shows groups, measurements, and corrections together. Enable <strong>Edit centers</strong> to start from the current detections; click a center to remove it or an empty position to add one. You can show the automatic centers for comparison, mark frames reviewed, and export your marks and frame-level counts. To correct a frame, check all its centers and choose “Done &amp; next” to apply and continue, or “Apply &amp; stay” to inspect the updated measurements. Draft edits do not affect measurements until applied. This replaces its centers in measurements and exports; applying no marks sets its count to zero. “Restore automatic centers” undoes the change. Original automatic candidates remain in JSON and in the diagnostic comparison. Corrections affect only this frame; they do not rerun tracking. Distances and groups otherwise include uncertain estimated positions. The full-frame toggle lets you mark fish outside the analyzed crop; these are exported separately and excluded from the cluster comparison. Include crowded, isolated, reflection, and crop-edge cases. A matching fish count alone can hide a misplaced detection.</p><p>“Average pair distance” is the mean of all center-to-center pairs in each frame, averaged over frames with at least two detections. “Detections near another” is the share whose nearest detected neighbor is within the close distance. The random-spacing comparison places the same number of points uniformly inside the unmasked part of the crop 399 times and compares each frame’s mean nearest-neighbor distance with those simulations. It is a per-frame reference, not proof that the whole video is statistically clustered; adjacent frames are related, and the random placements ignore fish size and tank behavior.</p><p class="about-note">For a stronger validation, label a representative set of frames by hand. Compare detected counts, centers, and cluster assignments with those labels before interpreting the whole video.</p></div>
       </section>
-    <section id="reflection-masks" class="about-section"><div class="about-number">07 / REFLECTION MASKS</div><div><h2>Fish above the floor and reflection masks</h2><p>The crop is a boundary in the camera image, not a boundary on the tank floor. Include the space where fish swim, including fish appearing beyond the floor edge. In the preview, choose “Mask reflection area” and outline reflections or fixtures using rectangle or four-corner mode, then analyze again. Red masks apply to every sampled frame and to either detection method. They also exclude real fish that swim into them; a fixed mask cannot separate a fish and reflection in the same image area.</p><p>Human marks inside masks remain exportable but are excluded from automatic comparisons. The random-spacing reference uses only the unmasked portion of the crop. JSON settings include mask shapes and their corners.</p></div></section>
+    <section id="reflection-masks" class="about-section"><div class="about-number">06 / REFLECTION MASKS</div><div><h2>Fish above the floor and reflection masks</h2><p>The crop is a boundary in the camera image, not a boundary on the tank floor. Include the space where fish swim, including fish appearing beyond the floor edge. In the preview, choose “Mask reflection area” and outline reflections or fixtures using rectangle or four-corner mode, then analyze again. Red masks apply to every sampled frame and to detection. They also exclude real fish that swim into them; a fixed mask cannot separate a fish and reflection in the same image area.</p><p>Human marks inside masks remain exportable but are excluded from automatic comparisons. The random-spacing reference uses only the unmasked portion of the crop. JSON settings include mask shapes and their corners.</p></div></section>
       <section id="sharpness" class="about-section">
-        <div class="about-number">08 / SHARPNESS DIAGNOSTICS</div>
+        <div class="about-number">07 / SHARPNESS DIAGNOSTICS</div>
         <div><h2>Can blur identify reflections?</h2><p>Candidate labels can show an S score: higher values usually mean sharper local edges. The score is the variance of a Laplacian edge filter on original grayscale pixels around the candidate, with three pixels of padding. It is not a probability or a 0–100 scale. Real fish can be blurred by motion or focus, and reflections can be sharp. Contrast, noise, and the paper grid can also affect scores.</p><p>In Results, open “Diagnostics: fish & reflections” to label individual candidates, inspect local contrast, compare median scores across frames, and export the comparison CSV. These labels do not filter detections or change measurements. Leave suspected reflection areas unmasked for a diagnostic run so those candidates can be scored. An asterisk marks a patch clipped by the crop or a mask; a dash means a score is unavailable.</p></div>
       </section>
       <section id="center-selection" class="about-section">
-        <div class="about-number">09 / OPTIONAL CANDIDATE SELECTION</div>
+        <div class="about-number">08 / OPTIONAL CANDIDATE SELECTION</div>
         <div><h2>Prefer candidates near the tank center</h2><p>Background mode can keep the candidates nearest the middle of the selected crop when there are more than the known fish count. Before this selection, unusually large central regions are checked for a touching
 pair even when reflections have already filled the candidate count. A dagger (†)
 marks an estimated split; inspect both centers against the video. Splitting is

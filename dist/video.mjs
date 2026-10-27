@@ -23,19 +23,13 @@ export function createVideoSource(video) {
   }
 
   function readGray(crop) {
-    // Read back only the tank crop. Keep a separate buffer so model bitmaps and
-    // labeling PNGs can use the full-frame canvas without resizing it each time.
+    // Read only the tank crop; keep PNG capture on a separate full-frame canvas.
     if (grayCanvas.width !== crop.width || grayCanvas.height !== crop.height) {
       grayCanvas.width = crop.width;
       grayCanvas.height = crop.height;
     }
     grayContext.drawImage(video, crop.x, crop.y, crop.width, crop.height, 0, 0, crop.width, crop.height);
     return grayscale(grayContext.getImageData(0, 0, crop.width, crop.height));
-  }
-
-  function readBitmap(crop) {
-    capture();
-    return createImageBitmap(canvas, crop.x, crop.y, crop.width, crop.height);
   }
 
   function readPng(crop) {
@@ -99,5 +93,5 @@ export function createVideoSource(video) {
     });
   }
 
-  return { showFirstFrame, seekTo, seekToDrawableFrame, readGray, readBitmap, readPng };
+  return { showFirstFrame, seekTo, seekToDrawableFrame, readGray, readPng };
 }

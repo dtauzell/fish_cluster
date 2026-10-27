@@ -162,9 +162,9 @@ test('a failed download cannot replace an existing offline installation', async 
   assert.deepEqual([...worker.stores.keys()], [oldCache]);
 });
 
-test('remote models, local videos, other routes, and non-GET requests are not intercepted', () => {
+test('remote assets, local videos, other routes, and non-GET requests are not intercepted', () => {
   const worker = workerHarness();
-  for (const url of ['https://cdn.jsdelivr.net/model.js', 'blob:https://fish.example/video',
+  for (const url of ['https://cdn.example/library.js', 'blob:https://fish.example/video',
     'https://fish.example/other/index.html', `${worker.scope}missing.html`]) {
     assert.equal(worker.request(url), undefined);
   }

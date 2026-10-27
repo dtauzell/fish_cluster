@@ -4,8 +4,14 @@
   "type": "module",
   "scripts": {
     "offline:prepare": "node scripts/offline-assets.mjs",
-    "deploy": "npm run offline:prepare && npm test && npx wrangler pages deploy dist --project-name fish-cluster --branch main",
+    "deploy": "npm run offline:prepare && npm run test:all && npx wrangler pages deploy dist --project-name fish-cluster --branch main",
     "dev": "node dev-server.mjs",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "test:all": "npm test && npm run test:browser",
+    "test:browser": "playwright test",
+    "test:browser:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
   }
 }

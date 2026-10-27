@@ -22,7 +22,7 @@ export async function checkCropCapture(videoUrl = '/profile-source.mov') {
   await loaded;
   const baseline = createBaselineSource(video);
   const candidate = createVideoSource(video);
-  const result = { videoSeconds: video.duration, grayComparisons: 0, bitmapComparisons: 0,
+  const result = { videoSeconds: video.duration, grayComparisons: 0,
     pngComparisons: 0, comparedBytes: 0, differingBytes: 0, failures: [] };
   function compare(a, b, label) {
     let differences = 0;
@@ -58,7 +58,7 @@ export async function checkCropCapture(videoUrl = '/profile-source.mov') {
       if (index % 50 === 0) globalThis.cropCaptureCheckProgress = { compared: index + 1, total: times.length };
     }
     // Include full-frame, odd-position, narrow, and edge-touching crops. Exercise
-    // resizing between grayscale capture and the bitmap/PNG export paths.
+    // resizing between grayscale capture and the PNG export path.
     const crops = [crop, { x: 0, y: 0, width: video.videoWidth, height: video.videoHeight },
       { x: 51, y: 241, width: 225, height: 301 },
       { x: 0, y: 0, width: 1, height: video.videoHeight },
@@ -69,13 +69,6 @@ export async function checkCropCapture(videoUrl = '/profile-source.mov') {
         const label = `${timestampMs}:${JSON.stringify(region)}`;
         compare(baseline.readGray(region), candidate.readGray(region), `gray:${label}`);
         result.grayComparisons++;
-        const originalBitmap = await baseline.readBitmap(region);
-        const croppedBitmap = await candidate.readBitmap(region);
-        if (originalBitmap.width !== croppedBitmap.width || originalBitmap.height !== croppedBitmap.height) {
-          result.failures.push({ label: `bitmap dimensions:${label}` });
-        }
-        compare(bitmapPixels(originalBitmap), bitmapPixels(croppedBitmap), `bitmap:${label}`);
-        result.bitmapComparisons++;
         const originalPng = await baseline.readPng(region);
         const croppedPng = await candidate.readPng(region);
         compare(bitmapPixels(await createImageBitmap(originalPng)), bitmapPixels(await createImageBitmap(croppedPng)), `png:${label}`);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calibrationFromLine, analyzeFrame, cropFitsFrame, inchesToPixels, mapCanvasPoint, matchPointsWithin, nearestNeighborLinks, sampleTimes, summarizeFrames, normalizePredictions, randomSpacingReference, spacingPercentile } from '../dist/analysis.mjs';
+import { calibrationFromLine, analyzeFrame, cropFitsFrame, inchesToPixels, mapCanvasPoint, matchPointsWithin, nearestNeighborLinks, sampleTimes, summarizeFrames, randomSpacingReference, spacingPercentile } from '../dist/analysis.mjs';
 
 test('nearest links include each fish and draw mutual nearest pairs once', () => {
   const points = [{ x: 0, y: 0 }, { x: 3, y: 4 }, { x: 3, y: 14 }];
@@ -83,19 +83,6 @@ test('empty and single-fish frames do not invent distances', () => {
   assert.equal(analyzeFrame([], 10).meanPairDistancePx, null);
   assert.equal(analyzeFrame([{ x: 1, y: 1 }], 10).meanNearestDistancePx, null);
   assert.equal(summarizeFrames([{ metrics: analyzeFrame([], 10) }]).meanPairDistancePx, null);
-});
-
-test('only valid fish center coordinates are recorded', () => {
-  const predictions = [{ class: 'zebrafish', bbox: { x: 10, y: 20, width: 5, height: 8 }, confidence: .8 }, { class: 'tank', x: 2, y: 2 }, { class: 'fish', x: 200, y: 2 }];
-  assert.equal(normalizePredictions(predictions, 100, 100, .5).length, 1);
-});
-
-test('multiple Roboflow boxes remain separate fish', () => {
-  const predictions = [
-    { class: 'zebrafish', confidence: .4, bbox: { x: 25, y: 40, width: 12, height: 8 } },
-    { class: 'zebrafish', confidence: .3, bbox: { x: 75, y: 60, width: 13, height: 7 } }
-  ];
-  assert.deepEqual(normalizePredictions(predictions, 100, 100, .15).map(p => p.x), [25, 75]);
 });
 
 test('line calibration uses video pixels for horizontal, vertical, and reversed diagonal lines', () => {

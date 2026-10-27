@@ -11,7 +11,6 @@ import { TRACKING_METHOD } from './tracking.mjs';
 import { analyzeFrame, calibrationFromLine, cropFitsFrame, inchesToPixels, mapCanvasPoint, summarizeFrames } from './analysis.mjs';
 import { createSettings } from './settings.mjs';
 import { frameMetrics, groupSignature, changeFrames as findChangeFrames } from './measurements.mjs';
-import { createModelService, modelIdentity, modelErrorMessage } from './model.mjs';
 import { createVideoSource } from './video.mjs';
 import { createPreview } from './preview.mjs';
 import { fmt, timeLabel } from './format.mjs';
@@ -19,7 +18,6 @@ import { baseName, detectionsCsv, framesCsv, exportedSettings, exportedSharpness
 import { download } from './download.mjs';
 import { createHumanReview } from './human-ui.mjs';
 import { analyzeVideo } from './pipeline.mjs';
-import { createLabeling } from './labeling-ui.mjs';
 import { initializeInputHelp } from './input-help.mjs';
 import { framePassesCountFilter } from './frame-selection.mjs';
 import { createDistanceControls, distanceFromInches, distanceToInches } from './distance-controls.mjs';
@@ -59,7 +57,6 @@ let previewSeek = Promise.resolve();
 // The entry point owns page state and translates UI actions into service calls.
 const videoSource = createVideoSource(video);
 const { showFirstFrame, seekToDrawableFrame } = videoSource;
-const { prepare: prepareModel } = createModelService();
 const preview = createPreview(canvas, video);
 let lastPreviewFrame = null;
 const previewViewport = createCanvasViewport({ canvas, viewport: $('canvas-wrap'),
@@ -116,39 +113,13 @@ const { selectHumanFrame, indices: visibleResultIndices, refresh: refreshHumanFr
     refreshHumanFrame();
     status(`Results updated: ${state.frames.length} of ${state.reviewFrames.length} sampled frames included.`);
   } });
-const labeling = createLabeling({ canvas: $('label-canvas'), source: videoSource, isRunning: () => state.running,
-  queueSeek: (timestampMs, capture) => {
-    const token = ++state.previewToken;
-    previewSeek = previewSeek.catch(() => {}).then(async () => {
-      if (token !== state.previewToken) return;
-      await seekToDrawableFrame(timestampMs / 1000);
-      if (token === state.previewToken) await capture();
-    });
-    return previewSeek;
-  } });
-
-$('open-labeler').addEventListener('click', async () => {
-  if (!state.file || state.running || video.readyState < 2) return;
-  document.querySelector('.tools-menu').open = false;
-  const file = state.file;
-  $('open-labeler').disabled = true;
-  try {
-    await labeling.start({ video: { name: file.name, size: file.size, lastModified: file.lastModified,
-      width: video.videoWidth, height: video.videoHeight, duration: video.duration },
-      crop: state.crop ?? { x: 0, y: 0, width: video.videoWidth, height: video.videoHeight },
-      intervalMs: Number($('interval').value) });
-    if (state.file === file) location.hash = '#labeling';
-  } catch (error) { status(error.message, true); }
-  finally { $('open-labeler').disabled = state.running || !state.file || video.readyState < 2; }
-});
-
 function status(message, error = false) {
   $('status').textContent = message;
   $('status').classList.toggle('error', error);
 }
 window.addEventListener('unhandledrejection', event => {
   const detail = event.reason?.message ?? String(event.reason);
-  status(`Browser model error: ${detail}`, true);
+  status(`Browser error: ${detail}`, true);
 });
 function resetHuman() {
   state.human = { marks: new Map(), candidateLabels: new Map(), reviewed: new Set(), index: null, loading: false };
@@ -173,7 +144,6 @@ function clearResults() {
 function loadMetadata(file) {
   if (!file || state.running) return;
   if (state.file) experimentTools.refresh();
-  labeling.reset();
   ++state.previewToken;
   if (state.url) URL.revokeObjectURL(state.url);
   state.file = file;
@@ -206,19 +176,10 @@ function loadMetadata(file) {
   $('empty-preview').hidden = false;
   $('empty-preview').querySelector('strong').textContent = 'Loading first frame…';
   $('analyze').disabled = true;
-  $('open-labeler').disabled = true;
   status('Reading video metadata…');
 }
 
 $('video-file').addEventListener('change', e => loadMetadata(e.target.files[0]));
-function updateMethod() {
-  const background = $('method').value === 'background';
-  $('background-settings').hidden = !background;
-  $('model-settings').hidden = background;
-  clearResults();
-  if (state.file && !state.running) status(background ? 'Video ready. Check the tank crop, then analyze.' : 'Video ready. The Roboflow model will load when you analyze.');
-}
-$('method').addEventListener('change', updateMethod);
 const dropzone = $('dropzone');
 for (const type of ['dragenter', 'dragover']) dropzone.addEventListener(type, e => { e.preventDefault(); dropzone.classList.add('dragging'); });
 for (const type of ['dragleave', 'drop']) dropzone.addEventListener(type, e => { e.preventDefault(); dropzone.classList.remove('dragging'); });
@@ -258,18 +219,7 @@ video.addEventListener('loadedmetadata', async () => {
     return;
   }
   $('analyze').disabled = false;
-  $('open-labeler').disabled = false;
-  if ($('method').value === 'background') { status('Video ready. Check the tank crop, then analyze.'); return; }
-  status('Preparing model while you choose the tank area…');
-  try {
-    const config = settings();
-    prepareModel(config).then(model => {
-      const currentIdentity = modelIdentity({ projectSlug: $('model-slug').value.trim(), version: Number($('model-version').value), key: $('publishable-key').value.trim() });
-      if (!state.running && state.file === selectedFile && model.identity === currentIdentity) status('Model ready. Drag around the tank or analyze the full frame.');
-    }).catch(error => {
-      if (!state.running && state.file === selectedFile && $('method').value === 'roboflow') status(modelErrorMessage(error, config), true);
-    });
-  } catch (error) { status(error.message, true); }
+  status('Video ready. Check the tank crop, then analyze.');
 });
 video.addEventListener('error', () => status('The browser could not decode this video. Try an MP4 or WebM file.', true));
 
@@ -480,15 +430,10 @@ function settings() {
     filterFrameCount: Number($('filter-frame-count').value),
     thresholdInches: distanceControls.readInches(),
     gridPixels: Number($('grid-pixels').value),
-    method: $('method').value,
     expectedFish: state.testType === 'light-dark' ? 1 : Number($('expected-fish').value),
     preferCenter: $('prefer-center').checked,
     trackFish: $('track-fish').checked,
-    suppressFlicker: $('suppress-flicker').checked,
-    confidence: Number($('confidence').value),
-    versionText: $('model-version').value.trim(),
-    projectSlug: $('model-slug').value.trim(),
-    key: $('publishable-key').value.trim()
+    suppressFlicker: $('suppress-flicker').checked
   }, state.crop, video.videoWidth, video.videoHeight, state.exclusions, state.tankZones);
 }
 
@@ -563,7 +508,7 @@ $('analyze').addEventListener('click', async () => {
   try { config = settings(); } catch (error) { status(error.message, true); return; }
   if (Math.ceil(video.duration * 1000 / config.intervalMs) > 10000) { status('This setting would analyze over 10,000 frames. Increase the frame interval.', true); return; }
   state.running = true;
-  // An earlier Results or labeling seek can still be in flight. Invalidate its
+  // An earlier Results seek can still be in flight. Invalidate its
   // queued work and let the active seek finish before detection reads the video.
   ++state.previewToken;
   updateWorkflow();
@@ -583,8 +528,6 @@ $('analyze').addEventListener('click', async () => {
   $('cancel').hidden = false;
   $('results').hidden = true;
   $('video-file').disabled = true;
-  $('open-labeler').disabled = true;
-  $('method').disabled = true;
   $('prefer-center').disabled = true;
   $('track-fish').disabled = true;
   $('suppress-flicker').disabled = true;
@@ -595,11 +538,11 @@ $('analyze').addEventListener('click', async () => {
   $('calibration-tools').disabled = true;
   $('progress').hidden = false;
   $('progress').value = 0;
-  for (const id of ['expected-fish', 'interval', 'threshold', 'grid-pixels', 'model-slug', 'model-version', 'confidence', 'publishable-key']) $(id).disabled = true;
+  for (const id of ['expected-fish', 'interval', 'threshold', 'grid-pixels']) $(id).disabled = true;
   try {
     await previewSeek.catch(() => {});
     const events = analyzeVideo({
-      config, duration: video.duration, source: videoSource, prepareModel,
+      config, duration: video.duration, source: videoSource,
       isStopped: () => state.stopped
     });
     for await (const event of events) {
@@ -620,25 +563,20 @@ $('analyze').addEventListener('click', async () => {
       state.frames.push(frame);
       drawFrame(frame);
       $('empty-preview').hidden = true;
-      status(config.method === 'background'
-        ? `Analyzed ${frame.frameIndex + 1} of ${total} frames · ${frame.detections.length} fish candidates (known count ${config.expectedFish})${frame.rejectedDetections.length ? ` · ${frame.rejectedDetections.length} candidates excluded` : ''}`
-        : `Analyzed ${frame.frameIndex + 1} of ${total} frames · ${frame.detections.length} fish in current frame (${frame.rawPredictionCount} model boxes)`);
+      status(`Analyzed ${frame.frameIndex + 1} of ${total} frames · ${frame.detections.length} fish candidates (known count ${config.expectedFish})${frame.rejectedDetections.length ? ` · ${frame.rejectedDetections.length} candidates excluded` : ''}`);
     }
     state.analysisComplete = !state.stopped;
     if (state.reviewFrames.length) showResults();
-    const maxRawCount = Math.max(0, ...state.frames.map(frame => frame.rawPredictionCount));
     status(state.settings.filterExactCount && !state.frames.length && !state.stopped
       ? `No frames matched exactly ${state.settings.filterFrameCount} fish. Skipped all ${totalSamples} sampled frames.`
       : state.settings.filterExactCount && !state.stopped
         ? `Complete: kept ${state.frames.length} frames with exactly ${state.settings.filterFrameCount} fish; skipped ${skippedFrames} of ${totalSamples} samples.`
         : state.stopped ? `Stopped after ${state.frames.length} frames. Partial results are available.` :
-      config.method === 'background' ? `Complete: ${state.frames.length} frames analyzed with background subtraction.` :
-      maxRawCount <= 1 ? `Complete: ${state.frames.length} frames. Roboflow returned at most one box per frame; try a tank crop or lower confidence.` :
-      `Complete: ${state.frames.length} frames analyzed. Up to ${maxRawCount} model boxes in a frame.`);
+      `Complete: ${state.frames.length} frames analyzed with background subtraction.`);
   } catch (error) {
     analysisFailed = true;
     if (state.reviewFrames.length) showResults();
-    status(config.method === 'background' ? `Analysis stopped: ${error.message}` : modelErrorMessage(error, config), true);
+    status(`Analysis stopped: ${error.message}`, true);
   } finally {
     state.running = false;
     $('human-review-link').hidden = !state.reviewFrames.length;
@@ -646,8 +584,6 @@ $('analyze').addEventListener('click', async () => {
     $('cancel').hidden = true;
     $('progress').hidden = true;
     $('video-file').disabled = false;
-    $('open-labeler').disabled = video.readyState < 2;
-    $('method').disabled = false;
     $('prefer-center').disabled = false;
     $('track-fish').disabled = false;
     $('suppress-flicker').disabled = false;
@@ -656,7 +592,7 @@ $('analyze').addEventListener('click', async () => {
     $('crop-fields').disabled = false;
     $('mask-tools').disabled = false;
     $('calibration-tools').disabled = video.readyState < 2;
-    for (const id of ['expected-fish', 'interval', 'threshold', 'grid-pixels', 'model-slug', 'model-version', 'confidence', 'publishable-key']) $(id).disabled = false;
+    for (const id of ['expected-fish', 'interval', 'threshold', 'grid-pixels']) $(id).disabled = false;
     updateTestControls();
     experimentTools.refresh();
     updateWorkflow();
@@ -1018,33 +954,28 @@ $('preview-full').addEventListener('click', () => { state.focusTank = false; pre
 function showPage() {
   // Existing review bookmarks lead to the unified results workspace.
   if (location.hash === '#human-analysis') history.replaceState(null, '', `${location.pathname}${location.search}#results`);
-  if ((location.hash === '#results' && (!state.resultsReady || state.running)) ||
-      (location.hash === '#labeling' && !labeling.hasProject())) {
+  if (location.hash === '#results' && (!state.resultsReady || state.running)) {
     history.replaceState(null, '', `${location.pathname}${location.search}#analysis`);
   }
-  const nextView = location.hash === '#about' ? 'about' : location.hash === '#labeling' ? 'label'
-    : location.hash === '#results' ? 'results' : 'analysis';
-  if (activeView === 'label' && nextView !== 'label') labeling.leave();
+  const nextView = location.hash === '#about' ? 'about' : location.hash === '#results' ? 'results' : 'analysis';
   if (activeView) viewScroll.set(activeView, window.scrollY);
   activeView = nextView;
-  const results = nextView === 'results', about = nextView === 'about', label = nextView === 'label';
-  $('test-chooser').hidden = Boolean(state.testType) || about || label;
+  const results = nextView === 'results', about = nextView === 'about';
+  $('test-chooser').hidden = Boolean(state.testType) || about;
   $('workspace').hidden = nextView !== 'analysis' || !state.testType;
   $('workspace').dataset.view = 'setup';
   document.querySelector('.setup').hidden = nextView !== 'analysis';
   $('results').hidden = !results;
   $('human-page').hidden = !results;
   $('about-page').hidden = !about;
-  $('label-page').hidden = !label;
   for (const [id, view] of [['nav-setup', 'analysis'], ['nav-results', 'results']]) {
     if (nextView === view) $(id).setAttribute('aria-current', 'page');
     else $(id).removeAttribute('aria-current');
   }
   updateWorkflow();
-  document.title = label ? 'Label training frames — Fish Cluster' : about ? 'About the analysis — Fish Cluster'
+  document.title = about ? 'About the analysis — Fish Cluster'
     : results ? 'Results & corrections — Fish Cluster' : 'Fish Cluster — zebrafish video analysis';
   if (about) loadAbout();
-  else if (label) labeling.show();
   else if (results) selectHumanFrame(state.human.index ?? visibleResultIndices()[0]);
   else if (video.readyState >= 2) drawFrame(null);
   requestAnimationFrame(() => window.scrollTo(0, viewScroll.get(nextView) ?? 0));
@@ -1105,7 +1036,6 @@ const experimentTools = createExperimentTools({
 });
 video.addEventListener('loadedmetadata', () => experimentTools.onVideoLoaded());
 $('download-summary').addEventListener('click', () => download(`${baseName(state.file?.name)}-summary.csv`, lightDarkSummaryCsv(lightDarkReport(state.reviewFrames, state.settings)), 'text/csv'));
-updateMethod();
 updateTestControls();
 showPage();
 

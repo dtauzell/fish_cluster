@@ -4,9 +4,8 @@ Capturing only the selected tank crop reduced pipeline runtime by **15.1%** on
 the included video. The optimized capture is kept in `dist/video.mjs`.
 
 Grayscale reads now draw the video crop at its original pixel dimensions into
-a dedicated crop-sized canvas. Bitmap capture and training PNG export keep their
-original full-frame canvas, avoiding repeated resizing when those paths are
-used alongside grayscale reads. The detector, sampling, thresholds, and tracking
+a dedicated crop-sized canvas. PNG export keeps its original full-frame canvas, avoiding repeated resizing
+when used alongside grayscale reads. The detector, sampling, thresholds, and tracking
 algorithms are unchanged.
 
 ## Measurements
@@ -49,9 +48,7 @@ app timings. Video loading is excluded from all timings.
 
 The improvement is measured for this video, crop, and browser. Larger crops,
 other codecs, and other browser graphics backends may behave differently. A
-full-frame analysis has less opportunity to benefit. Roboflow runtime was not
-benchmarked; its bitmap path is unchanged, and the grayscale adapter uses its
-own buffer. The remaining large cost is seeking/waiting for video frames.
+full-frame analysis has less opportunity to benefit. The grayscale adapter uses its own buffer. The remaining large cost is seeking/waiting for video frames.
 
 Raw results: [crop-capture-results.json](crop-capture-results.json).
 Reproduction: [README.md](README.md).

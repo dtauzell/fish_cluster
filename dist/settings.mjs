@@ -5,11 +5,10 @@ import { darkZoneMask } from './tank-zones.mjs';
 
 /** Validate plain values and snapshot the crop so later edits cannot change a run. */
 export function createSettings(values, selectedCrop, frameWidth, frameHeight, selectedExclusions = [], selectedTankZones = []) {
-  const { intervalMs, thresholdInches, gridPixels, method, confidence, versionText, projectSlug, key } = values;
+  const { intervalMs, thresholdInches, gridPixels } = values;
   const testType = values.testType;
   if (testType != null && !['shoaling', 'light-dark'].includes(testType)) throw new Error('Choose a shoaling or light-dark test.');
   const expectedFish = testType === 'light-dark' ? 1 : values.expectedFish;
-  const version = Number(versionText);
   if (!Number.isInteger(intervalMs) || intervalMs < 1) throw new Error('Frame interval must be at least 1 ms.');
   if (!Number.isFinite(thresholdInches) || thresholdInches < 0.01) throw new Error('Close distance must be at least 0.01 inches.');
   if (!Number.isFinite(gridPixels) || gridPixels <= 0) throw new Error('Enter the number of pixels across one 0.5-inch square.');
@@ -44,7 +43,7 @@ export function createSettings(values, selectedCrop, frameWidth, frameHeight, se
   // Each grid square is half an inch, so two squares span one inch.
   const common = {
     ...(testType ? { testType } : {}),
-    method,
+    method: 'background',
     expectedFish,
     intervalMs,
     thresholdInches,
@@ -60,12 +59,5 @@ export function createSettings(values, selectedCrop, frameWidth, frameHeight, se
   if (testType !== 'light-dark' && values.filterExactCount && (!Number.isInteger(values.filterFrameCount) || values.filterFrameCount < 1)) {
     throw new Error('Required fish per frame must be a whole number of at least one.');
   }
-  if (method === 'background') {
-    return { ...common, expectedFish, preferCenter: values.preferCenter === true, trackFish: values.trackFish !== false, suppressFlicker: values.suppressFlicker !== false };
-  }
-  if (!(confidence >= 0 && confidence <= 1)) throw new Error('Confidence must be between 0 and 1.');
-  if (!versionText || !Number.isInteger(version) || version < 1) throw new Error('Enter a trained model version from Roboflow’s Models or Deploy tab.');
-  if (!projectSlug || projectSlug.includes('/')) throw new Error('Enter only the Roboflow project slug, without the workspace name.');
-  if (!key) throw new Error('Enter a Roboflow workspace publishable key.');
-  return { ...common, confidence, version, projectSlug, key };
+  return { ...common, preferCenter: values.preferCenter === true, trackFish: values.trackFish !== false, suppressFlicker: values.suppressFlicker !== false };
 }

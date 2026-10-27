@@ -5,27 +5,25 @@ import { createSettings } from '../dist/settings.mjs';
 
 const crop = { x: 50, y: 100, width: 60, height: 40 };
 const values = {
-  method: 'background', intervalMs: 200, thresholdInches: 1, gridPixels: 15,
-  expectedFish: 1, confidence: .5, projectSlug: 'fish', versionText: '9', key: 'test'
+  intervalMs: 200, thresholdInches: 1, gridPixels: 15,
+  expectedFish: 1
 };
 const config = createSettings(values, crop, 200, 200);
 
-function modelSource(infer) {
-  const seeks = [];
-  const bitmaps = [];
-  return {
-    seeks, bitmaps,
-    source: {
-      readGray: () => new Uint8Array(crop.width * crop.height),
-      seekTo: async time => { seeks.push(time); },
-      readBitmap: async () => {
-        const bitmap = { closed: false, close() { this.closed = true; } };
-        bitmaps.push(bitmap);
-        return bitmap;
+function tankSource(counts, duration = .65) {
+  const seeks = [], references = Math.min(25, Math.max(1, Math.ceil(duration * 2)));
+  let reads = 0;
+  return { seeks, source: {
+    seekTo: async time => { seeks.push(time); },
+    readGray: () => {
+      const pixels = new Uint8Array(crop.width * crop.height).fill(200);
+      const sample = reads++ - references;
+      if (sample >= 0) for (let fish = 0; fish < (counts[sample] ?? 0); fish++) {
+        for (let y = 14; y < 24; y++) for (let x = 10 + fish * 22; x < 20 + fish * 22; x++) pixels[y * crop.width + x] = 60;
       }
-    },
-    prepareModel: async () => ({ workerId: 1, engine: { infer } })
-  };
+      return pixels;
+    }
+  } };
 }
 
 async function collect(options) {
@@ -35,10 +33,8 @@ async function collect(options) {
 }
 
 test('count-filter skips retain complete frames for review with original sample identities', async () => {
-  const counts = [1, 2, 0, 2];
-  const io = modelSource(async () => Array.from({ length: counts.shift() }, (_, i) =>
-    ({ class: 'fish', x: 15 + i * 12, y: 20, width: 8, height: 8, confidence: .8 })));
-  const events = (await collect({ ...io, config: { ...config, method: 'roboflow', confidence: .5,
+  const io = tankSource([1, 2, 0, 2]);
+  const events = (await collect({ ...io, config: { ...config, expectedFish: 2,
     filterExactCount: true, filterFrameCount: 2 }, duration: .65 })).filter(e => e.frame);
   assert.deepEqual(events.map(e => e.type), ['skipped', 'frame', 'skipped', 'frame']);
   assert.deepEqual(events.map(e => e.frame.frameIndex), [0, 1, 2, 3]);
@@ -56,11 +52,10 @@ test('settings validate units and snapshot the selected crop', () => {
   assert.equal(settings.pixelsPerInch, 30);
   assert.throws(() => createSettings({ ...values, intervalMs: 0 }, crop, 200, 200), /interval/);
   assert.throws(() => createSettings({ ...values, expectedFish: 0 }, crop, 200, 200), /fish count/);
-  assert.throws(() => createSettings({ ...values, method: 'roboflow', versionText: '' }, crop, 200, 200), /trained model version/);
 });
 
-test('model results retain the recording fish count independently of the inclusion override', () => {
-  const settings = createSettings({ ...values, method: 'roboflow', expectedFish: 8,
+test('results retain the recording fish count independently of the inclusion override', () => {
+  const settings = createSettings({ ...values, expectedFish: 8,
     filterExactCount: true, filterFrameCount: 3 }, crop, 200, 200);
   assert.equal(settings.expectedFish, 8);
   assert.equal(settings.filterFrameCount, 3);
@@ -94,34 +89,15 @@ test('background pipeline samples a tank, detects a region, and exports full-fra
   assert.equal(events.at(-1).progress, 100);
 });
 
-test('model pipeline filters predictions, translates coordinates and releases bitmaps', async () => {
-  const io = modelSource(async () => [
-    { class: 'fish', x: 10, y: 20, confidence: .8 },
-    { class: 'tank', x: 15, y: 15, confidence: .9 },
-    { class: 'fish', x: 20, y: 20, confidence: .1 }
-  ]);
-  const events = await collect({ ...io, config: { ...config, method: 'roboflow', confidence: .5 }, duration: .1 });
-  const { frame } = events.at(-1);
-  assert.equal(frame.rawPredictionCount, 3);
-  assert.equal(frame.detections.length, 1);
-  assert.equal(frame.detections[0].x, 60);
-  assert.equal(frame.detections[0].y, 120);
-  assert.equal(io.bitmaps[0].closed, true);
-});
-
 test('cancellation retains completed frames and stops before another seek', async () => {
-  const io = modelSource(async () => []);
+  const io = tankSource([1], 1);
   let stopped = false;
   const frames = [];
-  for await (const event of analyzeVideo({ ...io, config: { ...config, method: 'roboflow' },
-    duration: 1, isStopped: () => stopped })) {
-    if (event.type === 'frame') {
-      frames.push(event.frame);
-      stopped = true;
-    }
+  for await (const event of analyzeVideo({ ...io, config, duration: 1, isStopped: () => stopped })) {
+    if (event.type === 'frame') { frames.push(event.frame); stopped = true; }
   }
   assert.equal(frames.length, 1);
-  assert.deepEqual(io.seeks, [0]);
+  assert.deepEqual(io.seeks, [.25, .75, 0]);
 });
 
 test('cancel during background preparation skips detection', async () => {
@@ -135,32 +111,26 @@ test('cancel during background preparation skips detection', async () => {
   assert.equal(reads, 1);
 });
 
-test('inference failure releases its bitmap and preserves earlier yielded frames', async () => {
-  let count = 0;
-  const io = modelSource(async () => {
-    if (count++ > 0) throw new Error('inference failed');
-    return [];
-  });
+test('video decoding failure preserves earlier yielded frames', async () => {
+  const io = tankSource([1, 1]);
+  const seek = io.source.seekTo;
+  io.source.seekTo = async time => {
+    if (time === .2) throw new Error('Could not decode frame');
+    await seek(time);
+  };
   const frames = [];
   await assert.rejects(async () => {
-    for await (const event of analyzeVideo({ ...io, config: { ...config, method: 'roboflow' }, duration: 1 })) {
-      if (event.type === 'frame') frames.push(event.frame);
-    }
-  }, /inference failed/);
+    for await (const event of analyzeVideo({ ...io, config, duration: .65 })) if (event.frame) frames.push(event.frame);
+  }, /Could not decode frame/);
   assert.equal(frames.length, 1);
-  assert.ok(io.bitmaps.every(bitmap => bitmap.closed));
 });
 
-test('model pipeline excludes masked centers using original-video coordinates', async () => {
-  const io = modelSource(async () => [
-    { class: 'fish', x: 10, y: 20, confidence: .8 },
-    { class: 'fish', x: 40, y: 20, confidence: .8 }
-  ]);
-  const events = await collect({ ...io, config: { ...config, method: 'roboflow', confidence: .5,
-    exclusions: [{ x: 55, y: 110, width: 15, height: 20 }] }, duration: .1 });
-  assert.equal(events.at(-1).frame.rawPredictionCount, 2);
-  assert.deepEqual(events.at(-1).frame.detections.map(point => point.x), [90]);
-  assert.equal(io.bitmaps[0].closed, true);
+test('pipeline excludes masked fish while retaining original-video coordinates', async () => {
+  const io = tankSource([2], .1);
+  const events = await collect({ ...io, config: { ...config, expectedFish: 2,
+    exclusions: [{ x: 55, y: 110, width: 20, height: 20 }] }, duration: .1 });
+  assert.equal(events.at(-1).frame.detections.length, 1);
+  assert.equal(events.at(-1).frame.detections[0].x, 86.5);
 });
 
 test('background pipeline translates masks to crop pixels and keeps recovery out of them', async () => {
@@ -182,21 +152,6 @@ test('background pipeline translates masks to crop pixels and keeps recovery out
     duration: .1, source });
   assert.equal(events.at(-1).frame.detections.length, 0);
   assert.equal(events.at(-1).frame.metrics.countDifference, -1);
-});
-
-test('model pipeline scores original crop pixels before translating centers', async () => {
-  const io = modelSource(async () => [{ class: 'fish', x: 30, y: 20, width: 12, height: 8, confidence: .8 }]);
-  io.source.readGray = () => {
-    const image = new Uint8Array(crop.width * crop.height).fill(200);
-    for (let y = 16; y < 24; y++) for (let x = 24; x < 36; x++) image[y * crop.width + x] = 60;
-    return image;
-  };
-  const events = await collect({ ...io, config: { ...config, method: 'roboflow', confidence: .5 }, duration: .1 });
-  const candidate = events.at(-1).frame.detections[0];
-  assert.equal(candidate.x, crop.x + 30);
-  assert.ok(candidate.sharpness > 0);
-  assert.ok(candidate.localContrast > 0);
-  assert.equal(candidate.sharpnessClipped, false);
 });
 
 test('background center preference limits only excess candidates and retains scored rejects', async () => {

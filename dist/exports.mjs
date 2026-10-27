@@ -10,8 +10,7 @@ import { framePassesCountFilter, automaticCandidateCount } from './frame-selecti
 
 export function baseName(fileName) { return (fileName ?? 'fish-video').replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-') || 'fish-video'; }
 export function exportedSettings(settings, frameWidth, frameHeight) {
-  const { key, ...safe } = settings;
-  return { ...safe, frameWidth, frameHeight, modelReference: safe.projectSlug === 'zebrafish_in_aquarium' && safe.version === 9 ? 'https://universe.roboflow.com/zebrafish-zxjvh/zebrafish_in_aquarium' : null };
+  return { ...settings, frameWidth, frameHeight };
 }
 const positionColumns = ['position_source', 'position_uncertain', 'track_id',
   'track_last_observed_timestamp_ms', 'track_reacquired', 'track_reacquired_timestamp_ms', 'split_size_reference_area_px'];

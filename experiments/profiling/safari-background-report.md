@@ -85,8 +85,8 @@ The harness does not time the normal app's per-event DOM updates or final charts
 The separate normal-app measurement includes those costs and is a single run.
 Browser timers reported at roughly 1 ms resolution, so sub-millisecond individual
 call medians should not be interpreted as zero work. These results cover the
-default background method on this recording, not Roboflow, other videos, larger
-crops, other browsers, or a cold network model load. Skipped frames still undergo
+background subtraction on this recording, not other videos, larger crops, or
+other browsers. Skipped frames still undergo
 detection and tracking so the exact-five filter does not avoid their main cost.
 
 Raw measurements: [safari-background-results.json](safari-background-results.json).

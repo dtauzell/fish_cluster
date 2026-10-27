@@ -101,12 +101,11 @@ test('detection and frame exports preserve metrics and flag group-size changes',
   assert.equal(frameRows[1].groupSizes, '1+1');
 });
 
-test('exported settings omit the key and include original video dimensions', () => {
-  const settings = exportedSettings({ ...config, key: 'private', projectSlug: 'zebrafish_in_aquarium', version: 9 }, 540, 960);
-  assert.equal('key' in settings, false);
+test('exported settings include background configuration and original video dimensions', () => {
+  const settings = exportedSettings(config, 540, 960);
+  assert.equal(settings.method, 'background');
   assert.equal(settings.frameWidth, 540);
   assert.equal(settings.frameHeight, 960);
-  assert.match(settings.modelReference, /universe.roboflow.com/);
 });
 
 test('masked manual marks remain exported but do not count toward comparison', () => {

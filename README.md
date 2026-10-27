@@ -1,6 +1,6 @@
 # Fish Cluster
 
-A browser-only zebrafish tank video analyzer. It samples uploaded video at a chosen interval (200 ms by default), records candidate fish center coordinates, and calculates spacing and cluster metrics. Detection can use a locally built median background or an optional Roboflow model. The video is never uploaded by this application.
+A browser-only zebrafish tank video analyzer. It samples uploaded video at a chosen interval (200 ms by default), records candidate fish center coordinates, and calculates spacing and cluster metrics. Detection uses a locally built median background. The video is never uploaded by this application.
 
 ## Run locally
 
@@ -10,19 +10,60 @@ npm run dev
 
 Open <http://localhost:8000>. No install or build is required. Tests: `npm test`.
 
+## Browser regression tests
+
+Install the development dependency and matching test browser once:
+
+```sh
+npm ci
+npx playwright install chromium --only-shell
+```
+
+Then run the browser suite or all checks:
+
+```sh
+npm run test:browser
+npm run test:all
+```
+
+The Playwright suite runs Chromium against its own local server on port 8138;
+it does not use or modify a running `npm run dev` session. Override the port with
+`FISH_BROWSER_TEST_PORT` if needed. Each test gets isolated browser storage.
+The checked-in 1 KB synthetic video requires no user footage or FFmpeg install.
+The four browser regressions verify:
+
+- Physical distance survives unit switches before analysis; centimeter edits,
+  the Results slider, downloaded CSV/JSON, and reanalysis agree afterward.
+- Cancel, Escape, keeping the same test, and declining a switch preserve applied
+  corrections, review progress, and exported results. Confirming a different test
+  clears the old session.
+- A real service worker downloads release B while release A remains active, then
+  **Force refresh** activates B and reloads with browser networking disabled.
+  The test server includes Cloudflare-style HTML redirects.
+
+Ordinary UI cases block service workers so cached assets cannot mask changes;
+the dedicated offline case enables and exercises the real worker. The two test
+releases are in-memory snapshots and never overwrite application files.
+
+Failures retain screenshots and traces in `test-results/` and an HTML report in
+`playwright-report/`. Open the report with `npx playwright show-report`. For
+interactive runs, use `npm run test:browser:ui` after installing the full browser
+with `npx playwright install chromium`. Browser tests currently target Chromium;
+they do not replace checks in real Safari for platform-specific video behavior.
+`npm run deploy` prepares the offline assets and requires both Node and browser
+tests to pass before uploading.
+
 ## Work offline
 
 Visit the site over HTTPS (or localhost) and wait for **Ready for offline use**
 above the workspace. You can then disconnect and reopen the same URL in the
 same browser. Background subtraction, both test types, review and correction,
-training labels, CSV/JSON/ZIP exports, and the local help pages work offline.
+CSV/JSON exports, and the local help pages work offline.
 Select videos from your computer again after reopening; this feature saves the
-application, not your video files or unsaved analysis results. Saved tank setups,
-trial summaries, and labeling progress retain their existing browser storage.
+application, not your video files or unsaved analysis results. Saved tank setups
+and trial summaries retain their existing browser storage.
 
-The optional **Roboflow model** still requires internet to initialize its external
-model. Choose **Background subtraction** for offline analysis. External links such
-as GitHub and Roboflow also need internet. Fonts use the local sans-serif fallback.
+External links such as GitHub need internet. Fonts use the local sans-serif fallback.
 
 An updated app downloads during a later online visit and takes effect after all
 tabs for this app close. While open and visible, the app checks every five minutes,
@@ -32,8 +73,7 @@ successful downloads show **App update saved** and wait for you to refresh.
 To load it immediately, use **Force refresh** at the very
 bottom of the app. It checks for an update, finishes downloading it, activates it,
 and reloads. With a video loaded, it asks before discarding the video and unsaved
-analysis or corrections. Saved setups, trial summaries, and labeling progress are
-kept. If the site is unreachable, the current app stays open and you can retry.
+analysis or corrections. Saved setups and trial summaries are kept. If the site is unreachable, the current app stays open and you can retry.
 An already downloaded update can be activated while offline; Force refresh uses
 that saved copy without requiring another successful network check.
 For local development, keep `npm run dev` running; the dev server generates the
@@ -97,7 +137,7 @@ frame’s tracking, side, speed intervals, and exports. The selection method is
 and the selection before reconsideration. It checks only one preceding sample,
 even when tracking is disabled, and leaves ties or distant candidates unchanged.
 Manual corrections override the automatic choice. Reanalyze existing recordings
-to apply the rule. Multi-fish and Roboflow detection retain their existing rules.
+to apply the rule. Multi-fish detection retains its existing rules.
 
 Light/dark totals use every analyzed sample, including samples excluded by the
 count filter. The measured window runs from the first sample to the last, with
@@ -128,9 +168,9 @@ are identified in the table and exports. These summaries persist in this browser
 export CSVs to keep a portable copy.
 
 1. Add a tank video the browser can decode.
-2. Drag a rectangle around the tank in the preview if the fish occupy only part of the video, or open **Tank area, reflection masks & scale → Precise crop** to enter exact X/Y/width/height values. The preview fits both the available width and height. **Focus on tank** enlarges the selected tank crop, especially useful for portrait footage; **Full frame** shows the whole image for adjusting the crop. Fit resets zoom, and +/− zoom within the preview; scroll inside a zoomed image to reach its edges. For this repository's `fish.mov` (540 × 960), the tested 420 × 290 tank crop is selected automatically. Exported x/y coordinates remain in the original video frame. Choose centimeters or inches, then set the frame interval, close distance, and paper-grid calibration in pixels per 0.5-inch square. Centimeters are selected initially. The calibration applies to both detection methods. About 15.3 px per square and a 3.81 cm close distance are prefilled for this video. To measure your own scale, open **Set scale** and click **Draw calibration line**, drag along a known distance, enter its length in the selected units, and click **Use this scale**. Measure several grid squares near the swimming area for better accuracy; clearing the line keeps the applied scale. By default, analysis keeps only samples with exactly five detected fish; change the count or turn off **Only include frames with exactly** to keep every sample. Skipped samples still help tracking across neighboring frames.
-3. Background subtraction is the default method. It samples 25 points across the video to build a median tank background, then finds dark connected regions in each selected frame. Enter the known fish count. For this video, five fish are prefilled. The grid scale is approximate; nearby fish can merge into one blob and reflections can create false detections.
-4. The optional Roboflow mode uses the trained `zebrafish_in_aquarium/9` model by the `zebrafish-zxjvh` workspace. Its publishable key is prefilled in the static page and is therefore visible to visitors. Detection method, tracking options, frame inclusion, direct pixel calibration, and Model settings are under **Advanced settings**. The required inclusion count follows the tank count until you enter a different required count.
+2. Drag a rectangle around the tank in the preview if the fish occupy only part of the video, or open **Tank area, reflection masks & scale → Precise crop** to enter exact X/Y/width/height values. The preview fits both the available width and height. **Focus on tank** enlarges the selected tank crop, especially useful for portrait footage; **Full frame** shows the whole image for adjusting the crop. Fit resets zoom, and +/− zoom within the preview; scroll inside a zoomed image to reach its edges. For this repository's `fish.mov` (540 × 960), the tested 420 × 290 tank crop is selected automatically. Exported x/y coordinates remain in the original video frame. Choose centimeters or inches, then set the frame interval, close distance, and paper-grid calibration in pixels per 0.5-inch square. Centimeters are selected initially. The calibration applies to background subtraction. About 15.3 px per square and a 3.81 cm close distance are prefilled for this video. To measure your own scale, open **Set scale** and click **Draw calibration line**, drag along a known distance, enter its length in the selected units, and click **Use this scale**. Measure several grid squares near the swimming area for better accuracy; clearing the line keeps the applied scale. By default, analysis keeps only samples with exactly five detected fish; change the count or turn off **Only include frames with exactly** to keep every sample. Skipped samples still help tracking across neighboring frames.
+3. Analysis uses background subtraction. It samples 25 points across the video to build a median tank background, then finds dark connected regions in each selected frame. Enter the known fish count. For this video, five fish are prefilled. The grid scale is approximate; nearby fish can merge into one blob and reflections can create false detections.
+4. Tracking options, frame inclusion, and direct pixel calibration are under **Advanced settings**. The required inclusion count follows the tank count until you enter a different required count.
 4a. By default, analysis keeps only samples with exactly five detected fish. Change the required count or turn off **Only include frames with exactly** to keep every sample. Skipped samples still help tracking across neighboring frames.
 5. Analyze opens the **Results** view on the first included frame. Left/right arrow keys move through the selected frame view while you are not editing a control. Use **Setup** to configure the recording and **Results** to inspect and correct it. The Analyze button and status stay visible while setup settings scroll. Use the timeline above the video to skip to sampled frames. Yellow marks show where the detected group-size pattern changes; the previous/next buttons jump between those marks. The link-distance slider updates group colors, the selected-frame chart, timeline marks, and exports without rerunning detection. Export detections CSV, frame metrics CSV, or full JSON. In the same Results workspace, enable **Edit centers** to start from the current detections. Click a center to remove it, or click an empty location to add a center. Choose **Apply & stay** to update that frame’s groups, measurements, inclusion status, and exports. Draft edits do not affect results until applied. You can also show original automatic centers or the full frame, mark frames reviewed, and export annotations as CSV. Fish marked outside the crop are kept in the export but excluded from the automatic comparison. The review reports one-to-one center matches within 0.5 inch as well as count and group-size agreement. Manual marks are kept only until the tab reloads.
 
@@ -183,7 +223,7 @@ first. Selecting calibration shows Rectangle/drag mode. **Undo corner** and **Ca
 an unfinished selection. Crossed or concave outlines are rejected. The same
 four-corner mode works for light/dark regions and reflection masks. Rectangle
 mode still uses dragging. The detector and manual corrections use the outlined
-area, while decoding and clean PNG/training exports use its rectangular bounding
+area, while decoding and clean PNG exports use its rectangular bounding
 box. Coordinates remain in original-video pixels; the image is not rotated or
 stretched. Precise crop inputs replace a four-corner tank outline with a rectangle.
 Full JSON retains the corners. Changing areas requires analyzing again.
@@ -351,46 +391,9 @@ want to inspect unmasked during that diagnostic run. A `*` flags a scoring patch
 clipped by the crop or a mask. Grid lines, noise, contrast, and motion can all affect
 the score; compare examples from the same recording before considering a cutoff.
 
-The in-app About view explains both detection methods, coordinate and inch measurements, grouping, and validation. Its navigation stays in the analyzer document, so returning preserves the selected video, results, frame, and human marks. A standalone [About page](dist/about.html) is also available by direct URL.
+The in-app About view explains background subtraction, coordinate and inch measurements, grouping, and validation. Its navigation stays in the analyzer document, so returning preserves the selected video, results, frame, and human marks. A standalone [About page](dist/about.html) is also available by direct URL.
 
-Detection coordinates are pixel positions of region or bounding-box centers. A cluster is a connected group of at least two detections whose centers are linked by distances at or below the close distance in inches, converted using the entered grid calibration. Group numbers and colors apply within each frame only. The timeline marks changes in the sorted group sizes (for example, `3+2` to `4+1`), not changes in individual fish membership. The spacing percentile compares each frame's mean nearest-neighbor distance with 399 reproducible uniform random placements of the same detection count inside the selected crop outside reflection masks; it is a descriptive per-frame comparison, not a video-wide significance test. Average pair distance is calculated within each frame and averaged over frames with at least two detections. Distances are reported in approximate inches for either detection method. Background mode can follow short, provisional fish paths; these are not verified individual identities. If the linked Roboflow project has no trained browser-compatible version, use background mode or provide a different trained project and version.
-
-The default confidence cutoff is 0.15 to help detect small fish. The progress line shows both the raw model box count and the kept fish count; if the raw count is still one, the model itself is missing the other fish in that frame.
-
-When Roboflow mode is selected, the app begins preparing the model after a video is selected and keeps the browser worker alive for later analyses on the same page. Reloading the page still requires model initialization. Browser caching of downloaded assets depends on the browser and Roboflow response headers. Background mode needs no model download or key.
-
-## Label training frames
-
-1. Load a video, select a crop that contains every fish you want to label, and set
-   the sampling interval. Choose **Label frames for training**; running detection
-   first is optional.
-2. Click a real fish to place a box. Adjust width/height, or choose **Move or resize
-   boxes** and drag the box or a corner. Label each identifiable fish separately,
-   including overlapping fish. Use the fish buttons to select overlapping boxes.
-   Do not label reflections or guess completely hidden fish. Analysis reflection
-   masks are ignored here, so label all real fish visible inside the clean crop.
-3. Choose **This frame is labeled** or **Mark labeled & next** when every fish has
-   a suitable box. Previous/Next, the slider, frame number, and navigation step let
-   you skip any frames. **Next unlabeled frame** jumps past completed frames.
-   Editing a completed frame makes it a draft until you approve it again. A labeled
-   frame with no boxes is an explicit negative example; an unmarked empty frame
-   is excluded.
-4. At any time, choose **Export labeled dataset ZIP**. Only completed frames enter
-   the dataset, with clean cropped PNGs, matching [YOLO `.txt` boxes](https://docs.ultralytics.com/datasets/detect/) (class 0 =
-   fish), class names, and a JSON manifest with crop, source timestamps, boxes,
-   and centers. No overlays are burned into the images. Split recordings into
-   training/validation sets in Roboflow or your training workflow; the export
-   identifies the class but deliberately does not assign neighboring frames to
-   random training/validation splits.
-5. Progress saves automatically in this browser, separately for each video,
-   crop, and interval. Reopen the same video/settings to resume. **Save progress
-   JSON** creates a portable backup including draft boxes and exact saved images.
-   **Restore progress JSON** replaces this project's current marks with that
-   backup. Dataset ZIPs are for training; progress JSON is for resuming editing.
-
-The labeler is separate from Results corrections and comparisons and never changes the
-detector's results. Its boxes are manual training annotations, not automatic fish
-predictions. Browser storage can be cleared or fill up; keep progress backups.
+Detection coordinates are pixel positions of foreground-region centers. A cluster is a connected group of at least two detections whose centers are linked by distances at or below the close distance in inches, converted using the entered grid calibration. Group numbers and colors apply within each frame only. The timeline marks changes in the sorted group sizes (for example, `3+2` to `4+1`), not changes in individual fish membership. The spacing percentile compares each frame's mean nearest-neighbor distance with 399 reproducible uniform random placements of the same detection count inside the selected crop outside reflection masks; it is a descriptive per-frame comparison, not a video-wide significance test. Average pair distance is calculated within each frame and averaged over frames with at least two detections. Distances are reported in approximate inches for background subtraction. Background mode can follow short, provisional fish paths; these are not verified individual identities.
 
 ## Developer
 
@@ -414,24 +417,19 @@ calculate measurements, compare manual annotations, and format exports.
 | [dist/app.mjs](dist/app.mjs) | Main entry point: connects controls to analysis, manages page state, and updates results, charts, and navigation. |
 | [dist/preview.mjs](dist/preview.mjs) | Draws the video preview, detection centers, group links, and crop outline. |
 | [dist/human-ui.mjs](dist/human-ui.mjs) | Handles manual annotation controls and draws human-review overlays. |
-| [dist/labeling-ui.mjs](dist/labeling-ui.mjs), [dist/labeling.css](dist/labeling.css) | Training-data frame navigation, manual box editing, labeled/draft status, and export controls. |
-| [dist/label-data.mjs](dist/label-data.mjs) | Validates labeling projects and boxes, converts coordinates to YOLO format, and prepares annotation manifests. |
-| [dist/label-export.mjs](dist/label-export.mjs), [dist/zip.mjs](dist/zip.mjs) | Export selected clean images and YOLO labels as ZIP; save and restore portable progress with exact image data. |
-| [dist/label-storage.mjs](dist/label-storage.mjs) | Autosaves labeling annotations and PNGs in IndexedDB, separately for each video/crop/interval. |
 | [dist/video.mjs](dist/video.mjs) | Seeks and decodes video frames, then reads cropped pixels using a private canvas. |
 | [dist/pipeline.mjs](dist/pipeline.mjs) | Coordinates background preparation, frame sampling, detection, and measurement; reports progress and completed frames. |
 | [dist/background.mjs](dist/background.mjs) | Estimates the stationary tank background and finds dark moving regions that may be fish. |
 | [dist/connected-regions.mjs](dist/connected-regions.mjs), [dist/overlap-evidence.mjs](dist/overlap-evidence.mjs) | Find connected pixels and check for two dark bodies or two preceding observed centers entering one region. |
 | [dist/tracking.mjs](dist/tracking.mjs), [dist/point-assignment.mjs](dist/point-assignment.mjs) | Follow provisional fish paths, match centers one-to-one, and supply bounded overlap evidence without treating estimates as fresh observations. |
 | [dist/blob-splitting.mjs](dist/blob-splitting.mjs) | Estimates two centers inside unusually large regions, including touching pairs hidden by a full candidate count. |
-| [dist/model.mjs](dist/model.mjs) | Loads and reuses the optional Roboflow model worker and explains model errors. |
 | [dist/offline.mjs](dist/offline.mjs), [dist/sw.js](dist/sw.js) | Saves a complete app release for offline use and reports readiness. |
 | [scripts/offline-assets.mjs](scripts/offline-assets.mjs) | Generates the committed offline asset inventory and content revision. |
 | [dist/geometry.mjs](dist/geometry.mjs), [dist/tank-zones.mjs](dist/tank-zones.mjs) | Four-corner geometry, area drawing, side classification, and dark-region pixel maps. |
 | [dist/region.mjs](dist/region.mjs) | Defines the usable crop area, translates reflection masks, and splits the unmasked area for random sampling. |
 | [dist/candidate-selection.mjs](dist/candidate-selection.mjs) | Optionally ranks excess candidates by distance from the crop center, retaining rejected candidates for review. |
 | [dist/settings.mjs](dist/settings.mjs) | Validates settings, copies the selected crop, and converts calibrated inches to pixels. |
-| [dist/analysis.mjs](dist/analysis.mjs) | Calculates distances and connected groups from centers, normalizes model predictions, and supplies geometry and statistics helpers. |
+| [dist/analysis.mjs](dist/analysis.mjs) | Calculates distances and connected groups from centers, and supplies geometry and statistics helpers. |
 | [dist/sharpness.mjs](dist/sharpness.mjs), [dist/sharpness-ui.mjs](dist/sharpness-ui.mjs) | Measure candidate sharpness and contrast, draw scores, and collect diagnostic fish/reflection labels without filtering detections. |
 | [dist/side-tracking.mjs](dist/side-tracking.mjs) | Single-fish dark/light observations and side-change navigation that preserves unknown gaps. |
 | [dist/velocity.mjs](dist/velocity.mjs), [dist/velocity-ui.mjs](dist/velocity-ui.mjs) | Optional single-fish speed intervals, summary statistics, and graph with gaps for unavailable positions. |
@@ -479,7 +477,7 @@ Git commit and commit date, plus whether the source includes uncommitted edits:
 
 ```sh
 npm run offline:prepare
-npm test
+npm run test:all
 npx wrangler pages deploy dist --project-name fish-cluster --branch main
 ```
 
@@ -491,4 +489,4 @@ To publish a preview without updating production, use a branch name other than `
 npx wrangler pages deploy dist --project-name fish-cluster --branch preview
 ```
 
-These commands use Cloudflare's [Direct Upload workflow](https://developers.cloudflare.com/pages/get-started/direct-upload/) and [Wrangler Pages commands](https://developers.cloudflare.com/workers/wrangler/commands/pages/). Only `dist/` is uploaded, so the local `fish.mov` stays on your computer. Background mode works offline once the app is saved; a live network connection is needed for Roboflow model initialization. The prefilled Roboflow publishable key is visible in the deployed source; never put a private API key there.
+These commands use Cloudflare's [Direct Upload workflow](https://developers.cloudflare.com/pages/get-started/direct-upload/) and [Wrangler Pages commands](https://developers.cloudflare.com/workers/wrangler/commands/pages/). Only `dist/` is uploaded, so the local `fish.mov` stays on your computer. The analyzer works offline once the app is saved.

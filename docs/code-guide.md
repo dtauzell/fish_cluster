@@ -104,12 +104,9 @@ not part of the browser application.
    pixels. The GUI owns the current file, result list, and selection.
 2. `analyzeVideo()` in `pipeline.mjs` samples timestamps and asks `video.mjs`
    to seek the video and read the cropped pixels. Grayscale reads draw only the
-   selected crop into a dedicated canvas, reducing pixel readback work. Bitmap
-   and PNG captures use a separate full-frame canvas. Both canvases are private,
+   selected crop into a dedicated canvas, reducing pixel readback work. PNG captures use a separate full-frame canvas. Both canvases are private,
    so labels and crop outlines painted in the preview do not enter the detector.
-3. Background mode calls `background.mjs`. Roboflow mode asks `model.mjs` for
-   a reusable inference worker and normalizes its boxes with `analysis.mjs`.
-   Both methods initially return centers relative to the crop.
+3. The detector calls `background.mjs`, which returns centers relative to the crop.
 4. The pipeline adds the crop's X/Y offset to every center, producing positions
    in the original video. Background tracking in `tracking.mjs` assigns provisional
    path IDs and supplies overlap evidence to later sampled frames. It calls `frameMetrics()` in `measurements.mjs` to
@@ -121,10 +118,8 @@ not part of the browser application.
    browser's file download. JSON uses the same saved frames and measurements.
 
 The pipeline is an async generator: its caller uses `for await` to receive
-progress events and frames as they become available. It receives video access,
-model preparation, and a cancellation function as arguments. Tests can supply
-small synthetic images or model responses without starting a browser or
-fetching a model. Frames already yielded remain available after cancellation or
+progress events and frames as they become available. It receives video access and a cancellation function as arguments. Tests can supply
+small synthetic images without starting a browser. Frames already yielded remain available after cancellation or
 an error. Cancellation is checked between samples and frames, allowing the
 current operation to finish.
 
@@ -135,16 +130,11 @@ current operation to finish.
 | File selection, crop controls, result controls, charts, navigation | `dist/app.mjs` |
 | Automatic detection overlay | `dist/preview.mjs` |
 | Human annotation controls and overlay | `dist/human-ui.mjs` |
-| Training-data box editor and labeled-frame navigation | `dist/labeling-ui.mjs`, `dist/labeling.css` |
-| Label project identity, box validation, YOLO coordinates | `dist/label-data.mjs` |
-| Dataset ZIP and portable progress JSON | `dist/label-export.mjs`, `dist/zip.mjs` |
-| Labeling autosave and restoring saved images | `dist/label-storage.mjs` |
-| Video decoding, seeking, grayscale/bitmap capture | `dist/video.mjs` |
+| Video decoding, seeking, grayscale and PNG capture | `dist/video.mjs` |
 | Analysis sequence and progress events | `dist/pipeline.mjs` |
 | Detecting dark moving regions | `dist/background.mjs` |
 | Connected pixels and conservative overlap evidence | `dist/connected-regions.mjs`, `dist/overlap-evidence.mjs` |
 | Estimating centers inside joined regions | `dist/blob-splitting.mjs` |
-| Roboflow worker lifetime and model errors | `dist/model.mjs` |
 | Crop geometry, reflection masks, usable area | `dist/region.mjs` |
 | Optional selection of central candidates | `dist/candidate-selection.mjs` |
 | Form validation and calibration | `dist/settings.mjs` |
@@ -158,7 +148,7 @@ current operation to finish.
 
 `analysis`, `background`, `measurements`, `review`, `settings`, and `exports` work
 on ordinary data and do not access the DOM. `pipeline` coordinates those
-functions through the supplied video and model interfaces. Browser details stay
+functions through the supplied video interface. Browser details stay
 in the adapters and GUI modules.
 
 ## Coordinates, units, and result shapes
@@ -191,7 +181,7 @@ A detection has this common shape, with optional method-specific fields:
 
 Background detections can also have `area`, `splitFromBlob`, and `edgeRecovered`.
 Area is the number of foreground pixels, not the rectangle's area. Background
-centers are averages of region pixels; model centers come from predicted boxes.
+centers are averages of foreground-region pixels.
 
 A saved frame is:
 
@@ -199,7 +189,7 @@ A saved frame is:
 {
   frameIndex: 0,               // Zero-based sampled-frame index.
   timestampMs: 0,              // Milliseconds from the beginning of the video.
-  rawPredictionCount: 5,       // Model boxes before filtering, or background candidates.
+  rawPredictionCount: 5,       // Background candidates before selection.
   detections: [/* centers */],
   metrics: {/* distances, counts, groups, spacing percentile */}
 }
@@ -283,7 +273,7 @@ A completely hidden fish's exact position cannot be observed in a single view.
 ## Tracking through short overlaps
 
 `tracking.mjs` keeps independent, short-lived paths in original-video coordinates.
-It is enabled by default in background mode (`trackFish`); Roboflow mode is unchanged.
+It is enabled by default (`trackFish`).
 `point-assignment.mjs` implements minimum-cost one-to-one matching, allowing paths
 to remain unmatched rather than assigning the same candidate twice. IDs are
 provisional associations, not verified biological identities. They can swap when
@@ -375,7 +365,7 @@ in a candidate-sized patch padded by 3 pixels. For a pixel at index `i`, the
 Laplacian is `left + right + above + below - 4 * center`. The variance measures
 how much these responses vary across the patch. The pixels come from the original
 grayscale frame before detection thresholding, erosion, or dilation. Background
-mode reuses its grayscale image; model mode reads one for scoring.
+subtraction reuses its grayscale image for scoring.
 
 Each detection stores `sharpness`, `localContrast` (brightness standard deviation),
 `sharpnessPixelCount`, and `sharpnessClipped`. Crop and image boundaries are
@@ -443,63 +433,12 @@ continue to compare the original automatic result, avoiding agreement created
 by comparing manual corrections with themselves. CSV flags applied corrections;
 JSON retains both result and original centers.
 
-## Manual training-data labeling
-
-`#labeling` is independent of detection results. `app.mjs` passes the video
-metadata, selected crop, and interval to `createLabeling()`. This uses the same
-sample numbering as analysis and the same serialized video-seek queue, but no
-model, background, calibration, or fish count is required. Changing video, crop,
-or interval creates a different project identity. Analysis reflection masks are
-not applied to training images or annotation clicks: all visible real fish inside
-the clean crop need labels, including fish in an analysis mask.
-
-The editor captures a clean cropped PNG using `video.mjs.readPng()` and draws
-that image beneath the box overlay. The image is retained on the first edit or
-when explicitly labeling an empty frame. Revisiting an annotated frame displays
-its saved PNG rather than seeking a potentially different neighboring video
-frame. Dataset export reuses that exact PNG and does not seek the video.
-
-`label-data.mjs` keeps boxes in crop-local pixel coordinates as top-left
-`{id, x, y, width, height}`. `labelBoxAt()` places a box around a clicked center
-and clips placement at crop edges. `yoloLabels()` writes class 0 (`fish`) with
-normalized center X/Y and width/height. `labelManifest()` includes both crop-local
-and original-video centers, source metadata, and sample timestamps. Box IDs are
-within one frame and do not identify fish across time.
-
-Each annotation record has `frameIndex`, `timestampMs`, `boxes`, `labeled`, and
-an optional clean PNG `image` Blob. Unvisited frames need no record. Editing a
-completed frame changes `labeled` to false. Only explicit completion includes a
-frame in the dataset; a completed empty record exports a PNG and empty label file
-as a negative example. Skipped and draft frames are excluded even if draft boxes
-exist. Export refuses a completed record without its image rather than writing
-misaligned labels or quietly omitting it.
-
-`label-storage.mjs` uses IndexedDB for metadata and per-frame annotations/PNG
-Blobs. Writes are serialized; a save status acknowledges the latest requested
-write, and storage failures tell the user to download progress. Autosave is
-specific to the browser origin and can be cleared by the browser. Portable progress
-JSON includes draft records and base64 PNGs, independently of browser storage.
-Import validates the video/crop/interval identity, frame timestamps, box geometry,
-PNG dimensions, and image decoding before replacing current marks. The database
-replacement is one transaction. A portable import still works in memory if the
-browser cannot save it, with a visible backup reminder.
-
-`label-export.mjs` builds a dataset archive containing `images/`, matching
-`labels/`, `classes.txt`, class metadata in `data.yaml`, and `annotations.json`.
-It does not create a train/validation split; users should split by recording or
-separate time blocks. `zip.mjs` writes standard ZIP entries without compression
-(PNGs are already compressed), including CRC-32 and UTF-8 filenames. ZIP64 sizes
-and duplicate/unsafe paths are rejected. Dataset ZIP is for training; progress
-JSON is for resuming the editor. Neither changes Human analysis marks or detector
-measurements.
-
 ## Verification
 
 The Node tests cover geometry, grouping, detector examples, pipeline sampling,
-coordinate conversion, cancellation, inference cleanup, review comparisons, and
+coordinate conversion, cancellation, decoding failures, review comparisons, and
 CSV semantics. To check browser integration, load a local video, analyze it,
 change the distance, select a frame, add human marks, and visit About and back.
-Roboflow initialization also requires network access and a working trained model.
 
 
 ## Angled areas and bright fixtures
@@ -509,11 +448,10 @@ integer bounding box plus original-video `polygon` vertices. Crop, light/dark
 regions, and reflection masks can each carry these vertices. `insideCrop()`
 checks the polygon when present; `analysisPixelMask()` removes outside pixels
 before and after detector morphology. Video decoding still reads the bounding
-rectangle. Manual marks and model centers use the same area-membership check.
+rectangle. Manual marks and automatic centers use the same area-membership check.
 Random spacing uses uniform bounding-box rejection for polygon runs, with a
 bounded retry count; old rectangular runs retain their original reference sequence.
-JSON saves the vertices, and settings deep-copy them. Training PNGs and clean
-frame downloads retain the rectangular bounding image.
+JSON saves the vertices, and settings deep-copy them. Clean frame downloads retain the rectangular bounding image.
 
 In dark-region runs, `suppressFlicker` defaults to true. `backgroundVariation()`
 learns the 10th–90th percentile pixel range from the background samples and expands
@@ -522,7 +460,7 @@ After ordinary foreground cleanup, a connected region must contain at least five
 pixels and 8% of its area beyond the learned range (or darker foreground evidence
 on the light side). This validates a core without shrinking the full outline of
 a fish crossing a ridge. The check also applies to edge recovery. The optional
-setting does not affect runs without marked dark regions or model detection.
+setting does not affect runs without marked dark regions .
 
 
 ## Optional single-fish velocity
