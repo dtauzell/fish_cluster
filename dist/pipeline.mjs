@@ -1,5 +1,5 @@
 import { analysisTankSide, darkZoneMask } from './tank-zones.mjs';
-import { selectCentralCandidates, selectSingleFishCandidate } from './candidate-selection.mjs';
+import { selectCentralCandidates, selectSingleFishCandidate, selectSingleFishFromNextFrame } from './candidate-selection.mjs';
 import { candidateSharpness } from './sharpness.mjs';
 import { insideAnalysisArea, localExclusions, analysisPixelMask } from './region.mjs';
 import { normalizePredictions, sampleTimes } from './analysis.mjs';
@@ -26,6 +26,7 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
   const analysisMask = analysisPixelMask(crop, config.exclusions);
   let variation = null;
   let previousFrame = null;
+  let previousCandidates = null;
   let background = null;
   let model = null;
   const backgroundMode = config.method === 'background';
@@ -112,6 +113,26 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
       ? selectSingleFishCandidate(detections, crop, { previousPoint: previousTrackPoint,
         predictedPoint: previousTrackPoint ? tracker?.selectionPrediction(timestampMs) : undefined })
       : selectCentralCandidates(detections, crop, backgroundMode && config.preferCenter ? config.expectedFish : null);
+    // A unique current observation can disambiguate the preceding sample. Use
+    // its original candidates, before selection introduced uncertainty flags.
+    // Frames already yielded remain shared objects, as with track reacquisition.
+    if (backgroundMode && config.expectedFish === 1 && previousFrame &&
+      frameIndex === previousFrame.frameIndex + 1 && timestampMs > previousFrame.timestampMs &&
+      timestampMs - previousFrame.timestampMs <= 250 && previousCandidates?.length > 1 &&
+      detections.length === 1 && selected.selectionConfident === true &&
+      selected.rejectedDetections.length === 0) {
+      const resolved = selectSingleFishFromNextFrame(previousCandidates, crop, selected.detections[0]);
+      if (resolved) {
+        const originalSelection = { method: previousFrame.selectionMethod,
+          confident: previousFrame.selectionConfident, detectionId: previousFrame.detections[0]?.detectionId };
+        resolved.detections = tracker ? tracker.reviseLastUpdate(resolved.detections, previousFrame.timestampMs)
+          : resolved.detections.map(point => ({ ...point, positionSource: 'observed' }));
+        delete previousFrame.selectionPrediction;
+        Object.assign(previousFrame, resolved, { selectionReferenceTimestampMs: timestampMs,
+          selectionBeforeLookback: originalSelection,
+          metrics: frameMetrics(resolved.detections, config, resolved.rejectedDetections.length) });
+      }
+    }
     selected.detections = tracker ? tracker.update(selected.detections, timestampMs)
       : selected.detections.map(point => ({ ...point,
         positionSource: point.splitFromBlob ? 'overlap-estimate' : 'observed',
@@ -119,6 +140,7 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
     const frame = { frameIndex, timestampMs, rawPredictionCount, ...selected,
       metrics: frameMetrics(selected.detections, config, selected.rejectedDetections.length) };
     previousFrame = frame;
+    previousCandidates = detections;
     const preparationProgress = backgroundMode ? 10 : 0;
     const progress = preparationProgress + (frameIndex + 1) / times.length * (100 - preparationProgress);
     if (!framePassesCountFilter(frame, config)) {

@@ -75,8 +75,8 @@
       <tr><td><code>automatic_candidate_count</code></td><td>Original automatic count before selecting one fish, including rejected candidates.</td></tr>
       <tr><td><code>rejected_candidate_count</code></td><td>Number of candidates excluded from the automatic result. Their original positions remain in the JSON and review.</td></tr>
       <tr><td><code>foreground_contrast</code></td><td>Median foreground brightness difference from the background, in grayscale levels (0–255). Light regions use darkening; dark regions allow either contrast direction. Blank for manual or unavailable measurements.</td></tr>
-      <tr><td><code>selection_method</code></td><td>Versioned automatic selection rule, when applied.</td></tr>
-      <tr><td><code>selection_confident</code></td><td>Whether automatic selection passed the contrast separation rule. This is a heuristic, not a probability. Close competing candidates stay uncertain and do not contribute zone time or speed until corrected.</td></tr>
+      <tr><td><code>selection_method</code></td><td>Versioned automatic selection rule, when applied. <code>foreground-next-frame-continuity-v1</code> means a clear fish in the next sampled frame resolved this frame’s candidates by distance. The JSON records its reference timestamp and the earlier selection.</td></tr>
+      <tr><td><code>selection_confident</code></td><td>Whether automatic selection passed its contrast, boundary, or temporal separation rule. This is a heuristic, not a probability. Unresolved competing candidates stay uncertain and do not contribute zone time or speed until resolved or corrected.</td></tr>
     </tbody></table></div>
   </section>
   <section id="summaries"><h2>Light/dark and group summaries</h2>

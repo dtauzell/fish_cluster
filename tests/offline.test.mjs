@@ -12,6 +12,7 @@ function workerHarness(scope = 'https://fish.example/tools/fish/', { redirectHTM
   const stores = new Map();
   let online = true;
   let claimed = false;
+  let skippedWaiting = false;
   const fetch = async request => {
     if (!online) throw new Error('Network disconnected');
     const url = typeof request === 'string' ? request : request.url;
@@ -42,6 +43,7 @@ function workerHarness(scope = 'https://fish.example/tools/fish/', { redirectHTM
   const self = {
     registration: { scope },
     clients: { claim: async () => { claimed = true; } },
+    skipWaiting: async () => { skippedWaiting = true; },
     addEventListener: (name, handler) => handlers.set(name, handler),
   };
   const context = vm.createContext({ self, caches, fetch, URL, Request, Response,
@@ -55,6 +57,12 @@ function workerHarness(scope = 'https://fish.example/tools/fish/', { redirectHTM
     stores, caches, self, scope,
     disconnect: () => { online = false; },
     claimed: () => claimed,
+    skippedWaiting: () => skippedWaiting,
+    message: data => {
+      let completion;
+      handlers.get('message')({ data, waitUntil: promise => { completion = promise; } });
+      return completion;
+    },
     lifecycle: name => new Promise((resolve, reject) => handlers.get(name)({
       waitUntil: promise => promise.then(resolve, reject),
     })),
@@ -69,6 +77,16 @@ function workerHarness(scope = 'https://fish.example/tools/fish/', { redirectHTM
 
 test('offline inventory and release revision match all deployed source', async () => {
   assert.equal(manifest, await offlineManifest(), 'Run npm run offline:prepare after editing dist/');
+});
+
+test('updates wait for open tabs unless Force refresh explicitly requests activation', async () => {
+  const worker = workerHarness();
+  await worker.lifecycle('install');
+  assert.equal(worker.skippedWaiting(), false);
+  assert.equal(worker.message({ type: 'UNRELATED' }), undefined);
+  assert.equal(worker.skippedWaiting(), false);
+  await worker.message({ type: 'ACTIVATE_UPDATE' });
+  assert.equal(worker.skippedWaiting(), true);
 });
 
 test('first installation caches every asset, including unvisited help and modules, for offline reloads', async () => {

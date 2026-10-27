@@ -33,6 +33,11 @@ self.addEventListener('activate', event => {
   })());
 });
 
+// Only the explicit Force refresh action activates an update over open tabs.
+self.addEventListener('message', event => {
+  if (event.data?.type === 'ACTIVATE_UPDATE') event.waitUntil(self.skipWaiting());
+});
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);

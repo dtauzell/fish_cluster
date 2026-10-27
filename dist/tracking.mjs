@@ -12,6 +12,7 @@ export const TRACKING_METHOD = { version: 2, maxSampleGapMs: 250, maxObservation
  */
 export function createFishTracker(expectedFish) {
   let tracks = [], nextId = 1, lastTimestamp = null;
+  let lastUpdateSnapshot = null;
 
   function expire(timestampMs) {
     if (lastTimestamp != null && (timestampMs <= lastTimestamp || timestampMs - lastTimestamp > TRACKING_METHOD.maxSampleGapMs)) tracks = [];
@@ -80,6 +81,11 @@ export function createFishTracker(expectedFish) {
 
   /** Attach identities to kept detections, then update only the supported paths. */
   function update(detections, timestampMs) {
+    if (expectedFish === 1) lastUpdateSnapshot = {
+      tracks: tracks.map(track => ({ ...track, position: { ...track.position },
+        observed: { ...track.observed }, velocity: { ...track.velocity }, pending: [...track.pending] })),
+      nextId, lastTimestamp,
+    };
     expire(timestampMs);
     const unmatchedCost = TRACKING_METHOD.maxMatchDistancePx;
     const costs = tracks.map(track => detections.map(point => {
@@ -142,5 +148,14 @@ export function createFishTracker(expectedFish) {
     return output;
   }
 
-  return { overlapSeeds, sizeReference, selectionPrediction, update };
+  /** Replay only the last sample when the next observed frame resolves it. */
+  function reviseLastUpdate(detections, timestampMs) {
+    if (expectedFish !== 1 || !lastUpdateSnapshot || timestampMs !== lastTimestamp) {
+      throw new Error('Only the last single-fish tracking update can be revised.');
+    }
+    ({ tracks, nextId, lastTimestamp } = lastUpdateSnapshot);
+    return update(detections, timestampMs);
+  }
+
+  return { overlapSeeds, sizeReference, selectionPrediction, update, reviseLastUpdate };
 }

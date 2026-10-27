@@ -25,7 +25,15 @@ model. Choose **Background subtraction** for offline analysis. External links su
 as GitHub and Roboflow also need internet. Fonts use the local sans-serif fallback.
 
 An updated app downloads during a later online visit and takes effect after all
-tabs for this app close. Browser site-data clearing or storage eviction removes
+tabs for this app close. To load it immediately, use **Force refresh** at the very
+bottom of the app. It checks for an update, finishes downloading it, activates it,
+and reloads. With a video loaded, it asks before discarding the video and unsaved
+analysis or corrections. Saved setups, trial summaries, and labeling progress are
+kept. If the site is unreachable, the current app stays open and you can retry.
+For local development, keep `npm run dev` running; the dev server generates the
+offline revision from the current files so Force refresh picks up edits made
+while the server is running. Restart the server after changing server code.
+Browser site-data clearing or storage eviction removes
 the offline copy; revisit online to restore it. Offline access requires a browser
 with service workers enabled; private browsing may restrict it.
 
@@ -55,6 +63,15 @@ This is a selection heuristic, not proof that the winner is the fish. Rejected
 candidates remain visible as pink crosses and in the JSON and diagnostic review.
 The light/dark frames CSV includes the original candidate count, rejected count,
 selected foreground contrast, selection method, and automatic selection status.
+When a sample has one supported fish and no rejected alternatives, it also
+checks all original candidates in the immediately preceding sample. It selects
+the nearest supported candidate within 45 pixels when it has at least an 8-pixel
+distance advantage; samples must be no more than 250 ms apart. This can promote
+a previously rejected candidate or resolve an uncertain choice, updating that
+frame’s tracking, side, speed intervals, and exports. The selection method is
+`foreground-next-frame-continuity-v1`; JSON records the next sample’s timestamp
+and the selection before reconsideration. It checks only one preceding sample,
+even when tracking is disabled, and leaves ties or distant candidates unchanged.
 Manual corrections override the automatic choice. Reanalyze existing recordings
 to apply the rule. Multi-fish and Roboflow detection retain their existing rules.
 
