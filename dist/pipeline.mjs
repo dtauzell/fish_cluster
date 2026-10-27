@@ -69,7 +69,7 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
         ...point, x: point.x - crop.x, y: point.y - crop.y
       })) : [];
       const candidates = detectBackgroundFish(gray, background, crop.width, crop.height,
-        { expectedFish: config.expectedFish, preferCenter: config.preferCenter, exclusions, darkZones, analysisMask, backgroundVariation: variation,
+        { expectedFish: config.expectedFish, preferCenter: config.preferCenter, exclusions, darkZones, analysisMask, backgroundVariation: variation, timestampMs,
           ...(crop.polygon ? { edgeX: 0, edgeTop: 0, edgeBottom: 0 } : {}),
           previousDetections, previousTimestampMs: canReferencePrevious ? previousFrame.timestampMs : undefined,
           observedSizeReference: tracker?.sizeReference(timestampMs),

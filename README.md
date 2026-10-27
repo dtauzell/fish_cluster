@@ -25,6 +25,11 @@ dark fish over a faint reflection on the light floor, while still supporting a
 pale fish on the dark floor. A competing candidate is excluded as weaker contrast
 only when the winner has at least 1.5 times its contrast and an eight-level lead;
 close choices remain uncertain and do not contribute known zone time or speed.
+An unambiguous match to the previous observed position can resolve competing
+candidates. Otherwise, a supported fish away from the tank boundary takes
+precedence over a long, very thin region following that boundary. The diagnostic
+table identifies these rejected regions as **No (tank wall)**. This uses the
+actual polygon edges for four-corner crops.
 This is a selection heuristic, not proof that the winner is the fish. Rejected
 candidates remain visible as pink crosses and in the JSON and diagnostic review.
 The light/dark frames CSV includes the original candidate count, rejected count,
@@ -171,6 +176,20 @@ objects are already part of the median background. Turn the option off and
 reanalyze if faint fish are missed. Reflection masks remain an option for areas
 to exclude, but also exclude fish swimming through them.
 
+With one fish expected and learned background flicker enabled, the marked dark
+region gets a second pass for faint fish. A core must exceed the learned range
+by 18 brightness levels; connected body pixels can have contrast as low as 12.
+This can recover an empty sample or expand a small, faint detection to include
+more of the fish. Size, masks, and learned-variation checks still apply, and
+ordinary strong detections keep the usual cutoff of 24. Full JSON marks recovered
+detections with `lowContrastRecovered`, `foregroundThreshold`, and
+`foregroundCoreThreshold`.
+When a nearby observed fish was present within 250 ms, recovery can also use a
+12-level core if current foreground, body size, and movement agree with that
+observation. JSON records `lowContrastReferenceTimestampMs` for these detections.
+Faint interior recovery runs before relaxing the tank borders, so a wall
+reflection cannot fill the expected count and prevent that recovery step.
+
 For a recording configured with **Fish in tank = 1**, Results offers an optional
 **Single-fish velocity → Show velocity tracker**. It starts off. Enable it to see
 minimum, maximum, and average speed and a speed-versus-video-time graph. Pixels
@@ -220,6 +239,11 @@ can provide the size reference for splitting them. These remain uncertain estima
 including the two centers inside an X-shaped crossing.
 
 In **Results**, dashed † centers need checking against neighboring frames.
+With **Edit centers** enabled, the **Center coordinates** panel at the top of the
+sidebar shows pointer coordinates and each numbered draft center in original
+video pixels. **Copy center coordinates** includes the sample number and time;
+copying coordinates does not require applying a correction.
+
 Enable **Edit centers**, check or adjust every visible fish, then choose **Apply & stay** to update
 that frame's measurements and exports. Applying no marks explicitly sets its
 count to zero. **Restore automatic centers** undoes the correction. Manual marks

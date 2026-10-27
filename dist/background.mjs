@@ -101,8 +101,8 @@ function darkPixelMask(frame, background, width, height, threshold, exclusions, 
     for (let x = 0; x < width; x++) {
       const index = row + x;
       const difference = background[index] - frame[index];
-      // A fish can be lighter or darker than the local tank surface.
-      if (Math.abs(difference) >= threshold) mask[index] = 1;
+      // Pale fish can brighten the marked dark floor; light floors use darkening.
+      if ((darkZones?.[index] ? Math.abs(difference) : difference) >= threshold) mask[index] = 1;
     }
   }
   if (analysisMask) for (let i = 0; i < mask.length; i++) if (!analysisMask[i]) mask[i] = 0;
@@ -127,7 +127,7 @@ function hasStableForegroundEvidence(blob, frame, background, threshold, options
     if (options.darkZones[pixel]) {
       touchesDark = true;
       if (frame[pixel] <= variation.lower[pixel] - threshold || frame[pixel] >= variation.upper[pixel] + threshold) evidence++;
-    } else if (Math.abs(background[pixel] - frame[pixel]) >= threshold) evidence++;
+    } else if (background[pixel] - frame[pixel] >= threshold) evidence++;
   }
   return !touchesDark || evidence >= Math.max(5, Math.ceil(blob.area * 0.08));
 }
@@ -139,6 +139,57 @@ function excludeBorders(mask, width, height, edgeX, edgeTop, edgeBottom) {
   for (let y = edgeTop; y < height - edgeBottom; y++) {
     mask.fill(0, y * width, y * width + edgeX);
     mask.fill(0, (y + 1) * width - edgeX, (y + 1) * width);
+  }
+}
+
+// Hysteresis keeps faint body pixels connected to a stronger, stable core.
+// Dark-side learning is required so ordinary changes in ridges cannot seed it.
+function recoverLowContrastFish(blobs, frame, background, width, height, options, edges, threshold, minArea, maxArea) {
+  if (options.expectedFish !== 1 || options.threshold != null || options.recoverLowContrast === false ||
+    !options.backgroundVariation || !options.darkZones?.some(Boolean)) return;
+  const weakThreshold = threshold * .5, coreThreshold = threshold * .75;
+  const darkAnalysisMask = options.darkZones.map((value, index) =>
+    value && (!options.analysisMask || options.analysisMask[index]) ? 1 : 0);
+  const mask = darkPixelMask(frame, background, width, height, weakThreshold,
+    options.exclusions, options.darkZones, darkAnalysisMask);
+  excludeBorders(mask, width, height, edges.edgeX, edges.edgeTop, edges.edgeBottom);
+  const candidates = connectedRegions(mask, width, height, { minArea, maxArea, minLength: 10 });
+  const original = [...blobs];
+  for (const candidate of candidates) {
+    let requiredCore = coreThreshold;
+    if (!hasStableForegroundEvidence(candidate, frame, background, requiredCore, options)) {
+      const previous = options.previousDetections?.length === 1 ? options.previousDetections[0] : null;
+      // A recent observed path can support a faint body, but only where current
+      // pixels still exceed the learned range and have compatible size/motion.
+      if (!previous || previous.positionUncertain || previous.splitFromBlob ||
+        !Number.isFinite(options.timestampMs) || !Number.isFinite(options.previousTimestampMs) ||
+        options.timestampMs <= options.previousTimestampMs || options.timestampMs - options.previousTimestampMs > 250 ||
+        !(previous.area > 0) || !(previous.width > 0) || !(previous.height > 0) ||
+        Math.hypot(candidate.x - previous.x, candidate.y - previous.y) > 45 ||
+        candidate.area < previous.area * .35 || candidate.area > previous.area * 3 ||
+        Math.hypot(candidate.width, candidate.height) > Math.hypot(previous.width, previous.height) * 2 ||
+        !hasStableForegroundEvidence(candidate, frame, background, weakThreshold, options)) continue;
+      requiredCore = weakThreshold;
+    }
+    const pixels = new Set(candidate.pixels);
+    const seeds = original.filter(blob => blob.pixels?.some(pixel => pixels.has(pixel)));
+    if (original.length) {
+      if (seeds.length !== 1) continue;
+      const seed = seeds[0];
+      if (candidate.area <= seed.area || candidate.area > seed.area * 5 ||
+        Math.hypot(candidate.width, candidate.height) > Math.hypot(seed.width, seed.height) * 3 ||
+        seed.pixels.filter(pixel => pixels.has(pixel)).length < seed.area * .8) continue;
+      const contrasts = seed.pixels.map(pixel => Math.abs(frame[pixel] - background[pixel]))
+        .filter(value => value >= threshold).sort((a, b) => a - b);
+      // Ordinary high-contrast detections keep their original segmentation.
+      if (!contrasts.length || contrasts[Math.floor(contrasts.length / 2)] > threshold * 1.25) continue;
+    }
+    const recovered = { ...candidate, lowContrastRecovered: true,
+      foregroundThreshold: weakThreshold, foregroundCoreThreshold: requiredCore,
+      ...(requiredCore < coreThreshold ? { lowContrastReferenceTimestampMs: options.previousTimestampMs } : {}),
+      ...(seeds[0]?.edgeRecovered ? { edgeRecovered: true } : {}) };
+    if (seeds.length) blobs.splice(blobs.indexOf(seeds[0]), 1, recovered);
+    else blobs.push(recovered);
   }
 }
 
@@ -180,6 +231,9 @@ function joinSingleFishFragments(blobs, frame, background, width, threshold, opt
   const nearby = blobs.filter(blob => Math.hypot(blob.x - previous.x, blob.y - previous.y) <= 45);
   if (nearby.length !== 2) return;
   const [a, b] = nearby;
+  // Faint regions already grew along connected image evidence; keep any
+  // remaining disconnected pieces separate rather than joining them by history.
+  if (a.lowContrastRecovered || b.lowContrastRecovered) return;
   const area = a.area + b.area;
   if (area < previous.area * .5 || area > previous.area * 2) return;
   const pixels = [...a.pixels, ...b.pixels];
@@ -218,7 +272,7 @@ function joinSingleFishFragments(blobs, frame, background, width, threshold, opt
 }
 
 /**
- * Find moving regions in a cropped grayscale frame using either contrast sign.
+ * Find moving regions in a cropped grayscale frame, using either contrast sign in marked dark zones.
  * Input arrays are row-major: pixel (x, y) is at y * width + x, brightness 0–255.
  * Returned centers and bounding-box sizes are in crop pixels. These are candidate
  * fish, not tracked identities. Defaults reproduce the original tank experiment.
@@ -235,14 +289,22 @@ export function detectBackgroundFish(frame, background, width, height, options =
   excludeBorders(mask, width, height, edgeX, edgeTop, edgeBottom);
   const blobs = connectedRegions(mask, width, height, { minArea, maxArea, minLength: 10 })
     .filter(blob => hasStableForegroundEvidence(blob, frame, background, threshold, options));
+  // Look for supported faint fish inside the tank before relaxing its borders.
+  // Otherwise a wall reflection can fill the count and block faint-fish recovery.
+  recoverLowContrastFish(blobs, frame, background, width, height, options,
+    { edgeX, edgeTop, edgeBottom }, threshold, minArea, maxArea);
   recoverEdgeFish(blobs, frame, background, width, height, options, { edgeX, edgeTop, edgeBottom }, minArea);
   joinSingleFishFragments(blobs, frame, background, width, threshold, options);
   // Score real foreground pixels, excluding pixels introduced by morphology.
   // Absolute contrast supports pale fish on dark floors; light floors use darkening.
   for (const blob of blobs) {
+    // Edge recovery returns candidates already scored by its relaxed pass.
+    // Their pixel membership has been removed; retain the measured evidence.
+    if (!blob.pixels) continue;
+    const evidenceThreshold = blob.foregroundThreshold ?? threshold;
     const evidence = (blob.pixels ?? []).map(index => options.darkZones?.[index]
       ? Math.abs(background[index] - frame[index]) : background[index] - frame[index])
-      .filter(value => value >= threshold).sort((a, b) => a - b);
+      .filter(value => value >= evidenceThreshold).sort((a, b) => a - b);
     const middle = Math.floor(evidence.length / 2);
     blob.foregroundContrast = evidence.length ? (evidence.length % 2 ? evidence[middle]
       : (evidence[middle - 1] + evidence[middle]) / 2) : null;

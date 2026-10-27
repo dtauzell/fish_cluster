@@ -216,6 +216,15 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     const editing = $('human-edit-centers').checked;
     $('human-edit-centers').disabled = busy;
     const marks = state.human.marks.get(index);
+    $('human-center-coordinates').hidden = !editing;
+    $('human-pointer-position').textContent = 'Move over the image to see coordinates.';
+    $('human-center-copy-status').textContent = '';
+    $('human-center-coordinate-values').value = busy ? ''
+      : `Sample ${frame.frameIndex + 1} · ${(frame.timestampMs / 1000).toFixed(2)} s\n` +
+        (marks?.length ? marks.map((point, number) => `Center ${number + 1}: ${centerCoordinateText(point)}`).join('\n')
+          : 'No centers. Click the fish to add one.');
+    $('human-center-coordinate-values').rows = Math.min(8, Math.max(3, (marks?.length ?? 0) + 1));
+    $('human-copy-center-coordinates').disabled = busy || !marks?.length;
     const pending = hasPendingCenters(frame, marks, state.settings);
     $('human-edit-status').textContent = state.human.loadFailed ? 'Could not load this frame. Try another sample.'
       : state.human.loading ? 'Loading frame…'
@@ -449,12 +458,40 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     onFrameCorrected();
     drawHumanFrame(); updateHumanDetails();
   });
+  function centerCoordinateText(point) {
+    return `x=${Math.round(point.x * 10) / 10}, y=${Math.round(point.y * 10) / 10}`;
+  }
+  function humanPointerPoint(event) {
+    const rect = humanCanvas.getBoundingClientRect();
+    const view = humanViewBox();
+    return { x: view.x + (event.clientX - rect.left) * view.width / rect.width,
+      y: view.y + (event.clientY - rect.top) * view.height / rect.height };
+  }
+  humanCanvas.addEventListener('pointermove', event => {
+    if (!$('human-edit-centers').checked || state.human.index == null || state.human.loading || state.human.loadFailed) return;
+    $('human-pointer-position').textContent = `Pointer: ${centerCoordinateText(humanPointerPoint(event))}`;
+  });
+  humanCanvas.addEventListener('pointerleave', () => {
+    $('human-pointer-position').textContent = 'Move over the image to see coordinates.';
+  });
+  $('human-copy-center-coordinates').addEventListener('click', async () => {
+    const input = $('human-center-coordinate-values');
+    const value = input.value;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(value);
+      if (input.value === value) $('human-center-copy-status').textContent = 'Coordinates copied.';
+    } catch {
+      if (input.value !== value) return;
+      input.focus(); input.select();
+      $('human-center-copy-status').textContent = 'Coordinates selected. Press ⌘C or Ctrl+C to copy.';
+    }
+  });
   humanCanvas.addEventListener('click', event => {
     if (!$('human-edit-centers').checked || state.human.index == null || state.human.loading || state.human.loadFailed) return;
     const rect = humanCanvas.getBoundingClientRect();
     const view = humanViewBox();
-    const point = { x: view.x + (event.clientX - rect.left) * view.width / rect.width,
-      y: view.y + (event.clientY - rect.top) * view.height / rect.height };
+    const point = humanPointerPoint(event);
     rememberMarks();
     const marks = state.human.marks.get(state.human.index) ?? [];
     const hitRadius = 10 * view.width / rect.width;

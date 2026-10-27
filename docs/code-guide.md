@@ -20,9 +20,20 @@ foreground contrast over the original threshold-passing blob pixels, excluding
 the padding introduced by morphology. `candidate-selection.mjs` caps the result
 at one and marks insufficient separation uncertain. `pipeline.mjs` applies this
 before tracking, so ambiguous choices cannot create or refresh observed tracks.
-Side and velocity calculations accept rejected weaker candidates only when the
-versioned contrast-selection rule passed; geometric and ambiguous rejections
-still invalidate automatic intervals. All candidates and scores remain auditable.
+Side and velocity calculations accept rejected candidates only when the recorded,
+versioned selection rule confidently resolves them. Ambiguous choices and generic
+center-distance filtering still invalidate automatic intervals. All candidates
+and scores remain auditable.
+
+Single-fish selection first permits an unambiguous recent observed path to
+resolve competitors. Without that evidence, `foreground-boundary-margin-v1`
+prefers a supported alternative over a wall-like region that is at most 6 pixels
+thick, at least 40 pixels long, has an aspect ratio of at least 10, lies within
+8 pixels of a crop edge, and runs parallel to that edge (absolute axis dot
+product at least 0.95). Polygon crops use their actual edges. Isolated wall
+candidates remain available. Rejected wall regions retain their original scores
+and IDs with reason `wall-like-boundary-region`; near ties among the remaining
+candidates stay uncertain. The diagnostics table displays **No (tank wall)**.
 
 `experiment-storage.mjs` validates and snapshots named setups and per-fish
 results, persists compact records, and calculates equal-weight means by trial

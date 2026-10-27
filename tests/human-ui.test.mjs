@@ -55,7 +55,8 @@ async function withReview(run) {
       human: { index: null, marks: new Map(), candidateLabels: new Map(), reviewed: new Set(), loading: false } };
     let changes = 0;
     const downloadedFrames = [];
-    const review = createHumanReview({ state, video: { videoWidth: 100, videoHeight: 100 },
+    const video = { videoWidth: 100, videoHeight: 100 };
+    const review = createHumanReview({ state, video,
       humanCanvas: $('human-canvas'), queuePreviewSeek: async (_token, _time, render) => render(),
       downloadFramePng: async (frame, view, fullFrame) => downloadedFrames.push({ frame, view, fullFrame }),
       onFrameSelected() {}, onFrameCorrected() {
@@ -72,13 +73,55 @@ async function withReview(run) {
       Object.assign(event, { clientX: 320, clientY: 320 });
       $('human-canvas').dispatchEvent(event);
     };
-    await run({ $, state, review, edit, addCenter, changes: () => changes, downloadedFrames, document });
+    await run({ $, state, review, edit, addCenter, changes: () => changes, downloadedFrames, document, video });
   } finally {
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete globalThis[key]; else globalThis[key] = value;
     }
   }
 }
+
+test('Edit centers reports original video coordinates across crop, zoom, undo, and full-frame views', async () => {
+  await withReview(async ({ $, state, review, edit, video }) => {
+    Object.assign(video, { videoWidth: 1280, videoHeight: 720 });
+    state.settings.crop = { x: 452, y: 111, width: 491, height: 182 };
+    state.reviewFrames[0].detections = [{ x: 865, y: 262 }];
+    state.reviewFrames[0].metrics = frameMetrics(state.reviewFrames[0].detections, state.settings);
+    await review.selectHumanFrame(0);
+    assert.equal($('human-center-coordinates').hidden, true);
+    edit(true);
+    assert.equal($('human-center-coordinates').hidden, false);
+    assert.match($('human-center-coordinate-values').value, /Sample 1.*0\.00 s\nCenter 1: x=865, y=262/);
+    $('human-clear').click();
+    assert.equal($('human-copy-center-coordinates').disabled, true);
+    const pointAt = (type, fractionX, fractionY) => {
+      const rect = $('human-canvas').getBoundingClientRect();
+      const event = new Event(type);
+      Object.assign(event, { clientX: rect.left + rect.width * fractionX, clientY: rect.top + rect.height * fractionY });
+      $('human-canvas').dispatchEvent(event);
+    };
+    pointAt('pointermove', .25, .5);
+    assert.equal($('human-pointer-position').textContent, 'Pointer: x=574.8, y=202');
+    pointAt('click', .25, .5);
+    assert.match($('human-center-coordinate-values').value, /Center 1: x=574\.8, y=202/);
+    assert.equal($('human-copy-center-coordinates').disabled, false);
+    assert.equal(state.reviewFrames[0].detections[0].x, 865, 'reading draft coordinates does not apply corrections');
+    $('human-zoom-in').click();
+    pointAt('click', .75, .5);
+    assert.match($('human-center-coordinate-values').value, /Center 2: x=820\.3, y=202/);
+    $('human-undo').click();
+    assert.doesNotMatch($('human-center-coordinate-values').value, /Center 2/);
+    $('human-clear').click();
+    $('human-show-full').checked = true;
+    $('human-show-full').dispatchEvent(new Event('change'));
+    pointAt('pointermove', .5, .5);
+    assert.equal($('human-pointer-position').textContent, 'Pointer: x=640, y=360');
+    pointAt('click', .5, .5);
+    assert.match($('human-center-coordinate-values').value, /Center 1: x=640, y=360/);
+    edit(false);
+    assert.equal($('human-center-coordinates').hidden, true);
+  });
+});
 
 test('Done applies pending edits, Apply & stay keeps selection, and completion requires all frames', async () => {
   await withReview(async ({ $, state, review, edit, addCenter, changes, document }) => {

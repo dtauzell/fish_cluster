@@ -727,7 +727,8 @@ function resultCropEntries() {
 }
 
 function cropCoordinateText(shape) {
-  return `x=${shape.x}, y=${shape.y}, width=${shape.width}, height=${shape.height}`;
+  const bounds = `x=${shape.x}, y=${shape.y}, width=${shape.width}, height=${shape.height}`;
+  return shape.polygon ? `${bounds}; corners=${JSON.stringify(shape.polygon)}` : bounds;
 }
 
 function renderResultCropCoordinates() {

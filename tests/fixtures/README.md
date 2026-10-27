@@ -1,5 +1,45 @@
 # Fish video regression images
 
+## Low-contrast fish in the lighter dark-side recording
+
+`lighter-dark-low-contrast/` contains samples 1 and 7–10 (one-based) of
+`single_fish_lighter_dark_part.mov` (1280 × 720, duration 63.33 seconds).
+Tank crop: `(452, 111, 491, 182)`; dark region: `(686, 118, 256, 169)`.
+Decode uses `crop=491:182:452:111:exact=1`, raw RGBA, and the app's
+`grayscale()` function. Background and expanded variation bounds use 25 samples
+at `(i + 0.5) * 63.33 / 25` seconds.
+
+Sample 1 is a direct seek to 0 seconds; samples 7–10 are 1.2–1.8 seconds.
+For sample 1, the user confirmed the fish near `(863, 257)` and the reflection
+near `(461.1, 257.4)`. The startup regression requires the selected center to be
+within 10 pixels of the fish and far from the reflection, without a prior track
+or coordinate hints. FFmpeg and Safari both select near `(865, 262)`.
+`single-fish-boundary.test.mjs` uses four-corner crop and dark-region geometry
+reconstructed from the user's screenshot, within these same bounding boxes.
+It reproduces the exact rejected wall location `(461.1, 257.4)`: a 4 × 66 region
+with contrast 35 (FFmpeg) or 32 (Safari), stronger than the fish's 21. Selection
+must prefer the supported fish and retain the wall candidate with rejection
+reason `wall-like-boundary-region`. A pipeline regression checks the first
+observed track and dark-side classification; controls preserve isolated wall
+candidates, observed paths near walls, and ambiguity among interior candidates.
+An additional controlled case reduces the recorded fish's contrast by 15% and
+adds a darker wall pulse near the reported reflection. Border recovery alone
+selects `(461, 256)`; running faint interior recovery first selects the confirmed
+fish near `(865, 262)`. This guards the startup ordering failure even when the
+unaltered decode already finds the fish.
+The default 24-level cutoff misses samples 7 and 9. Requiring a stable 18-level
+core while retaining connected 12-level body pixels gives approximate centers
+`(832, 210)` and `(852, 192)` respectively. The sequence regression checks track continuity through
+samples 7–10. Synthetic controls reject faint regions without a stronger core,
+ordinary background variation, excluded pixels, and light-side changes.
+
+`safari/` contains a separate browser decode with background and variation bounds
+and samples 1, 33–35, and 63–65 from the same crop. Samples 34 and 64 need a lower
+12-level core supported by the immediately previous observed fish. The regression
+checks centers near `(821, 239)` and `(809, 177)`, continuous track IDs, and known
+dark-side observations. Controls reject stale or uncertain history, incompatible
+size or motion, and pixels within ordinary background variation.
+
 ## Single fish crossing tank markings, sample 61
 
 `single-fish-ridge/` contains crops from `single_fish_dark_side - 1.mov`

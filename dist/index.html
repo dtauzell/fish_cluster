@@ -159,6 +159,13 @@
             </div>
           </div>
           <aside class="human-sidebar">
+            <div id="human-center-coordinates" class="human-center-coordinates" hidden>
+              <div class="center-coordinate-heading"><label for="human-center-coordinate-values">Center coordinates</label><output id="human-pointer-position">Move over the image to see coordinates.</output></div>
+              <p id="human-center-coordinate-help" class="human-help">Original video pixels. Numbers match the center labels on the image. Click the fish to add its center; you can copy coordinates before applying edits.</p>
+              <textarea id="human-center-coordinate-values" readonly rows="3" aria-describedby="human-center-coordinate-help"></textarea>
+              <button id="human-copy-center-coordinates" class="secondary" type="button">Copy center coordinates</button>
+              <span id="human-center-copy-status" class="human-help" role="status" aria-live="polite"></span>
+            </div>
 <div class="human-review-filter">
               <label>Frames<select id="human-frame-filter"><option value="included">Included in results</option><option value="all">All sampled frames</option><option value="mismatches">Count mismatches</option></select></label>
               <label>Review count (override)<input id="human-expected-fish" type="number" min="1" step="1" value="5"></label>
