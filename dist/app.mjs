@@ -96,7 +96,7 @@ function changeFrames() {
   return sides ? visibleSideChanges(sides, indices) : findChangeFrames(indices.map(index => state.reviewFrames[index]));
 }
 function selectedResultFrame() { return state.human.index == null ? null : state.reviewFrames[state.human.index]; }
-const { selectHumanFrame, indices: visibleResultIndices, refresh: refreshHumanFrame } = createHumanReview({
+const { selectHumanFrame, indices: visibleResultIndices, refresh: refreshHumanFrame, stopPlayback } = createHumanReview({
   state, video, humanCanvas, queuePreviewSeek,
   downloadFramePng: async (frame, view, fullFrame) => {
     const sample = String(frame.frameIndex + 1).padStart(6, '0');
@@ -122,6 +122,7 @@ window.addEventListener('unhandledrejection', event => {
   status(`Browser error: ${detail}`, true);
 });
 function resetHuman() {
+  stopPlayback();
   state.human = { marks: new Map(), candidateLabels: new Map(), reviewed: new Set(), index: null, loading: false };
   $('human-edit-centers').checked = false;
   $('human-review-link').hidden = true;

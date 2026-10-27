@@ -8,6 +8,74 @@ test.beforeEach(async ({ page }) => {
   page.on('pageerror', error => { throw error; });
 });
 
+test('review playback supports speed, stop, and spacebar without marking frames done', async ({ page }) => {
+  await analyzeVideo(page);
+  const play = page.locator('#human-play');
+  const stop = page.locator('#human-stop');
+  const item = page.locator('#human-frame-number');
+  await page.locator('#human-playback-speed').selectOption('1');
+  await play.click();
+  await expect(stop).toBeEnabled();
+  await page.waitForTimeout(300);
+  await expect(item).toHaveValue('1');
+  await expect(item).toHaveValue('2');
+  await stop.click();
+  const stopped = await item.inputValue();
+  await page.waitForTimeout(1200);
+  await expect(item).toHaveValue(stopped);
+
+  await page.locator('#human-playback-speed').selectOption('10');
+  await play.click();
+  await expect(item).not.toHaveValue(stopped);
+  // Space also works while the speed selector has focus.
+  await page.locator('#human-playback-speed').focus();
+  await page.keyboard.press('Space');
+  await expect(stop).toBeDisabled();
+  const paused = await item.inputValue();
+  await page.waitForTimeout(400);
+  await expect(item).toHaveValue(paused);
+  await page.keyboard.press('Space');
+  await expect(stop).toBeEnabled();
+  await expect(item).not.toHaveValue(paused);
+  await page.keyboard.press('Space');
+  await expect(stop).toBeDisabled();
+  // A held Space must not toggle repeatedly, including with Play focused.
+  await play.focus();
+  await page.keyboard.down('Space');
+  await expect(stop).toBeEnabled();
+  await page.keyboard.down('Space');
+  await expect(stop).toBeEnabled();
+  await page.keyboard.up('Space');
+  await page.keyboard.press('Space');
+  await expect(stop).toBeDisabled();
+  await expect(page.locator('#human-progress')).toContainText('0 of 12 frames done');
+});
+
+test('review playback finishes at the end, restarts, and stops on navigation', async ({ page }) => {
+  await analyzeVideo(page);
+  const item = page.locator('#human-frame-number');
+  const play = page.locator('#human-play');
+  const stop = page.locator('#human-stop');
+  await item.fill('11');
+  await item.press('Enter');
+  await expect(play).toBeEnabled();
+  await page.locator('#human-playback-speed').selectOption('10');
+  await play.click();
+  await expect(item).toHaveValue('12');
+  await expect(stop).toBeDisabled();
+  await play.click();
+  await expect(item).not.toHaveValue('12');
+  await page.keyboard.press('ArrowRight');
+  await expect(stop).toBeDisabled();
+  const paused = await item.inputValue();
+  await page.waitForTimeout(400);
+  await expect(item).toHaveValue(paused);
+  await play.click();
+  await page.getByRole('link', { name: 'Setup', exact: true }).click();
+  await page.getByRole('link', { name: 'Results', exact: true }).click();
+  await expect(stop).toBeDisabled();
+});
+
 test('switching units before analysis preserves the physical distance', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /Shoaling/ }).click();

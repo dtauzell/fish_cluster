@@ -25,6 +25,64 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     onChange: drawHumanFrame });
   const reviewHelp = $('review-help-dialog');
   let downloadingFrame = false;
+  let playing = false;
+  let playbackTimer;
+  let playbackRun = 0;
+  function updatePlaybackControls() {
+    $('human-play').disabled = playing || state.running || state.human.loading || state.human.loadFailed ||
+      state.human.index == null || visibleIndices().length < 2;
+    $('human-stop').disabled = !playing;
+  }
+  function stopPlayback() {
+    playing = false;
+    ++playbackRun;
+    clearTimeout(playbackTimer);
+    $('human-play').disabled = true;
+    $('human-stop').disabled = true;
+    if (state.settings && state.reviewFrames.length) updatePlaybackControls();
+  }
+  function schedulePlayback(run) {
+    if (!playing || run !== playbackRun) return;
+    const indices = visibleIndices();
+    const position = indices.indexOf(state.human.index);
+    if (state.running || $('human-page').hidden || state.human.loadFailed || position < 0 || position === indices.length - 1) {
+      stopPlayback();
+      return;
+    }
+    playbackTimer = setTimeout(async () => {
+      if (!playing || run !== playbackRun) return;
+      try {
+        await selectHumanFrame(indices[position + 1], true);
+        schedulePlayback(run);
+      } catch {
+        stopPlayback();
+      }
+    }, 1000 / Number($('human-playback-speed').value));
+  }
+  $('human-play').addEventListener('click', async () => {
+    if (playing || state.running || state.human.loading || state.human.loadFailed || state.human.index == null) return;
+    playing = true;
+    const run = ++playbackRun;
+    updatePlaybackControls();
+    // At the end, Play starts a fresh pass through this view.
+    const indices = visibleIndices();
+    if (state.human.index === indices.at(-1)) await selectHumanFrame(indices[0], true);
+    schedulePlayback(run);
+  });
+  $('human-stop').addEventListener('click', stopPlayback);
+  $('human-playback-speed').addEventListener('change', () => {
+    clearTimeout(playbackTimer);
+    if (playing && !state.human.loading) schedulePlayback(playbackRun);
+  });
+  // Inspecting, navigating, or editing a frame keeps it on screen.
+  $('human-page').addEventListener('pointerdown', event => {
+    if (!event.target.closest('#human-play, #human-stop, #human-playback-speed')) stopPlayback();
+  });
+  $('human-page').addEventListener('keydown', event => {
+    if (playing && event.key !== ' ' && !event.target.closest('#human-playback-speed')) stopPlayback();
+  });
+  window.addEventListener('hashchange', stopPlayback);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stopPlayback(); });
   $('review-help').addEventListener('click', () => reviewHelp.showModal());
   reviewHelp.addEventListener('click', event => {
     if (event.target !== reviewHelp) return;
@@ -257,6 +315,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     $('human-clear').disabled = busy || !editing;
     $('human-prev').disabled = state.human.loading || position <= 0;
     $('human-next').disabled = state.human.loading || position === indices.length - 1;
+    updatePlaybackControls();
     $('human-frame-details').innerHTML = `<div><span>Your fish in usable area</span><strong>${manual.fishCount}</strong></div>
       <div><span>Your fish outside usable area</span><strong>${outside}</strong></div>
       ${state.settings.tankZones?.length ? `<div><span>Fish by side (applied result)</span><strong>${frame.metrics.darkSideCount} dark / ${frame.metrics.lightSideCount} light / ${frame.metrics.unmarkedSideCount} unmarked</strong></div>` : ''}
@@ -271,7 +330,8 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
       <p class="shoaling-only">Your group sizes: ${[...manual.groupSizes].sort((a, b) => b - a).join('+') || 'none'}<br>Automatic group sizes: ${groupSignature({ metrics: automatic }) || 'none'}</p>`;
   }
 
-  function selectHumanFrame(index) {
+  function selectHumanFrame(index, fromPlayback = false) {
+    if (!fromPlayback) stopPlayback();
     if (state.running) return;
     $('human-download-status').textContent = '';
     const indices = updateReviewFilter();
@@ -437,6 +497,17 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     $('results-exports').querySelector('summary').focus({ preventScroll: true });
   });
   document.addEventListener('keydown', event => {
+    if (event.code === 'Space' && !$('human-page').hidden && !state.running &&
+        !reviewHelp.open && !$('test-change-dialog')?.open && !event.defaultPrevented &&
+        !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey &&
+        (playing || event.target.closest('#human-playback-speed') ||
+          !event.target.closest('input,select,textarea,summary,[role="button"],[contenteditable]:not([contenteditable="false"])'))) {
+      event.preventDefault();
+      if (event.repeat) return;
+      if (playing) stopPlayback();
+      else if (!$('human-play').disabled) $('human-play').click();
+      return;
+    }
     if (reviewHelp.open || $('test-change-dialog')?.open || $('human-page').hidden || state.running || event.defaultPrevented ||
         event.target.closest('input,select,textarea,summary,[role="button"],[contenteditable]:not([contenteditable="false"])')) return;
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z' && !event.shiftKey) {
@@ -511,5 +582,5 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     updateHumanDetails();
     drawHumanFrame();
   }
-  return { selectHumanFrame, indices: visibleIndices, refresh };
+  return { selectHumanFrame, indices: visibleIndices, refresh, stopPlayback };
 }

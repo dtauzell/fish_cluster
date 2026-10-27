@@ -1013,6 +1013,10 @@ footer {
 .results-workspace .human-controls {
   flex-wrap: wrap;
 }
+.results-workspace .human-playback {
+  justify-content: flex-start;
+  margin-top: 10px;
+}
 .results-workspace .human-view-controls {
   margin-left: auto;
 }
