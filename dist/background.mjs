@@ -226,6 +226,67 @@ function recoverLowContrastFish(blobs, frame, background, width, height, options
   }
 }
 
+// Search faint current pixels near image-supported candidates in the preceding
+// sample. A rejected candidate can be the visible body when selection followed
+// a disconnected tail or a reflection. History limits the search; it never
+// supplies a position without a new region beyond the learned brightness range.
+function recoverNearbyFish(blobs, frame, background, width, height, options, edges, threshold, minArea, maxArea) {
+  if (options.expectedFish !== 1 || options.threshold != null ||
+    options.recoverLowContrast === false || !options.backgroundVariation || !options.darkZones?.some(Boolean)) return;
+  const fragment = blobs.length === 1 && blobs[0].lowContrastRecovered && blobs[0].pixels ? blobs[0] : null;
+  if (blobs.length && !fragment) return;
+  const recent = timestamp => Number.isFinite(timestamp) && Number.isFinite(options.timestampMs) &&
+    options.timestampMs > timestamp && options.timestampMs - timestamp <= 250;
+  let references = [
+    ...(recent(options.previousTimestampMs) ? (options.previousDetections ?? [])
+      .map(point => ({ point, timestampMs: options.previousTimestampMs, selected: true })) : []),
+    ...(recent(options.previousCandidateTimestampMs) ? (options.previousCandidates ?? [])
+      .map(point => ({ point, timestampMs: options.previousCandidateTimestampMs })) : []),
+  ].filter(({ point }) => !point.positionUncertain && !point.splitFromBlob &&
+    point.positionSource !== 'overlap-estimate' && Number.isFinite(point.x) && Number.isFinite(point.y) &&
+    Number.isFinite(point.foregroundContrast) && point.supportPixelCount >= 5 &&
+    point.area > 0 && point.width > 0 && point.height > 0);
+  // A sudden loss of over half the observed body can leave only a faint patch.
+  // Expansion requires the previously selected observation, not alternatives.
+  if (fragment) references = references.filter(({ point, selected }) => selected && fragment.area < point.area * .5);
+  if (!references.length) return;
+  const nearbyMask = options.darkZones.map((dark, index) => dark &&
+    (!options.analysisMask || options.analysisMask[index]) && references.some(({ point }) =>
+      Math.hypot(index % width - point.x, Math.floor(index / width) - point.y) <= 60) ? 1 : 0);
+  const coreThreshold = threshold * .5;
+  // Keep the usual 12-level body where possible. Only a bounded temporal search
+  // may retain 8-level body pixels, still requiring a stable 12-level core.
+  // A partial outline first gets the more conservative 10-level retry, then 8.
+  const bodyThresholds = fragment ? [threshold * 5 / 12, threshold / 3] : [threshold * .5, threshold / 3];
+  for (const bodyThreshold of bodyThresholds) {
+    if (fragment && bodyThreshold >= fragment.foregroundThreshold) continue;
+    const mask = darkPixelMask(frame, background, width, height, bodyThreshold,
+      options.exclusions, options.darkZones, nearbyMask);
+    excludeBorders(mask, width, height, edges.edgeX, edges.edgeTop, edges.edgeBottom);
+    const candidates = connectedRegions(mask, width, height, { minArea, maxArea, minLength: 10 });
+    for (const candidate of candidates) {
+      const pixels = fragment ? new Set(candidate.pixels) : null;
+      if (fragment && (candidate.area <= fragment.area ||
+        fragment.pixels.filter(pixel => pixels.has(pixel)).length < fragment.area * .8)) continue;
+      const matches = references.filter(({ point }) =>
+        Math.hypot(candidate.x - point.x, candidate.y - point.y) <= (fragment ? 15 : 45) &&
+        candidate.area >= point.area * (fragment ? .5 : .35) && candidate.area <= point.area * (fragment ? 2 : 3) &&
+        Math.hypot(candidate.width, candidate.height) <= Math.hypot(point.width, point.height) * (fragment ? 1.5 : 2))
+        .sort((a, b) => Math.hypot(candidate.x - a.point.x, candidate.y - a.point.y) -
+          Math.hypot(candidate.x - b.point.x, candidate.y - b.point.y));
+      if (!matches.length || !hasStableForegroundEvidence(candidate, frame, background, coreThreshold, options)) continue;
+      const recovered = { ...candidate, lowContrastRecovered: true, nearbyFrameRecovered: true,
+        ...(fragment ? { nearbyFrameExpanded: true } : {}),
+        foregroundThreshold: bodyThreshold, foregroundCoreThreshold: coreThreshold,
+        lowContrastReferenceTimestampMs: matches[0].timestampMs,
+        lowContrastReferenceDetectionId: matches[0].point.detectionId };
+      if (fragment) { blobs.splice(0, 1, recovered); return; }
+      blobs.push(recovered);
+    }
+    if (!fragment && blobs.length) return;
+  }
+}
+
 // The known count guides recovery; it does not guarantee that every fish is found.
 function recoverEdgeFish(blobs, frame, background, width, height, options, edges, minArea) {
   const { edgeX, edgeTop, edgeBottom } = edges;
@@ -325,6 +386,8 @@ export function detectBackgroundFish(frame, background, width, height, options =
   // Look for supported faint fish inside the tank before relaxing its borders.
   // Otherwise a wall reflection can fill the count and block faint-fish recovery.
   recoverLowContrastFish(blobs, frame, background, width, height, options,
+    { edgeX, edgeTop, edgeBottom }, threshold, minArea, maxArea);
+  recoverNearbyFish(blobs, frame, background, width, height, options,
     { edgeX, edgeTop, edgeBottom }, threshold, minArea, maxArea);
   recoverEdgeFish(blobs, frame, background, width, height, options, { edgeX, edgeTop, edgeBottom }, minArea);
   joinSingleFishFragments(blobs, frame, background, width, threshold, options);

@@ -1,7 +1,7 @@
 /* One complete app version per cache; updates wait until existing tabs close. */
 importScripts('./offline-assets.js');
 
-const { revision, assets } = self.FISH_CLUSTER_OFFLINE;
+const { revision, version, assets } = self.FISH_CLUSTER_OFFLINE;
 const scope = self.registration.scope;
 const prefix = `fish-cluster-offline:${scope}:`;
 const cacheName = `${prefix}${revision}`;
@@ -36,6 +36,7 @@ self.addEventListener('activate', event => {
 // Only the explicit Force refresh action activates an update over open tabs.
 self.addEventListener('message', event => {
   if (event.data?.type === 'ACTIVATE_UPDATE') event.waitUntil(self.skipWaiting());
+  if (event.data?.type === 'GET_APP_VERSION') event.ports?.[0]?.postMessage({ revision, version });
 });
 
 self.addEventListener('fetch', event => {

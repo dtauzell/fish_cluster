@@ -25,7 +25,11 @@ model. Choose **Background subtraction** for offline analysis. External links su
 as GitHub and Roboflow also need internet. Fonts use the local sans-serif fallback.
 
 An updated app downloads during a later online visit and takes effect after all
-tabs for this app close. To load it immediately, use **Force refresh** at the very
+tabs for this app close. While open and visible, the app checks every five minutes,
+on returning to its tab (at most once per minute), and immediately on reconnecting.
+Hidden tabs defer checks until visible. Failed checks leave the current app usable;
+successful downloads show **App update saved** and wait for you to refresh.
+To load it immediately, use **Force refresh** at the very
 bottom of the app. It checks for an update, finishes downloading it, activates it,
 and reloads. With a video loaded, it asks before discarding the video and unsaved
 analysis or corrections. Saved setups, trial summaries, and labeling progress are
@@ -36,6 +40,15 @@ while the server is running. Restart the server after changing server code.
 Browser site-data clearing or storage eviction removes
 the offline copy; revisit online to restore it. Offline access requires a browser
 with service workers enabled; private browsing may restrict it.
+
+Beside Force refresh, **Version** shows the short Git commit ID and its commit
+date/time in your local timezone. **modified** means the prepared copy includes
+uncommitted changes; the date still refers to the commit. Hover over the label for
+the full commit, its original timestamp, and the offline build hash. This metadata
+is saved by `npm run offline:prepare` and read from the service worker serving the
+current app, so an older offline copy keeps its own version until refreshed.
+The dev server also generates this metadata when checking for local updates.
+Copies prepared without Git metadata display **Version unavailable**.
 
 ## Use
 
@@ -230,6 +243,25 @@ detections with `lowContrastRecovered`, `foregroundThreshold`, and
 When a nearby observed fish was present within 250 ms, recovery can also use a
 12-level core if current foreground, body size, and movement agree with that
 observation. JSON records `lowContrastReferenceTimestampMs` for these detections.
+If the ordinary passes find no fish, a further local search can use supported
+candidates from the preceding sample, including rejected alternatives. References
+must be within 250 ms; the new region must be within 45 pixels, with compatible
+area and dimensions. It tries 12-level body pixels first, then 8-level pixels,
+always requiring a 12-level core beyond the learned brightness range. The search
+is limited to the marked dark region near those candidates and respects masks.
+It measures a new center from the current image rather than carrying a position
+through a gap. JSON marks this retry with `nearbyFrameRecovered` and records the
+reference timestamp and candidate ID. This recovers samples 307–310 in the
+lighter-dark recording, where tank markings separate the faint fish from the
+previously selected fragment.
+If one faint recovered region suddenly shrinks below half the preceding selected
+body’s area, a tighter retry can retain connected body pixels at contrast 10 or 8.
+The new region must contain at least 80% of that fragment, have a stable 12-level
+core, and remain within 15 pixels of the previous center with compatible area and
+dimensions. This recovers the fuller body in frame 153 during a turn. It records
+`nearbyFrameExpanded` in JSON and does not expand ordinary strong detections or
+use rejected alternatives as body-size references. Reanalyze existing recordings
+to apply these changes.
 Faint interior recovery runs before relaxing the tank borders, so a wall
 reflection cannot fill the expected count and prevent that recovery step.
 
@@ -425,7 +457,14 @@ Create the Pages project once. Skip this command if `fish-cluster` already exist
 npx wrangler pages project create fish-cluster --production-branch main
 ```
 
-Test and deploy the current `dist/` directory to production:
+Prepare the Git version and offline assets, run tests, and deploy to production:
+
+```sh
+npm run deploy
+```
+
+This runs the following commands in order. The preparation step stamps the current
+Git commit and commit date, plus whether the source includes uncommitted edits:
 
 ```sh
 npm run offline:prepare

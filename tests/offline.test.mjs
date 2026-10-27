@@ -58,9 +58,9 @@ function workerHarness(scope = 'https://fish.example/tools/fish/', { redirectHTM
     disconnect: () => { online = false; },
     claimed: () => claimed,
     skippedWaiting: () => skippedWaiting,
-    message: data => {
+    message: (data, ports = []) => {
       let completion;
-      handlers.get('message')({ data, waitUntil: promise => { completion = promise; } });
+      handlers.get('message')({ data, ports, waitUntil: promise => { completion = promise; } });
       return completion;
     },
     lifecycle: name => new Promise((resolve, reject) => handlers.get(name)({
@@ -76,7 +76,12 @@ function workerHarness(scope = 'https://fish.example/tools/fish/', { redirectHTM
 }
 
 test('offline inventory and release revision match all deployed source', async () => {
-  assert.equal(manifest, await offlineManifest(), 'Run npm run offline:prepare after editing dist/');
+  // A committed snapshot records the Git state when prepared. Committing it
+  // necessarily advances HEAD; verify assets using that recorded stamp.
+  const snapshot = { self: {} };
+  vm.runInNewContext(manifest, snapshot);
+  assert.equal(manifest, await offlineManifest({ version: snapshot.self.FISH_CLUSTER_OFFLINE.version }),
+    'Run npm run offline:prepare after editing dist/');
 });
 
 test('updates wait for open tabs unless Force refresh explicitly requests activation', async () => {
@@ -87,6 +92,16 @@ test('updates wait for open tabs unless Force refresh explicitly requests activa
   assert.equal(worker.skippedWaiting(), false);
   await worker.message({ type: 'ACTIVATE_UPDATE' });
   assert.equal(worker.skippedWaiting(), true);
+});
+
+test('the serving worker reports its own cached commit and date without checking the network', () => {
+  const worker = workerHarness();
+  worker.disconnect();
+  let metadata;
+  worker.message({ type: 'GET_APP_VERSION' }, [{ postMessage: value => { metadata = value; } }]);
+  assert.equal(metadata.revision, worker.self.FISH_CLUSTER_OFFLINE.revision);
+  assert.deepEqual(metadata.version, worker.self.FISH_CLUSTER_OFFLINE.version);
+  assert.ok(Object.hasOwn(metadata.version, 'commitDate'));
 });
 
 test('first installation caches every asset, including unvisited help and modules, for offline reloads', async () => {

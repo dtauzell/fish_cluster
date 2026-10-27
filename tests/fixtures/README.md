@@ -50,15 +50,45 @@ checks that observed motion breaks the ambiguous previous-position match in
 favor of the fish while preserving the path through sample 145. The competing
 region's scores and shape are stress inputs, not measured Safari evidence.
 
+## Faint fish near tank markings, samples 303–313
+
+`lighter-dark-nearby/` contains 25 background samples and samples 303–313 from
+`single_fish_lighter_dark_part.mov`, encoded as concatenated gzip-compressed
+PGM images (`P5\n140 90\n255\n`). They preserve original video rectangle
+`(760, 190, 140, 90)`, crop-local `(308, 79)`, with unmodified grayscale pixels.
+Tests place this rectangle in the shared median background so surrounding tank
+pixels stay fixed. Background times and tank/dark polygons match the earlier
+lighter-dark regressions. Video samples use every sixth native frame at 30 fps.
+
+The prior full-frame replay missed samples 307–310. Sample 306 had two supported
+regions: the selected fragment near `(866, 223)` and a rejected body region near
+`(821, 248)`. The latter supports a faint region in sample 307; it then supports
+the following observed samples. Sample 310 requires 8-level connected body
+pixels while retaining a stable 12-level core. Approximate visually checked
+recovered body centers are `(818, 247)`, `(817, 247)`, `(806, 247)`, and `(810, 247)`.
+`single-fish-nearby.test.mjs` checks those samples, correction of sample 306,
+track continuity, dark-side time, and speed coverage. Controls reject stale or
+unsupported references, ordinary learned variation, empty frames, masked pixels,
+and weak pixels without the required core. These are FFmpeg images; browser
+seeking may select neighboring native frames.
+
 ## Fish resting over embossed lettering, samples 172–264
 
-`lighter-dark-lettering/` stores two gzip-compressed sequences of concatenated
+`lighter-dark-lettering/` stores gzip-compressed sequences of concatenated
 lossless PGM images (each image has header `P5\n100 115\n255\n`).
 `background-samples.pgm.gz` contains 25 reference samples at
 `(i + 0.5) * 63.33 / 25` seconds. `samples-169-266.pgm.gz` contains 98 samples,
 including three preceding samples and two following samples around the reported
 93-sample interval. Video: `single_fish_lighter_dark_part.mov`, same tank and dark
 polygons as the angled-crop first-frame regression.
+
+`samples-149-156.pgm.gz` adds eight samples around the turn in frame 153, using
+the same unmodified rectangle and reference images. The original 12-level body
+segmentation shrinks from area 307 in frame 152 to area 138 in frame 153, moving
+the center left to about `(842, 214)`. A bounded 10-level retry retains a connected
+area of 416 near `(851, 212)`, while still requiring a stable 12-level core.
+The regression checks the measured outline, track continuity, stale or invalid
+references, masks, and controls that remove the faint connecting body pixels.
 
 To keep the data compact, these images preserve original video rectangle
 `(800, 160, 100, 115)`, containing the fish, embossed letters, and surrounding

@@ -35,6 +35,30 @@ previous area, and its bounding diagonal is at most 1.5 times the previous one.
 This permits a small bright core to retain its connected body without treating
 an estimate as a new observation.
 
+When both ordinary detection and faint recovery leave an empty frame,
+`recoverNearbyFish()` searches dark-region pixels within 60 pixels of supported
+candidates from the preceding 250 ms. `pipeline.mjs` supplies the original
+candidates as well as the kept detection so a rejected body region remains a
+possible reference. Split, uncertain, unsupported, and stale references cannot
+seed this pass. It tries 12-level segmentation before 8-level segmentation, still
+requiring at least five pixels and 8% of each new region beyond the learned range
+by 12 levels. The new center must be within 45 pixels of a reference, with area
+between .35 and 3 times its area and diagonal at most twice its diagonal. Crop
+geometry and reflection masks apply before and after morphology. Recovered
+regions retain their measured pixels and receive `nearbyFrameRecovered`,
+`foregroundThreshold`, `foregroundCoreThreshold`, `lowContrastReferenceTimestampMs`,
+and `lowContrastReferenceDetectionId`. Ordinary selection and tracking then apply;
+this pass does not fill missing positions by prediction or interpolation.
+
+The same local search can expand a single low-contrast region that has shrunk
+below half the area of the preceding selected observation. It tries 10-level,
+then 8-level segmentation, with the same 12-level stable-core check. An expansion
+must contain at least 80% of the original fragment, its new center must be within
+15 pixels of the preceding center, its area between half and twice the preceding
+area, and its diagonal at most 1.5 times the preceding diagonal. Rejected
+alternatives cannot authorize expansion. Successful retries add
+`nearbyFrameExpanded`; otherwise the original fragment remains unchanged.
+
 Side and velocity calculations accept rejected candidates only when the recorded,
 versioned selection rule confidently resolves them. Ambiguous choices and generic
 center-distance filtering still invalidate automatic intervals. All candidates

@@ -66,11 +66,21 @@ function images(name, count) {
 }
 const references = images('background-samples', 25);
 const sequence = images('samples-169-266', 98);
+const turn = images('samples-149-156', 8);
 const background = medianBackground(references);
 const ordinary = backgroundVariation(references, crop.width, crop.height);
 const learned = backgroundVariation(references, crop.width, crop.height, { excludeForegroundRuns: true });
 const options = { expectedFish: 1, darkZones: darkZoneMask(crop, tankZones), analysisMask: analysisPixelMask(crop),
   edgeX: 0, edgeTop: 0, edgeBottom: 0 };
+function observedTurnReference() {
+  let previous;
+  for (const [i, image] of turn.slice(0, 4).entries()) {
+    previous = detectBackgroundFish(image, background, crop.width, crop.height,
+      { ...options, backgroundVariation: learned, previousDetections: previous ? [previous] : [],
+        previousTimestampMs: (i - 1) * 200, timestampMs: i * 200 })[0];
+  }
+  return previous;
+}
 
 test('the stationary fish over lettering is image-supported after sustained foreground is excluded from learning', () => {
   const frame = sequence[200 - 169];
@@ -113,6 +123,79 @@ test('the embossed lettering alone does not become a fish after foreground learn
   const frame = references[10];
   assert.equal(detectBackgroundFish(frame, background, crop.width, crop.height,
     { ...options, backgroundVariation: learned }).length, 0);
+});
+
+test('frame 153 retains the faint connected body after its ordinary outline suddenly shrinks', () => {
+  const detect = extra => detectBackgroundFish(turn[153 - 149], background, crop.width, crop.height,
+    { ...options, backgroundVariation: learned, timestampMs: 200, ...extra });
+  const previous = observedTurnReference();
+  const fragment = detect()[0];
+  assert.ok(fragment.area < previous.area * .5);
+  assert.ok(Math.hypot(fragment.x + crop.x - 842, fragment.y + crop.y - 214) < 2);
+  const points = detect({ previousDetections: [previous], previousTimestampMs: 0 });
+  assert.equal(points.length, 1);
+  const point = points[0];
+  assert.ok(Math.hypot(point.x + crop.x - 851, point.y + crop.y - 212) < 2);
+  assert.ok(point.area > fragment.area * 2 && point.width > fragment.width * 2);
+  assert.equal(point.nearbyFrameExpanded, true);
+  assert.equal(point.foregroundThreshold, 10);
+  assert.equal(point.foregroundCoreThreshold, 12);
+  assert.equal(point.lowContrastReferenceTimestampMs, 0);
+  for (const extra of [
+    { previousTimestampMs: -600 }, { previousTimestampMs: 200 }, { previousTimestampMs: undefined },
+    { previousDetections: [{ ...previous, positionUncertain: true }] },
+    { previousDetections: [{ ...previous, splitFromBlob: true }] },
+    { previousDetections: [{ ...previous, x: previous.x - 60 }] },
+    { previousDetections: [{ ...previous, area: 10000 }] },
+    { previousDetections: [{ ...previous, width: 1, height: 1 }] },
+    { previousDetections: [], previousCandidates: [previous], previousCandidateTimestampMs: 0 },
+  ]) {
+    const result = detect({ previousDetections: [previous], previousTimestampMs: 0, ...extra });
+    assert.equal(result[0].nearbyFrameExpanded, undefined);
+    assert.equal(result[0].area, fragment.area);
+  }
+});
+
+test('frame 153 expansion uses current connected pixels instead of copying the previous outline', () => {
+  const frame = turn[153 - 149];
+  const previous = observedTurnReference();
+  const context = { ...options, backgroundVariation: learned, timestampMs: 200, previousTimestampMs: 0,
+    previousDetections: [previous] };
+  const fragment = detectBackgroundFish(frame, background, crop.width, crop.height,
+    { ...options, backgroundVariation: learned })[0];
+  const cropped = background.slice();
+  for (let y = 208 - crop.y; y < 221 - crop.y; y++) {
+    for (let x = 830 - crop.x; x < 854 - crop.x; x++) cropped[y * crop.width + x] = frame[y * crop.width + x];
+  }
+  const result = detectBackgroundFish(cropped, background, crop.width, crop.height, context);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].nearbyFrameExpanded, undefined);
+  assert.ok(result[0].area <= fragment.area);
+  assert.equal(detectBackgroundFish(background, background, crop.width, crop.height, context).length, 0);
+  assert.equal(detectBackgroundFish(frame, background, crop.width, crop.height,
+    { ...context, exclusions: [{ x: 348, y: 49, width: 100, height: 115 }] }).length, 0);
+});
+
+test('frame 153 pipeline uses the fuller current-image center while retaining one observed track', async () => {
+  let reads = 0, time = 0;
+  const source = { seekTo: async value => { time = value; }, readGray: () => reads < 25
+    ? references[reads++] : (reads++, turn[Math.round(time * 5)]) };
+  const config = { method: 'background', testType: 'light-dark', expectedFish: 1, trackFish: true,
+    intervalMs: 200, crop, tankZones, exclusions: [], pixelsPerInch: 30.6, thresholdPx: 45 };
+  const frames = [];
+  for await (const event of analyzeVideo({ config, source, duration: 63.33,
+    isStopped: () => frames.length === turn.length })) if (event.frame) frames.push(event.frame);
+  const frame = frames[153 - 149], point = frame.detections[0];
+  assert.equal(frame.selectionConfident, true);
+  assert.equal(point.nearbyFrameExpanded, true);
+  assert.ok(Math.hypot(point.x - 851, point.y - 212) < 2);
+  assert.equal(point.positionSource, 'observed');
+  assert.equal(point.positionUncertain, false);
+  assert.equal(point.lowContrastReferenceTimestampMs, frames[152 - 149].timestampMs);
+  assert.ok(frames.every(sample => sample.detections[0].trackId === point.trackId));
+  const report = lightDarkReport(frames, config);
+  assert.equal(report.unknownTimeSeconds, 0);
+  assert.equal(report.velocity.validIntervalCount, frames.length - 1);
 });
 
 test('a small bright core can retain a faint body matching a recent full observation', () => {

@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "offline:prepare": "node scripts/offline-assets.mjs",
+    "deploy": "npm run offline:prepare && npm test && npx wrangler pages deploy dist --project-name fish-cluster --branch main",
     "dev": "node dev-server.mjs",
     "test": "node --test tests/*.test.mjs"
   }
