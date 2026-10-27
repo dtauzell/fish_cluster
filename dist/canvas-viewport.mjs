@@ -1,10 +1,13 @@
 /** Size the canvas itself so pointer coordinates exclude the surrounding letterbox. */
 export function createCanvasViewport({ canvas, viewport, controls, dimensions, onChange }) {
   let zoom = 1;
+  const fitMargin = 24;
   function resize() {
     const { width, height } = dimensions();
     if (!width || !height || !viewport.clientWidth || !viewport.clientHeight) return false;
-    const scale = Math.min(viewport.clientWidth / width, viewport.clientHeight / height) * zoom;
+    const availableWidth = Math.max(1, viewport.clientWidth - fitMargin * 2);
+    const availableHeight = Math.max(1, viewport.clientHeight - fitMargin * 2);
+    const scale = Math.min(availableWidth / width, availableHeight / height) * zoom;
     const nextWidth = `${Math.max(1, Math.floor(width * scale))}px`;
     const nextHeight = `${Math.max(1, Math.floor(height * scale))}px`;
     const changed = canvas.style.width !== nextWidth || canvas.style.height !== nextHeight;

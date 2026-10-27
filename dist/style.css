@@ -90,3 +90,13 @@
 .side-timeline-legend span{display:flex;align-items:center;gap:5px}
 .side-timeline-legend i{display:inline-block;width:14px;height:5px;border-radius:2px}
 .side-dark{background:#bdadff}.side-light{background:#69e3e9}.side-unknown{background:#52666f}
+
+#results-crops{margin:0 0 22px}
+#results-crops>p{margin:10px 0}
+.results-crop-list{display:grid;gap:8px;margin:12px 0}
+.results-crop-row{display:grid;grid-template-columns:minmax(120px,auto) minmax(0,1fr) auto;align-items:center;gap:10px;padding:9px 11px;background:#0c2029;border:1px solid #29414a;border-radius:8px}
+.results-crop-row strong{font-size:12px}
+.results-crop-row code{color:#c2dbd5;font-size:12px;overflow-wrap:anywhere}
+.results-crop-row button{padding:6px 10px}
+#copy-all-crops{margin-bottom:8px}
+@media(max-width:560px){.results-crop-row{grid-template-columns:1fr auto}.results-crop-row code{grid-column:1}.results-crop-row button{grid-column:2;grid-row:1/3}}

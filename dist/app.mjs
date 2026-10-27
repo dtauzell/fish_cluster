@@ -386,9 +386,10 @@ function updateCalibrationControls() {
   const line = state.calibrationLine;
   $('apply-calibration').disabled = !line;
   $('clear-calibration').disabled = !line;
+  const unit = $('distance-units').value === 'cm' ? 'centimeters' : 'inches';
   $('calibration-status').textContent = line
-    ? `Line: ${fmt(Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y), 2)} video pixels. Enter its length in inches, then click Use this scale.`
-    : 'Draw along a known distance in the preview, enter its length in inches, then use the scale.';
+    ? `Line: ${fmt(Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y), 2)} video pixels. Enter its length in ${unit}, then click Use this scale.`
+    : `Draw along a known distance in the preview, enter its length in ${unit}, then use the scale.`;
 }
 $('draw-calibration').addEventListener('click', () => {
   $('crop-tool').value = 'calibrate';
@@ -400,10 +401,12 @@ $('apply-calibration').addEventListener('click', () => {
   if (state.running || !state.calibrationLine) return;
   try {
     const { start, end } = state.calibrationLine;
-    const scale = calibrationFromLine(start, end, Number($('calibration-length').value));
+    const length = Number($('calibration-length').value) / ($('distance-units').value === 'cm' ? 2.54 : 1);
+    const scale = calibrationFromLine(start, end, length);
     $('grid-pixels').value = Number(scale.gridPixels.toPrecision(12));
     $('grid-pixels').dispatchEvent(new Event('change'));
-    $('calibration-status').textContent = `Scale applied: ${fmt(scale.pixelsPerInch, 3)} pixels/inch (${fmt(scale.gridPixels, 3)} pixels per 0.5-inch square).`;
+    const cm = $('distance-units').value === 'cm';
+    $('calibration-status').textContent = `Scale applied: ${fmt(scale.pixelsPerInch / (cm ? 2.54 : 1), 3)} pixels/${cm ? 'cm' : 'inch'} (${fmt(scale.gridPixels, 3)} pixels per 0.5-inch square).`;
   } catch (error) { $('calibration-status').textContent = error.message; }
 });
 $('clear-calibration').addEventListener('click', () => {
@@ -464,12 +467,13 @@ for (const id of ['undo-zone', 'clear-zones']) {
 }
 
 function settings() {
+  const distanceScale = $('distance-units').value === 'cm' ? 1 / 2.54 : 1;
   return createSettings({
     testType: state.testType,
     intervalMs: Number($('interval').value),
     filterExactCount: $('filter-exact-count').checked,
     filterFrameCount: Number($('filter-frame-count').value),
-    thresholdInches: Number($('threshold').value),
+    thresholdInches: Number($('threshold').value) * distanceScale,
     gridPixels: Number($('grid-pixels').value),
     method: $('method').value,
     expectedFish: state.testType === 'light-dark' ? 1 : Number($('expected-fish').value),
@@ -482,6 +486,29 @@ function settings() {
     key: $('publishable-key').value.trim()
   }, state.crop, video.videoWidth, video.videoHeight, state.exclusions, state.tankZones);
 }
+
+function displayDistance(inches, digits = 2) {
+  const cm = $('distance-units').value === 'cm';
+  return `${fmt(inches * (cm ? 2.54 : 1), digits)} ${cm ? 'cm' : 'in'}`;
+}
+function updateDistanceUnits() {
+  const cm = $('distance-units').value === 'cm';
+  $('threshold-unit').textContent = cm ? 'cm' : 'inches';
+  $('threshold').step = cm ? '0.1' : '0.01';
+  $('calibration-unit').textContent = cm ? 'cm' : 'inches';
+  $('calibration-length').value = cm ? '1.27' : '0.5';
+  $('scale-summary').textContent = `${fmt(Number($('grid-pixels').value) * 2 / (cm ? 2.54 : 1), 2)} px/${cm ? 'cm' : 'in'}`;
+  if (state.settings && !state.running && state.reviewFrames.length) {
+    $('threshold').value = (state.settings.thresholdInches * (cm ? 2.54 : 1)).toFixed(2);
+    $('cluster-distance').value = state.settings.thresholdInches;
+    drawClusterChart();
+    $('stat-distance').textContent = Number.isFinite(summarizeFrames(state.frames).meanPairDistanceInches)
+      ? displayDistance(summarizeFrames(state.frames).meanPairDistanceInches) : '—';
+    $('distance-note').textContent = `approximate · ${fmt(summarizeFrames(state.frames).meanPairDistancePx)} px · ${fmt(state.settings.pixelsPerInch / (cm ? 2.54 : 1))} px/${cm ? 'cm' : 'in'}`;
+    refreshHumanFrame();
+  }
+}
+$('distance-units').addEventListener('change', updateDistanceUnits);
 
 let filterCountOverridden = false;
 $('expected-fish').addEventListener('change', () => {
@@ -645,13 +672,16 @@ function showResults(preserveSelection = false) {
   }
   if (!preserveSelection) state.human.index = visibleResultIndices()[0] ?? null;
   const summary = summarizeFrames(state.frames);
+  renderResultCropCoordinates();
+  $('cluster-distance').value = state.settings.thresholdInches;
   velocity.refresh();
   state.resultsReady = true;
   $('results').hidden = location.hash !== '#results';
   updateWorkflow();
   $('stat-fish').textContent = fmt(summary.meanFishCount);
-  $('stat-distance').textContent = Number.isFinite(summary.meanPairDistanceInches) ? `${fmt(summary.meanPairDistanceInches, 2)} in` : '—';
-  $('distance-note').textContent = `approximate · ${fmt(summary.meanPairDistancePx)} px · ${fmt(state.settings.pixelsPerInch)} px/in`;
+  $('stat-distance').textContent = Number.isFinite(summary.meanPairDistanceInches) ? displayDistance(summary.meanPairDistanceInches) : '—';
+  const cmUnits = $('distance-units').value === 'cm';
+  $('distance-note').textContent = `approximate · ${fmt(summary.meanPairDistancePx)} px · ${fmt(state.settings.pixelsPerInch / (cmUnits ? 2.54 : 1))} px/${cmUnits ? 'cm' : 'in'}`;
   $('stat-close').textContent = Number.isFinite(summary.meanCloseFishFraction) ? `${fmt(summary.meanCloseFishFraction * 100, 0)}%` : '—';
   $('stat-clusters').textContent = fmt(summary.meanClusterCount);
   $('results-inclusion').textContent = `${state.frames.length} of ${state.reviewFrames.length} samples included${!state.frames.length ? '. Choose All sampled frames or Count mismatches to correct excluded samples.' : '. Corrections update these measurements and exports.'}`;
@@ -659,7 +689,7 @@ function showResults(preserveSelection = false) {
     const report = lightDarkReport(state.reviewFrames, state.settings);
     for (const [id,key] of [['ld-dark','darkTimeSeconds'],['ld-light','lightTimeSeconds'],['ld-unknown','unknownTimeSeconds']]) $(id).textContent = `${fmt(report[key], 2)} s`;
     $('ld-switches').textContent = report.zoneSwitchCount;
-    $('ld-speed').textContent = report.averageSpeedPxPerSecond == null ? '—' : `${fmt(report.averageSpeedPxPerSecond, 2)} px/s · ${fmt(report.averageSpeedInchesPerSecond, 2)} in/s`;
+    $('ld-speed').textContent = report.averageSpeedPxPerSecond == null ? '—' : `${fmt(report.averageSpeedPxPerSecond, 2)} px/s · ${displayDistance(report.averageSpeedInchesPerSecond).replace(' ', '')}/s`;
     $('ld-coverage').textContent = `${fmt(report.observedDurationSeconds, 2)} s sampled window · ${fmt((report.coverageFraction ?? 0) * 100, 1)}% side coverage · ${fmt(report.velocityDurationSeconds, 2)} s measured for speed${state.analysisComplete ? '' : ' · Partial analysis'}.`;
     $('results-inclusion').textContent = `All ${state.reviewFrames.length} sampled frames contribute to this report. Unknown intervals remain in the time totals. Corrections update measurements and exports.`;
     updateSelectedFrameDetails(); drawTimeline(); experimentTools.refresh(); return;
@@ -685,6 +715,68 @@ function showResults(preserveSelection = false) {
   const uncertain = state.frames.filter(frame => frame.metrics.uncertainPositionCount).length;
   if (uncertain) $('random-summary').textContent += ` Distances and groups include uncertain overlap estimates in ${uncertain} frame(s). Check these in this view; dashed rings and † mark estimated positions.`;
 }
+
+function resultCropEntries() {
+  const crop = state.settings?.crop;
+  if (!crop) return [];
+  return [
+    { name: 'Tank crop', shape: crop },
+    ...(state.settings.tankZones ?? []).map((shape, index) => ({ name: `${shape.side ?? 'Tank'} region ${index + 1}`, shape })),
+    ...(state.settings.exclusions ?? []).map((shape, index) => ({ name: `Reflection mask ${index + 1}`, shape }))
+  ];
+}
+
+function cropCoordinateText(shape) {
+  return `x=${shape.x}, y=${shape.y}, width=${shape.width}, height=${shape.height}`;
+}
+
+function renderResultCropCoordinates() {
+  const container = $('results-crop-list');
+  container.replaceChildren();
+  for (const { name, shape } of resultCropEntries()) {
+    const row = document.createElement('div');
+    row.className = 'results-crop-row';
+    const label = document.createElement('strong');
+    label.textContent = name;
+    const value = document.createElement('code');
+    value.textContent = cropCoordinateText(shape);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'secondary';
+    button.dataset.copyCrop = cropCoordinateText(shape);
+    button.textContent = 'Copy';
+    row.append(label, value, button);
+    container.append(row);
+  }
+}
+
+async function copyCropCoordinates(value) {
+  try {
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(value);
+    else {
+      const input = document.createElement('textarea');
+      input.value = value;
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.append(input);
+      input.select();
+      const copied = document.execCommand('copy');
+      input.remove();
+      if (!copied) throw new Error('Clipboard copy was unavailable');
+    }
+    $('crop-copy-status').textContent = 'Coordinates copied.';
+  } catch {
+    $('crop-copy-status').textContent = 'Copy was blocked. Select and copy the coordinate text above.';
+  }
+}
+
+$('results-crop-list').addEventListener('click', event => {
+  const button = event.target.closest('[data-copy-crop]');
+  if (button) copyCropCoordinates(button.dataset.copyCrop);
+});
+$('copy-all-crops').addEventListener('click', () => {
+  copyCropCoordinates(resultCropEntries().map(({ name, shape }) => `${name}: ${cropCoordinateText(shape)}`).join('\n'));
+});
 
 function drawTimeline() {
   const canvas = $('change-timeline');
@@ -755,13 +847,14 @@ function drawClusterChart() {
   if (state.testType === 'light-dark') { $('cluster-chart').replaceChildren(); return; }
   const frame = selectedResultFrame();
   if (!frame) { $('cluster-chart').replaceChildren(); return; }
-  const maxInches = Number($('cluster-distance').max);
+    const maxInches = Number($('cluster-distance').max);
   const points = Array.from({ length: 101 }, (_, i) => analyzeFrame(frame.detections, maxInches * state.settings.pixelsPerInch * i / 100));
   const ymax = Math.max(1, frame.detections.length);
   const path = key => points.map((point, i) => `${i ? 'L' : 'M'}${30 + i * 5.5},${130 - point[key] * 110 / ymax}`).join(' ');
   const marker = 30 + state.settings.thresholdInches / maxInches * 550;
-  $('cluster-chart').innerHTML = `<line x1="30" y1="130" x2="580" y2="130" stroke="#5d7880"/><line x1="30" y1="20" x2="30" y2="130" stroke="#5d7880"/><path d="${path('clusterCount')}" fill="none" stroke="#8ce6ce" stroke-width="3"/><path d="${path('isolatedCount')}" fill="none" stroke="#f6d979" stroke-width="3"/><line x1="${marker}" y1="18" x2="${marker}" y2="130" stroke="#ffffff" stroke-dasharray="4 4"/><text x="30" y="151" fill="#a8c2c0" font-size="12">0 in</text><text x="535" y="151" fill="#a8c2c0" font-size="12">${fmt(maxInches, 1)} in</text><text x="5" y="24" fill="#a8c2c0" font-size="12">${ymax}</text>`;
-  $('cluster-distance-label').textContent = `${fmt(state.settings.thresholdInches, 2)} in (${fmt(state.settings.thresholdPx)} px)`;
+  const cm = $('distance-units').value === 'cm';
+  $('cluster-chart').innerHTML = `<line x1="30" y1="130" x2="580" y2="130" stroke="#5d7880"/><line x1="30" y1="20" x2="30" y2="130" stroke="#5d7880"/><path d="${path('clusterCount')}" fill="none" stroke="#8ce6ce" stroke-width="3"/><path d="${path('isolatedCount')}" fill="none" stroke="#f6d979" stroke-width="3"/><line x1="${marker}" y1="18" x2="${marker}" y2="130" stroke="#ffffff" stroke-dasharray="4 4"/><text x="30" y="151" fill="#a8c2c0" font-size="12">0 ${cm ? 'cm' : 'in'}</text><text x="535" y="151" fill="#a8c2c0" font-size="12">${fmt(maxInches * (cm ? 2.54 : 1), 1)} ${cm ? 'cm' : 'in'}</text><text x="5" y="24" fill="#a8c2c0" font-size="12">${ymax}</text>`;
+  $('cluster-distance-label').textContent = `${displayDistance(state.settings.thresholdInches)} (${fmt(state.settings.thresholdPx)} px)`;
 }
 
 function queuePreviewSeek(token, timestampMs, render) {
@@ -881,7 +974,8 @@ function updateSamplingSummary() {
 }
 $('interval').addEventListener('input', updateSamplingSummary);
 function updateScaleSummary() {
-  $('scale-summary').textContent = `${fmt(Number($('grid-pixels').value) * 2, 2)} px/in`;
+  const cm = $('distance-units').value === 'cm';
+  $('scale-summary').textContent = `${fmt(Number($('grid-pixels').value) * 2 / (cm ? 2.54 : 1), 2)} px/${cm ? 'cm' : 'in'}`;
 }
 $('grid-pixels').addEventListener('input', updateScaleSummary);
 $('grid-pixels').addEventListener('change', updateScaleSummary);
@@ -910,7 +1004,6 @@ $('selection-shape').addEventListener('change', () => {
   state.corners = []; state.drag = null;
   if ($('selection-shape').value === 'polygon') {
     if ($('crop-tool').value === 'calibrate') $('crop-tool').value = state.areaTool;
-    if ($('crop-tool').value === 'crop') { state.focusTank = false; previewViewport.reset(); }
   }
   updateCornerControls(); drawFrame(null);
 });

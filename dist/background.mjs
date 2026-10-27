@@ -101,8 +101,8 @@ function darkPixelMask(frame, background, width, height, threshold, exclusions, 
     for (let x = 0; x < width; x++) {
       const index = row + x;
       const difference = background[index] - frame[index];
-      // A pale fish can brighten a dark floor; preserve the original rule elsewhere.
-      if ((darkZones?.[index] ? Math.abs(difference) : difference) >= threshold) mask[index] = 1;
+      // A fish can be lighter or darker than the local tank surface.
+      if (Math.abs(difference) >= threshold) mask[index] = 1;
     }
   }
   if (analysisMask) for (let i = 0; i < mask.length; i++) if (!analysisMask[i]) mask[i] = 0;
@@ -127,7 +127,7 @@ function hasStableForegroundEvidence(blob, frame, background, threshold, options
     if (options.darkZones[pixel]) {
       touchesDark = true;
       if (frame[pixel] <= variation.lower[pixel] - threshold || frame[pixel] >= variation.upper[pixel] + threshold) evidence++;
-    } else if (background[pixel] - frame[pixel] >= threshold) evidence++;
+    } else if (Math.abs(background[pixel] - frame[pixel]) >= threshold) evidence++;
   }
   return !touchesDark || evidence >= Math.max(5, Math.ceil(blob.area * 0.08));
 }
@@ -169,8 +169,56 @@ function recoverEdgeFish(blobs, frame, background, width, height, options, edges
   }
 }
 
+// Tank markings can erase contrast across a single fish, leaving separate body
+// and tail regions. Join only a bounded pair supported by the previous observed
+// fish's size and position and by current contrast in the gap.
+function joinSingleFishFragments(blobs, frame, background, width, threshold, options) {
+  if (options.expectedFish !== 1 || options.previousDetections?.length !== 1) return;
+  const previous = options.previousDetections[0];
+  if (previous.positionUncertain || previous.splitFromBlob || !(previous.area > 0) ||
+    !(previous.width > 0) || !(previous.height > 0)) return;
+  const nearby = blobs.filter(blob => Math.hypot(blob.x - previous.x, blob.y - previous.y) <= 45);
+  if (nearby.length !== 2) return;
+  const [a, b] = nearby;
+  const area = a.area + b.area;
+  if (area < previous.area * .5 || area > previous.area * 2) return;
+  const pixels = [...a.pixels, ...b.pixels];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const pixel of pixels) {
+    const x = pixel % width, y = Math.floor(pixel / width);
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+  }
+  if (Math.hypot(maxX - minX + 1, maxY - minY + 1) > Math.hypot(previous.width, previous.height) * 1.75) return;
+  let gap = Infinity, start, end;
+  for (const i of a.pixels) for (const j of b.pixels) {
+    const distance = Math.hypot(i % width - j % width, Math.floor(i / width) - Math.floor(j / width));
+    if (distance < gap) { gap = distance; start = i; end = j; }
+  }
+  if (gap > 20) return;
+  const steps = Math.ceil(gap);
+  let evidence = 0, weakRun = 0;
+  for (let step = 0; step <= steps; step++) {
+    const x = Math.round(start % width + (end % width - start % width) * step / steps);
+    const y = Math.round(Math.floor(start / width) + (Math.floor(end / width) - Math.floor(start / width)) * step / steps);
+    const pixel = y * width + x;
+    if ((options.analysisMask && !options.analysisMask[pixel]) ||
+      options.exclusions?.some(box => x >= box.x && x < box.x + box.width && y >= box.y && y < box.y + box.height)) return;
+    if (Math.abs(frame[pixel] - background[pixel]) >= threshold / 2) { evidence++; weakRun = 0; }
+    else if (++weakRun > 6) return;
+  }
+  if (evidence < (steps + 1) * .5) return;
+  const joined = { x: (a.x * a.area + b.x * b.area) / area,
+    y: (a.y * a.area + b.y * b.area) / area, area, pixels,
+    width: maxX - minX + 1, height: maxY - minY + 1,
+    joinedForegroundFragments: 2,
+    ...(a.edgeRecovered || b.edgeRecovered ? { edgeRecovered: true } : {}) };
+  blobs.splice(blobs.indexOf(a), 1, joined);
+  blobs.splice(blobs.indexOf(b), 1);
+}
+
 /**
- * Find moving regions in a cropped grayscale frame, using either contrast sign in marked dark zones.
+ * Find moving regions in a cropped grayscale frame using either contrast sign.
  * Input arrays are row-major: pixel (x, y) is at y * width + x, brightness 0–255.
  * Returned centers and bounding-box sizes are in crop pixels. These are candidate
  * fish, not tracked identities. Defaults reproduce the original tank experiment.
@@ -188,6 +236,7 @@ export function detectBackgroundFish(frame, background, width, height, options =
   const blobs = connectedRegions(mask, width, height, { minArea, maxArea, minLength: 10 })
     .filter(blob => hasStableForegroundEvidence(blob, frame, background, threshold, options));
   recoverEdgeFish(blobs, frame, background, width, height, options, { edgeX, edgeTop, edgeBottom }, minArea);
+  joinSingleFishFragments(blobs, frame, background, width, threshold, options);
   // Score real foreground pixels, excluding pixels introduced by morphology.
   // Absolute contrast supports pale fish on dark floors; light floors use darkening.
   for (const blob of blobs) {

@@ -1,5 +1,23 @@
 # Fish video regression images
 
+## Single fish crossing tank markings, sample 61
+
+`single-fish-ridge/` contains crops from `single_fish_dark_side - 1.mov`
+(720 × 1280, duration 62.13 seconds). Tank crop: `(167, 372, 538, 209)`;
+marked dark region: `(408, 377, 289, 190)`. Samples 60–62 are one-based,
+direct seeks to 11.8, 12.0, and 12.2 seconds. FFmpeg uses
+`crop=538:209:167:372:exact=1`, raw RGBA, and the app's `grayscale()` function.
+The median background and expanded variation range use 25 samples at
+`(i + 0.5) * 62.13 / 25` seconds.
+
+At sample 61, tank markings interrupt the fish's contrast and separate the body
+near `(571, 468)` from its tail near `(602, 477)`. The sequence regression
+checks a bounded, image-supported join near `(581, 471)` and observed track
+continuity through the neighboring samples. Negative controls remove the faint
+connecting contrast or provide an incompatible size or uncertain history.
+
+## Original shoaling recording
+
 These small grayscale crops come from the repository's local `fish.mov` and are
 used by Node tests without requiring a video decoder. They are outside `dist/`
 and are not part of the deployed site.

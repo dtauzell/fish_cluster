@@ -185,7 +185,8 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     }
     for (const { from, to, distancePx } of links) {
       const a = detections[from], b = detections[to];
-      const label = `${fmt(distancePx / state.settings.pixelsPerInch, 2)} in`;
+      const cm = document.getElementById('distance-units')?.value === 'cm';
+      const label = `${fmt(distancePx / state.settings.pixelsPerInch * (cm ? 2.54 : 1), 2)} ${cm ? 'cm' : 'in'}`;
       const width = humanCtx.measureText(label).width + 8 * scale, height = 22 * scale;
       const x = Math.max(width / 2, Math.min(view.width - width / 2, (a.x + b.x) / 2 - view.x));
       const y = Math.max(height / 2, Math.min(view.height - height / 2, (a.y + b.y) / 2 - view.y));

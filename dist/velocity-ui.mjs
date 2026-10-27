@@ -8,10 +8,13 @@ export function createVelocityView({ getFrames, getSettings, getSelectedTime }) 
     $('velocity-details').hidden = !enabled;
     if (!enabled) { $('velocity-chart').innerHTML = ''; return; }
     const inches = $('velocity-units').value === 'inches';
+    const distanceCm = $('distance-units')?.value === 'cm';
+    const physical = inches && $('velocity-units').value !== 'pixels';
     const suffix = inches ? 'InchesPerSecond' : 'PxPerSecond';
     for (const [id, key] of [['velocity-min', 'min'], ['velocity-max', 'max'], ['velocity-average', 'average']]) {
       const value = report[key + suffix];
-      $(id).textContent = value == null ? '—' : `${value.toFixed(2)} ${inches ? 'in/s' : 'px/s'}`;
+      const shown = value == null ? null : value * (physical && distanceCm ? 2.54 : 1);
+      $(id).textContent = shown == null ? '—' : `${shown.toFixed(2)} ${physical ? (distanceCm ? 'cm/s' : 'in/s') : 'px/s'}`;
     }
     $('velocity-coverage').textContent = report.validIntervalCount
       ? `${report.validIntervalCount} of ${report.possibleIntervalCount} adjacent intervals measured · ${(report.measuredDurationMs / 1000).toFixed(2)} s covered. Average = total measured distance / measured time.`
@@ -19,7 +22,8 @@ export function createVelocityView({ getFrames, getSettings, getSelectedTime }) 
     $('velocity-scale-note').hidden = !inches;
     $('velocity-empty').hidden = report.validIntervalCount > 0;
     $('velocity-chart').hidden = report.validIntervalCount === 0;
-    $('velocity-chart').innerHTML = velocityChart(report, $('velocity-units').value, getSelectedTime());
+    const chartUnits = physical && distanceCm ? 'centimeters' : $('velocity-units').value;
+    $('velocity-chart').innerHTML = velocityChart(report, chartUnits, getSelectedTime());
   }
   function refresh() {
     report = getFrames().length ? singleFishVelocity(getFrames(), getSettings()) : null;

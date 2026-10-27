@@ -46,7 +46,8 @@
             <label>Fish in tank<input id="expected-fish" type="number" min="1" step="1" value="5"></label>
             <label>Sample ms<input id="interval" type="number" min="1" step="1" value="200"></label>
             <p id="sampling-summary" class="fine-print">Every 0.2 seconds · 5 samples/sec</p>
-            <label class="shoaling-only">Link distance <span class="help">inches</span><input id="threshold" type="number" min="0.01" step="0.01" value="1.5"></label>
+            <label>Distance units<select id="distance-units"><option value="cm" selected>Centimeters</option><option value="in">Inches</option></select></label>
+            <label class="shoaling-only">Link distance <span class="help" id="threshold-unit">cm</span><input id="threshold" type="number" min="0.01" step="0.1" value="3.8"></label>
           </div>
           <button id="open-scale" class="scale-summary secondary" type="button">Set scale <span id="scale-summary">30.6 px/in</span></button>
           <details class="advanced-settings"><summary>Advanced settings</summary>
@@ -112,7 +113,7 @@
           <fieldset id="calibration-tools" class="calibration-tools" disabled>
             <legend>Calibrate from a known length</legend>
             <button id="draw-calibration" class="secondary" type="button">Draw calibration line</button>
-            <label>Line length <span class="help">inches</span><input id="calibration-length" type="number" min="0.000001" step="any" value="0.5"></label>
+            <label>Line length <span class="help" id="calibration-unit">cm</span><input id="calibration-length" type="number" min="0.000001" step="any" value="1.27"></label>
             <button id="apply-calibration" class="secondary" type="button" disabled>Use this scale</button>
             <button id="clear-calibration" class="secondary" type="button" disabled>Clear line</button>
             <p id="calibration-status" class="fine-print" role="status">Draw along a known distance in the preview, enter its length in inches, then use the scale.</p>
@@ -169,11 +170,18 @@
               <p>Export results to keep your work.</p>
               <button id="review-export-results" class="secondary" type="button">Export results</button>
             </div>
+            <details id="results-crops" class="result-exports">
+              <summary>Copy crop coordinates</summary>
+              <p class="human-help">Coordinates use the original video frame. Copy a crop or region to paste its values elsewhere.</p>
+              <div id="results-crop-list" class="results-crop-list"></div>
+              <button id="copy-all-crops" class="secondary" type="button">Copy all coordinates</button>
+              <span id="crop-copy-status" class="human-help" role="status" aria-live="polite"></span>
+            </details>
       <section id="results" class="results" hidden>
         <div class="results-head"><div><h2>Results summary</h2><p id="results-inclusion" class="human-help" role="status"></p></div></div>
         <div class="stat-grid shoaling-only">
           <article class="stat"><span>Average detections / frame</span><strong id="stat-fish">—</strong></article>
-          <article class="stat"><span>Average pair distance</span><strong id="stat-distance">—</strong><small id="distance-note">center to center · approximate inches</small></article>
+          <article class="stat"><span>Average pair distance</span><strong id="stat-distance">—</strong><small id="distance-note">center to center · approximate centimeters</small></article>
           <article class="stat"><span>Detections near another</span><strong id="stat-close">—</strong><small>within chosen distance</small></article>
           <article class="stat"><span>Average clusters / frame</span><strong id="stat-clusters">—</strong><small>groups of at least 2</small></article>
         </div>

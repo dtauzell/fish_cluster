@@ -31,14 +31,29 @@ export function frameCandidates(frame) {
 }
 
 export const SINGLE_FISH_SELECTION_METHOD = 'foreground-contrast-margin-v1';
+export const TRACKED_SINGLE_FISH_SELECTION_METHOD = 'foreground-track-continuity-v1';
 
 /** Cap single-fish runs without presenting a near-tie as a reliable observation. */
-export function selectSingleFishCandidate(candidates, crop) {
+export function selectSingleFishCandidate(candidates, crop, options = {}) {
   const measured = selectCentralCandidates(candidates, crop).detections;
-  const ranked = [...measured].sort((a, b) => (b.foregroundContrast ?? -Infinity) - (a.foregroundContrast ?? -Infinity));
-  const winner = ranked[0], runnerUp = ranked[1];
   const supported = point => Number.isFinite(point?.foregroundContrast) && point.supportPixelCount >= 5 &&
     !point.splitFromBlob && !point.positionUncertain;
+  const previousPoint = options.previousPoint;
+  if (previousPoint && Number.isFinite(previousPoint.x) && Number.isFinite(previousPoint.y)) {
+    const nearby = measured.filter(supported).map(point => ({ point,
+      distance: Math.hypot(point.x - previousPoint.x, point.y - previousPoint.y) }))
+      .filter(entry => entry.distance <= (options.maxTrackDistancePx ?? 45))
+      .sort((a, b) => a.distance - b.distance);
+    if (nearby.length && (!nearby[1] || nearby[1].distance - nearby[0].distance >= 8)) {
+      const winner = nearby[0].point;
+      return { selectionMethod: TRACKED_SINGLE_FISH_SELECTION_METHOD, selectionConfident: true,
+        detections: [{ ...winner, positionUncertain: false }],
+        rejectedDetections: measured.filter(point => point !== winner).map(point => ({ ...point,
+          rejectionReason: 'weaker-track-continuity' })) };
+    }
+  }
+  const ranked = [...measured].sort((a, b) => (b.foregroundContrast ?? -Infinity) - (a.foregroundContrast ?? -Infinity));
+  const winner = ranked[0], runnerUp = ranked[1];
   const confident = Boolean(winner && supported(winner) && (!runnerUp ||
     (ranked.slice(1).every(supported) && winner.foregroundContrast >= runnerUp.foregroundContrast * 1.5 &&
       winner.foregroundContrast - runnerUp.foregroundContrast >= 8)));
@@ -48,8 +63,11 @@ export function selectSingleFishCandidate(candidates, crop) {
       rejectionReason: confident ? 'weaker-foreground-contrast' : 'ambiguous-single-fish' })) };
 }
 
-/** Only a scored, clear contrast margin resolves automatic extra candidates. */
+/** Extra candidates are resolved only by the recorded, confident selection rule. */
 export function hasAmbiguousRejectedCandidates(frame) {
-  return Boolean(frame.rejectedDetections?.length) && !(frame.selectionMethod === SINGLE_FISH_SELECTION_METHOD &&
-    frame.selectionConfident === true && frame.rejectedDetections.every(point => point.rejectionReason === 'weaker-foreground-contrast'));
+  if (!frame.rejectedDetections?.length) return false;
+  const reason = frame.selectionMethod === SINGLE_FISH_SELECTION_METHOD ? 'weaker-foreground-contrast'
+    : frame.selectionMethod === TRACKED_SINGLE_FISH_SELECTION_METHOD ? 'weaker-track-continuity' : null;
+  return !(reason && frame.selectionConfident === true &&
+    frame.rejectedDetections.every(point => point.rejectionReason === reason));
 }

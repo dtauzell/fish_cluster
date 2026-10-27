@@ -102,7 +102,13 @@ export async function* analyzeVideo({ config, duration, source, prepareModel, is
       tankSide: analysisTankSide({ x: point.x + crop.x, y: point.y + crop.y }, config) }));
     // A split region's estimated center must also fall in the usable area.
     detections = detections.filter(point => insideAnalysisArea(point, crop, config.exclusions));
-    const selected = backgroundMode && config.expectedFish === 1 ? selectSingleFishCandidate(detections, crop)
+    const previousTrackPoint = previousFrame?.detections.length === 1 &&
+      previousFrame.timestampMs < timestampMs && timestampMs - previousFrame.timestampMs <= 250 &&
+      previousFrame.selectionConfident !== false && !previousFrame.detections[0].positionUncertain &&
+      previousFrame.detections[0].positionSource !== 'overlap-estimate'
+      ? previousFrame.detections[0] : undefined;
+    const selected = backgroundMode && config.expectedFish === 1
+      ? selectSingleFishCandidate(detections, crop, { previousPoint: previousTrackPoint })
       : selectCentralCandidates(detections, crop, backgroundMode && config.preferCenter ? config.expectedFish : null);
     selected.detections = tracker ? tracker.update(selected.detections, timestampMs)
       : selected.detections.map(point => ({ ...point,
