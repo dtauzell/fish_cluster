@@ -52,9 +52,16 @@ The browser regressions verify:
   restarting; measured single-fish crossings, speed, and correction-induced gaps.
 - Analyzing and correcting footage, downloading results, and opening cached help
   after reloading the app with browser networking disabled.
+- Trial grouping with equal weight per fish, missing metrics, and partial trials
+  retaining their status across saving, reload and exports.
+- Candidate diagnostic labels and comparison exports without changing detections
+  or applied corrections.
+- Invalid uploads, decoder errors and browser-storage failures preserving usable
+  analysis controls, earlier saved records and downloadable results.
 
-See the [coverage plan](docs/playwright-coverage-plan.md) for implementation
-batches, model assignments, and follow-up scenarios requiring additional fixtures.
+See the [coverage plan](docs/playwright-coverage-plan.md#remaining-coverage-and-resuming-work)
+for the handoff and remaining priorities: correction boundaries under crop/mask
+and zoom, WebKit/Safari workflows, and clipboard success/fallback behavior.
 
 Ordinary UI cases block service workers so cached assets cannot mask changes;
 the dedicated offline case enables and exercises the real worker. The two test

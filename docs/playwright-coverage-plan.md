@@ -62,11 +62,41 @@ also verifies that the resulting report can be saved.
 
 Second batch verification: all 30 Chromium tests pass (8 new in this batch),
 and all 236 Node tests pass. The first batch is committed as `928fdaa`; the
-second batch and the coverage-rounding fix are ready for review in the workspace.
+second batch and the coverage-rounding fix are committed as `96b0645`.
 
-## Follow-up coverage
+## Third batch
 
-Browser expansion to Firefox/WebKit should follow fixture compatibility checks
-and CI browser installation planning (Sol). Additional useful batches include
-diagnostic candidate labels and comparison downloads (Terra), clipboard fallbacks
-(Luna), and multiple-fish trial grouping with unequal valid durations (Terra).
+| Owner | Scenarios | File |
+| --- | --- | --- |
+| Terra | Multiple fish, equal-fish means with unequal valid durations, absent-metric counts, trial/exposure separation, persistence and CSV downloads | `tests/browser/trial-groups.spec.mjs` |
+| Terra | Frame-local Fish/Reflection labels, clearing with Unsure, comparison CSV/JSON, labels leaving results and corrections unchanged | `tests/browser/diagnostics.spec.mjs` |
+| Coordinator | Stop a light/dark run, finish review, save its partial snapshot, reload and verify per-fish/group CSVs | `tests/browser/partial-trials.spec.mjs` |
+| Coordinator | Invalid replacement video, mid-analysis decoder failure, corrupt data, blocked storage reads and quota failure, with analysis/export/retry recovery | `tests/browser/failure-recovery.spec.mjs` |
+
+Trial workflows share small test helpers for real single-fish preparation,
+downloads and independent CSV parsing in `tests/browser/trial-helpers.mjs`.
+Storage failures are injected only at the browser Storage boundary. Decoder
+failure and partial-run synchronization use test-only wrappers around the real
+pipeline; no results or persisted trial records are fabricated.
+
+Third batch verification: all 38 Chromium tests pass (8 new in this batch),
+and all 236 Node tests pass. No application-source changes were needed.
+
+## Remaining coverage and resuming work
+
+The three implemented batches cover the main workflows. Last verified on
+2026-10-28: 38 Chromium tests and 236 Node tests pass. No additional test
+implementation is in progress. Remaining work, in recommended order:
+
+| Priority | Model | Work and acceptance criteria |
+| --- | --- | --- |
+| 1 | Terra | Canvas correction boundaries: draw centers outside a crop and inside reflection masks, including while zoomed or showing the full frame. Verify applied counts and metrics exclude those centers while review exports preserve the marks with the correct inclusion flags. Check original-video coordinates with a crop offset and four-corner geometry. |
+| 2 | Sol for setup; Terra for workflows | WebKit/Safari coverage: check both synthetic fixtures decode correctly, then run upload, seeking, corrections and downloads under Playwright WebKit. Add browser installation to CI when CI is configured. Keep real Safari checks for platform-specific behavior; WebKit automation does not replace them. Consider Firefox after WebKit. |
+| 3 | Luna | Clipboard success and fallback: verify center/crop coordinate text, sample/time context where applicable, success feedback and the selection/manual-copy fallback when clipboard access is unavailable or rejected. Copying must not apply draft corrections. |
+
+Start with the boundary checks; the existing `corrections.spec.mjs`,
+`geometry.spec.mjs` and `setup.spec.mjs` provide the relevant fixtures and
+canvas interactions. Recheck the working tree and run `npm run test:all` when
+resuming to establish the current baseline. Follow the isolated ports/output
+rules above if delegating parallel batches. Commit history contains the completed
+batches; later work should target these specific risks or reported bugs.
