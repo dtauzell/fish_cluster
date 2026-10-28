@@ -30,7 +30,7 @@ The Playwright suite runs Chromium against its own local server on port 8138;
 it does not use or modify a running `npm run dev` session. Override the port with
 `FISH_BROWSER_TEST_PORT` if needed. Each test gets isolated browser storage.
 The checked-in 1 KB synthetic video requires no user footage or FFmpeg install.
-The four browser regressions verify:
+The browser regressions verify:
 
 - Physical distance survives unit switches before analysis; centimeter edits,
   the Results slider, downloaded CSV/JSON, and reanalysis agree afterward.
@@ -40,6 +40,15 @@ The four browser regressions verify:
 - A real service worker downloads release B while release A remains active, then
   **Force refresh** activates B and reloads with browser networking disabled.
   The test server includes Cloudflare-style HTML redirects.
+- Review filters, playback, correction application and restoration, draft undo,
+  review CSV semantics, and original-resolution PNG downloads without overlays.
+- Test selection, sampling controls, Help, and About navigation preserving results.
+- Precise crops, reflection masks, preview controls, and saved setup persistence.
+- Light/dark exports and trial collection validation, replacement, persistence,
+  removal, and per-fish/group CSV downloads.
+
+See the [coverage plan](docs/playwright-coverage-plan.md) for implementation
+batches, model assignments, and follow-up scenarios requiring additional fixtures.
 
 Ordinary UI cases block service workers so cached assets cannot mask changes;
 the dedicated offline case enables and exercises the real worker. The two test
