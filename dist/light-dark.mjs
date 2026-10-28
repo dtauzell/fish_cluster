@@ -32,6 +32,8 @@ export function lightDarkReport(frames, config, options = {}) {
     averageSpeedPxPerSecond: velocity?.averagePxPerSecond ?? null,
     averageSpeedInchesPerSecond: velocity?.averageInchesPerSecond ?? null,
     velocityDurationSeconds: (velocity?.measuredDurationMs ?? 0) / 1000,
-    coverageFraction: observedDurationSeconds ? (darkTimeSeconds + lightTimeSeconds) / observedDurationSeconds : null,
+    // Summing the side intervals separately can exceed the total by a rounding
+    // error. Keep complete coverage valid for saved-trial fraction validation.
+    coverageFraction: observedDurationSeconds ? Math.min(1, (darkTimeSeconds + lightTimeSeconds) / observedDurationSeconds) : null,
     samples, velocity };
 }

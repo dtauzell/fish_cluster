@@ -29,7 +29,7 @@ npm run test:all
 The Playwright suite runs Chromium against its own local server on port 8138;
 it does not use or modify a running `npm run dev` session. Override the port with
 `FISH_BROWSER_TEST_PORT` if needed. Each test gets isolated browser storage.
-The checked-in 1 KB synthetic video requires no user footage or FFmpeg install.
+The checked-in synthetic videos require no user footage or FFmpeg install.
 The browser regressions verify:
 
 - Physical distance survives unit switches before analysis; centimeter edits,
@@ -46,6 +46,12 @@ The browser regressions verify:
 - Precise crops, reflection masks, preview controls, and saved setup persistence.
 - Light/dark exports and trial collection validation, replacement, persistence,
   removal, and per-fish/group CSV downloads.
+- Four-corner geometry, calibration under zoom, and rejecting saved setups on
+  videos with different dimensions.
+- Stopping background preparation or analysis, exporting partial results, and
+  restarting; measured single-fish crossings, speed, and correction-induced gaps.
+- Analyzing and correcting footage, downloading results, and opening cached help
+  after reloading the app with browser networking disabled.
 
 See the [coverage plan](docs/playwright-coverage-plan.md) for implementation
 batches, model assignments, and follow-up scenarios requiring additional fixtures.

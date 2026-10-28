@@ -40,12 +40,33 @@ two batches, and the coordinator added 4 correction/artifact tests. The combined
 Chromium suite passes all 22 tests (9 existing plus 13 new); the existing Node
 suite passes all 235 tests. Application source and dependencies were unchanged.
 
+## Second batch
+
+| Owner | Scenarios | File |
+| --- | --- | --- |
+| Terra | Four-corner crop export, unfinished corner undo/cancel, calibration under zoom | `tests/browser/geometry.spec.mjs` |
+| Terra | Reload cached app, analyze, correct and download JSON/CSV plus open cached help while offline | `tests/browser/offline-analysis.spec.mjs` |
+| Luna | Reject automatic reuse and manual application of setups on mismatched video dimensions; apply again on matching dimensions | `tests/browser/setup-dimensions.spec.mjs` |
+| Coordinator | Stop during background preparation or after two decoded samples; export partial results and restart | `tests/browser/cancellation.spec.mjs` |
+| Coordinator | Real one-fish crossing, calibrated speed, missing-position gaps, restoration and saving a fully observed trial | `tests/browser/single-fish.spec.mjs` |
+
+The new lossless single-fish fixture is 320 × 200, with exact 12-pixel steps at
+5 fps. Its generation command is in the fixtures README; FFmpeg is not needed
+to run tests. Flicker learning is disabled for this short constant-floor clip.
+Cancellation tests gate the real pipeline at event boundaries so Stop is
+deterministic while decoding and detection still execute normally.
+
+The crossing regression exposed coverage rounding slightly above 100%, which
+prevented saving a complete trial. Coverage now caps at 1; a Node regression
+also verifies that the resulting report can be saved.
+
+Second batch verification: all 30 Chromium tests pass (8 new in this batch),
+and all 236 Node tests pass. The first batch is committed as `928fdaa`; the
+second batch and the coverage-rounding fix are ready for review in the workspace.
+
 ## Follow-up coverage
 
-These need dedicated fixtures or synchronization and are outside this first batch:
-stopping a long analysis and exporting partial results (Sol), reliable single-fish
-crossings and velocity gaps (Terra after a one-fish fixture is defined), mismatched
-video dimensions for saved setups (Terra with a second fixture), four-corner tank
-geometry/calibration under zoom (Terra), and actual analysis/downloads while offline
-(Terra). Browser expansion to Firefox/WebKit should follow fixture compatibility
-checks and CI browser installation planning (Sol).
+Browser expansion to Firefox/WebKit should follow fixture compatibility checks
+and CI browser installation planning (Sol). Additional useful batches include
+diagnostic candidate labels and comparison downloads (Terra), clipboard fallbacks
+(Luna), and multiple-fish trial grouping with unequal valid durations (Terra).

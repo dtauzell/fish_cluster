@@ -5,6 +5,7 @@ import { lightDarkFramesCsv, lightDarkSummaryCsv } from '../dist/exports.mjs';
 import { createSettings } from '../dist/settings.mjs';
 import { usesSingleFishSides } from '../dist/tank-zones.mjs';
 import { applyManualCenters } from '../dist/review.mjs';
+import { snapshotResult } from '../dist/experiment-storage.mjs';
 
 const config = { testType: 'light-dark', expectedFish: 1, intervalMs: 200, pixelsPerInch: 10, thresholdPx: 10,
   crop: { x: 0, y: 0, width: 100, height: 100 }, tankZones: [{ x: 50, y: 0, width: 50, height: 100, side: 'dark' }] };
@@ -20,6 +21,16 @@ test('zone occupancy splits crossing intervals and speed weights elapsed time', 
   assert.equal(report.averageSpeedPxPerSecond, 175);
   assert.equal(report.averageSpeedInchesPerSecond, 17.5);
   assert.equal(report.coverageFraction, 1);
+});
+
+test('complete coverage remains a valid saved fraction after separate side sums round', () => {
+  // A crossing near the end accumulates the two sides in a different order
+  // from the full observed duration (previously coverage was 1 + one ULP).
+  const frames = Array.from({ length: 12 }, (_, i) => frame(i, i < 10 ? 80 : 20));
+  const report = lightDarkReport(frames, config);
+  assert.equal(report.coverageFraction, 1);
+  const saved = snapshotResult({ trial: 'Crossing', exposure: 'Control', fishId: '1' }, report);
+  assert.equal(saved.coverageFraction, 1);
 });
 
 test('unknown positions and sample gaps retain time without inventing switches or speed', () => {

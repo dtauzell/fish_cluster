@@ -30,3 +30,4 @@ experiments/background_results/
 *.avi
 *.mkv
 !tests/browser/fixtures/moving-fish.webm
+!tests/browser/fixtures/single-fish.webm
