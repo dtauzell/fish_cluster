@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
-import { analysisJSON, download } from './helpers.mjs';
+import { analysisJSON, download, expectDataTable } from './helpers.mjs';
 
 test.use({ serviceWorkers: 'block' });
 test.beforeEach(async ({ page }) => {
@@ -70,6 +70,14 @@ test('light/dark real analysis exports consistent summary and frame data', async
     expect(frames.reduce((total, row) => total + Number(row[column]), 0)).toBeCloseTo(result.summary[key], 8);
   }
   expect(result.summary.darkTimeSeconds + result.summary.lightTimeSeconds + result.summary.unknownTimeSeconds).toBeCloseTo(result.summary.observedDurationSeconds, 8);
+  const summaryCsv = await download(page, 'Export summary CSV ↓');
+  const framesCsv = await download(page, 'Export frames CSV ↓');
+  await page.locator('#nav-data').click();
+  await page.locator('#data-format').selectOption('summary');
+  await expectDataTable(page, summaryCsv);
+  await page.locator('#data-format').selectOption('frames');
+  await expectDataTable(page, framesCsv);
+  await expect(page.locator('#data-format option[value="detections"]')).toBeDisabled();
 });
 
 test('trial collection validates, replaces corrected snapshots, persists and removes results', async ({ page }) => {

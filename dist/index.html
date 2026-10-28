@@ -25,6 +25,7 @@
       <nav class="workflow-nav" aria-label="Analysis workflow">
         <a id="nav-setup" href="#analysis" aria-current="page">Setup</a>
         <a id="nav-results" href="#results" aria-disabled="true">Results</a>
+        <a id="nav-data" href="#data" aria-disabled="true">Data</a>
         <span id="test-name"></span><button id="change-test" class="secondary" type="button" aria-haspopup="dialog" aria-controls="test-change-dialog" hidden>Change test</button><span id="workflow-summary">Add a video to begin</span>
       </nav>
       <div class="top-links"><a href="#about">About the analysis</a><a href="https://github.com/dtauzell/fish_cluster" target="_blank" rel="noopener">Source code ↗</a></div>
@@ -229,6 +230,19 @@
             </details>
           </aside>
         </div>
+      </section>
+      <section id="data-page" class="data-page" hidden aria-labelledby="data-title">
+        <h1 id="data-title">Data</h1>
+        <p class="human-help">Preview the data that will be exported, including applied corrections.</p>
+        <label for="data-format">Export format</label>
+        <select id="data-format">
+          <option value="frames">Frames CSV</option>
+          <option value="detections">Detections CSV</option>
+          <option value="summary">Summary CSV</option>
+          <option value="json">All JSON</option>
+        </select>
+        <details id="data-columns"><summary>Choose columns</summary><div id="data-column-options"></div></details>
+        <div id="data-preview" tabindex="0" role="region" aria-label="Export data preview"></div>
       </section>
       <section id="about-page" hidden aria-label="About the analysis"><div id="about-content" class="about-main">Loading the method guide…</div></section>
     </main>

@@ -34,6 +34,15 @@ export async function analysisJSON(page) {
   return JSON.parse(await download(page, 'Export all JSON ↓'));
 }
 
+export async function expectDataTable(page, exported) {
+  const table = page.locator('#data-preview table');
+  await expect(table).toBeVisible();
+  const csv = await table.locator('tr').evaluateAll(rows => rows.map(row =>
+    [...row.cells].map(cell => `"${cell.textContent.replaceAll('"', '""')}"`).join(',')
+  ).join('\r\n'));
+  expect(csv).toBe(exported);
+}
+
 export async function addCorrection(page) {
   await page.getByRole('checkbox', { name: 'Edit centers', exact: true }).check();
   await expect(page.locator('#human-center-coordinate-values')).not.toHaveValue('');

@@ -22,6 +22,7 @@ import { initializeInputHelp } from './input-help.mjs';
 import { framePassesCountFilter } from './frame-selection.mjs';
 import { createDistanceControls, distanceFromInches, distanceToInches } from './distance-controls.mjs';
 import { createTestChooser } from './test-chooser.mjs';
+import { renderExportPreview } from './data-preview.mjs';
 
 initializeInputHelp();
 
@@ -137,7 +138,8 @@ function clearResults() {
   resetHuman();
   $('results').hidden = true;
   updateWorkflow();
-  if (location.hash === '#results') location.hash = '#analysis';
+  $('data-preview').textContent = '';
+  if (['#results', '#data'].includes(location.hash)) location.hash = '#analysis';
   $('frame-groups').hidden = true;
   $('timeline').hidden = true;
 }
@@ -887,12 +889,12 @@ function loadAbout() {
 }
 
 function updateWorkflow() {
-  $('nav-results').setAttribute('aria-disabled', String(!state.resultsReady || state.running));
+  for (const id of ['nav-results', 'nav-data']) $(id).setAttribute('aria-disabled', String(!state.resultsReady || state.running));
   $('workflow-summary').textContent = state.running ? 'Analyzing video…'
     : state.reviewFrames.length ? `${state.frames.length} of ${state.reviewFrames.length} samples included`
     : state.file?.name ?? 'Add a video to begin';
 }
-for (const id of ['nav-results']) $(id).addEventListener('click', event => {
+for (const id of ['nav-results', 'nav-data']) $(id).addEventListener('click', event => {
   if ($(id).getAttribute('aria-disabled') === 'true') event.preventDefault();
 });
 function updateSamplingSummary() {
@@ -955,10 +957,10 @@ $('preview-full').addEventListener('click', () => { state.focusTank = false; pre
 function showPage() {
   // Existing review bookmarks lead to the unified results workspace.
   if (location.hash === '#human-analysis') history.replaceState(null, '', `${location.pathname}${location.search}#results`);
-  if (location.hash === '#results' && (!state.resultsReady || state.running)) {
+  if (['#results', '#data'].includes(location.hash) && (!state.resultsReady || state.running)) {
     history.replaceState(null, '', `${location.pathname}${location.search}#analysis`);
   }
-  const nextView = location.hash === '#about' ? 'about' : location.hash === '#results' ? 'results' : 'analysis';
+  const nextView = ['#about', '#results', '#data'].includes(location.hash) ? location.hash.slice(1) : 'analysis';
   if (activeView) viewScroll.set(activeView, window.scrollY);
   activeView = nextView;
   const results = nextView === 'results', about = nextView === 'about';
@@ -968,16 +970,18 @@ function showPage() {
   document.querySelector('.setup').hidden = nextView !== 'analysis';
   $('results').hidden = !results;
   $('human-page').hidden = !results;
+  $('data-page').hidden = nextView !== 'data';
   $('about-page').hidden = !about;
-  for (const [id, view] of [['nav-setup', 'analysis'], ['nav-results', 'results']]) {
+  for (const [id, view] of [['nav-setup', 'analysis'], ['nav-results', 'results'], ['nav-data', 'data']]) {
     if (nextView === view) $(id).setAttribute('aria-current', 'page');
     else $(id).removeAttribute('aria-current');
   }
   updateWorkflow();
   document.title = about ? 'About the analysis — Fish Cluster'
-    : results ? 'Results & corrections — Fish Cluster' : 'Fish Cluster — zebrafish video analysis';
+    : nextView === 'data' ? 'Data — Fish Cluster' : results ? 'Results & corrections — Fish Cluster' : 'Fish Cluster — zebrafish video analysis';
   if (about) loadAbout();
   else if (results) selectHumanFrame(state.human.index ?? visibleResultIndices()[0]);
+  else if (nextView === 'data') renderData();
   else if (video.readyState >= 2) drawFrame(null);
   requestAnimationFrame(() => window.scrollTo(0, viewScroll.get(nextView) ?? 0));
 }
@@ -1036,17 +1040,51 @@ const experimentTools = createExperimentTools({
   }
 });
 video.addEventListener('loadedmetadata', () => experimentTools.onVideoLoaded());
-$('download-summary').addEventListener('click', () => download(`${baseName(state.file?.name)}-summary.csv`, lightDarkSummaryCsv(lightDarkReport(state.reviewFrames, state.settings)), 'text/csv'));
+$('download-summary').addEventListener('click', () => download(`${baseName(state.file?.name)}-summary.csv`, exportData('summary'), 'text/csv'));
 updateTestControls();
 showPage();
 
 $('download-csv').addEventListener('click', () => {
-  download(`${baseName(state.file?.name)}-detections.csv`, detectionsCsv(state.testType === 'light-dark' ? state.reviewFrames : state.frames), 'text/csv');
+  download(`${baseName(state.file?.name)}-detections.csv`, exportData('detections'), 'text/csv');
 });
 $('download-frames').addEventListener('click', () => {
-  download(`${baseName(state.file?.name)}-frames.csv`, state.testType === 'light-dark' ? lightDarkFramesCsv(state.reviewFrames, state.settings) : framesCsv(state.frames), 'text/csv');
+  download(`${baseName(state.file?.name)}-frames.csv`, exportData('frames'), 'text/csv');
 });
 $('download-json').addEventListener('click', () => {
+  download(`${baseName(state.file?.name)}-analysis.json`, exportData('json'), 'application/json');
+});
+
+function renderData() {
+  const lightDark = state.testType === 'light-dark';
+  const format = $('data-format');
+  for (const option of format.options) {
+    option.hidden = option.disabled = (option.value === 'summary' && !lightDark) || (option.value === 'detections' && lightDark);
+  }
+  if (format.selectedOptions[0].disabled) format.value = 'frames';
+  const text = exportData(format.value);
+  const csv = format.value !== 'json';
+  $('data-columns').hidden = !csv;
+  const options = $('data-column-options');
+  if (csv) {
+    const headers = text.slice(0, text.indexOf('\r\n')).match(/"(?:[^"]|"")*"/g)?.map(value => value.slice(1, -1).replaceAll('""', '"')) ?? [];
+    const key = `${state.testType}:${format.value}`;
+    const selected = new Set(JSON.parse(localStorage.getItem(`data-columns:${key}`) ?? 'null') ?? headers);
+    options.replaceChildren(...headers.map(name => {
+      const label = document.createElement('label'), input = document.createElement('input');
+      input.type = 'checkbox'; input.checked = selected.has(name); input.value = name;
+      input.addEventListener('change', () => { const values = [...options.querySelectorAll('input:checked')].map(item => item.value); localStorage.setItem(`data-columns:${key}`, JSON.stringify(values)); renderData(); });
+      label.append(input, document.createTextNode(name)); return label;
+    }));
+    renderExportPreview($('data-preview'), format.value, text, selected);
+  } else renderExportPreview($('data-preview'), format.value, text);
+}
+$('data-format').addEventListener('change', renderData);
+
+function exportData(format) {
+  const lightDark = state.testType === 'light-dark';
+  if (format === 'frames') return lightDark ? lightDarkFramesCsv(state.reviewFrames, state.settings) : framesCsv(state.frames);
+  if (format === 'detections') return detectionsCsv(lightDark ? state.reviewFrames : state.frames);
+  if (format === 'summary') return lightDarkSummaryCsv(lightDarkReport(state.reviewFrames, state.settings));
   const velocityReport = velocity.exportReport();
   const sideReport = sideTracking();
   const result = {
@@ -1063,5 +1101,5 @@ $('download-json').addEventListener('click', () => {
     frames: state.testType === 'light-dark' ? state.reviewFrames.map(({ metrics, ...frame }) => frame) : state.frames,
     excludedFrames: state.testType === 'light-dark' ? [] : state.reviewFrames.filter(frame => !framePassesCountFilter(frame, state.settings))
   };
-  download(`${baseName(state.file?.name)}-analysis.json`, JSON.stringify(result, null, 2), 'application/json');
-});
+  return JSON.stringify(result, null, 2);
+}
