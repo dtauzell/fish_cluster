@@ -1,0 +1,13 @@
+{
+  "metrics": {
+    "tp": 20,
+    "fn": 0,
+    "fp": 10,
+    "occludedTp": 0,
+    "occludedFn": 4,
+    "precision": 0.6666666666666666,
+    "visibleRecall": 1,
+    "occludedRecall": 0,
+    "overallRecall": 0.8333333333333334
+  }
+}

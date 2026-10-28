@@ -1,0 +1,27 @@
+{
+  "revision": "02bb9e85c146b55671ffd7c66f8ce6a9a697ad7d",
+  "sequence": "ZebraFish-03",
+  "frames": [
+    1,
+    151,
+    301,
+    451,
+    601,
+    751,
+    901,
+    1051,
+    1201,
+    1351,
+    1501,
+    1651
+  ],
+  "width": 2704,
+  "height": 1520,
+  "crop": {
+    "x": 0,
+    "y": 0,
+    "width": 2704,
+    "height": 1520
+  },
+  "expectedFish": 2
+}

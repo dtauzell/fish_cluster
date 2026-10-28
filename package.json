@@ -9,7 +9,8 @@
     "test": "node --test tests/*.test.mjs",
     "test:all": "npm test && npm run test:browser",
     "test:browser": "playwright test",
-    "test:browser:ui": "playwright test --ui"
+    "test:browser:ui": "playwright test --ui",
+    "benchmark:zef": "node benchmarks/zef-small/run.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1"

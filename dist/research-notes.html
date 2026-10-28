@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zebrafish detection research — Fish Cluster</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <style>
+    :root{color-scheme:light dark;font-family:system-ui,sans-serif;line-height:1.65;background:#f6f9f8;color:#18332e}
+    *{box-sizing:border-box}body{margin:0}main{max-width:900px;margin:auto;padding:32px 24px 72px}
+    a{color:#086954;text-underline-offset:3px}a:focus-visible{outline:3px solid currentColor;outline-offset:4px}
+    nav{display:flex;flex-wrap:wrap;gap:24px}h1{line-height:1.15;font-size:clamp(2rem,5vw,3rem)}h2{margin-top:2.5rem;line-height:1.3}h3{line-height:1.4}
+    article{border-top:1px solid #aac1b9;padding-top:16px;margin-top:24px}.note{background:#e4efea;border-left:4px solid #237b63;padding:16px 20px;margin:24px 0}.note p{margin:0}li{margin-bottom:14px}.meta{font-size:.9rem}code{overflow-wrap:anywhere}
+    @media(prefers-color-scheme:dark){:root{background:#071a22;color:#eaf7f6}a{color:#8ce6ce}.note{background:#102b34}article{border-color:#31535c}}
+    @media print{nav{display:none}main{max-width:none;padding:0}a{color:inherit}article{break-inside:avoid}}
+  </style>
+</head>
+<body><main>
+  <nav aria-label="Related pages"><a href="./index.html">← Fish Cluster analyzer</a><a href="./test-videos.html">Test video library</a></nav>
+  <header><h1>Zebrafish detection research</h1><p class="meta">Research notes · October 28, 2026 · Recommendations have not yet been validated in this app.</p>
+  <p>Research relevant to simple fish detection in tank images and tracking across video frames. The immediate focus is rectangular tanks, representative fish sizes, and improvements that fit the app’s existing background-subtraction approach.</p></header>
+
+  <section aria-labelledby="scope"><h2 id="scope">Intended use and known observations</h2>
+  <div class="note"><p>The five-fish round-tank example performed poorly in user testing. Small fish are a possible explanation, not a confirmed diagnosis. That setup is outside the intended use of the app; keep it as an optional stress test rather than a release requirement.</p></div>
+  <p>The whole-tank “two tank” video also performed poorly. Neither observation establishes that a particular research method will fix the problem. Evaluate changes on footage resembling the intended setup.</p>
+  <p>Detection locates fish in an image. Tracking associates detections over time. Size and contrast calibration can help with individual photos; motion prediction and trajectory recovery require a sequence. Persistent individual identity is a separate, more demanding objective.</p></section>
+
+  <section aria-labelledby="papers"><h2 id="papers">Relevant papers</h2>
+  <article><h3><a href="https://www.nature.com/articles/s41598-018-29185-0">Automatic multiple zebrafish tracking based on improved HOG features</a> (2018)</h3>
+  <p>The method uses background subtraction, with area thresholds based on fish size and grayscale thresholds based on foreground/background contrast. Its main identification method uses features of the fish’s appearance.</p>
+  <p><strong>Useful here:</strong> calibrate detection size and contrast for the recording. The segmentation settings are more directly relevant to our immediate needs than the individual-identification system.</p></article>
+
+  <article><h3><a href="https://elifesciences.org/articles/64000">TRex: a fast multi-animal tracking system</a> (2021)</h3>
+  <p>TRex combines background subtraction with motion-based tracking and optional visual identification. To separate touching animals, it progressively increases the threshold within a merged region, seeking the expected number of plausibly sized smaller bodies.</p>
+  <p><strong>Useful here:</strong> compare its overlap-splitting method with our existing blob splitting. Keep basic detection and motion tracking independent of any optional neural-network identity system. The paper covers multiple species; its results should not be assumed to transfer directly to our recordings.</p></article>
+
+  <article><h3><a href="https://www.sciencedirect.com/science/article/abs/pii/S0010482518300192">An algorithm to track laboratory zebrafish shoals</a> (2018)</h3>
+  <p>The method represents fish as blobs and maintains a Kalman filter for each animal, explicitly handling occlusions. It was evaluated on four video streams with different fish counts and resolutions.</p>
+  <p><strong>Useful here:</strong> a reference for lightweight tracking and associating detections through crossings. Predictions cannot replace reliable image evidence. This assessment is based on the accessible abstract and publisher excerpts, not a full implementation review.</p></article>
+
+  <article><h3><a href="https://www.nature.com/articles/s41598-021-81997-9">Zebrafish tracking using YOLOv2 and Kalman filter</a> (2021)</h3>
+  <p><a href="./research-yolov2-kalman.html">Read the plain-language explanation and implications for Fish Cluster →</a></p>
+  <p>A trained network detects fish heads, then a Kalman filter helps track positions and connect trajectories. The authors use a rectangular backlit tank with exterior glass treatment to reduce reflections.</p>
+  <p><strong>Useful here:</strong> head detection could be a later option for difficult body overlaps. It requires a trained model and representative labeled examples. The controlled acquisition setup also matters; these results do not demonstrate reliable detection in arbitrary aquarium footage.</p></article>
+
+  <article><h3><a href="https://vap.aau.dk/3d-zef/">3D-ZeF: A 3D Zebrafish Tracking Benchmark Dataset</a> (2020)</h3>
+  <p>The dataset provides aquarium recordings with manually annotated bounding boxes and head positions. Different fish are used across training, validation, and test splits. Occluded head positions may be estimated, which matters when interpreting ground truth.</p>
+  <p><strong>Useful here:</strong> use the overhead view for evaluating 2D detection without adopting the 3D reconstruction system. Measure missed fish, false detections, and location error. Our test library includes cropped overhead preview clips; source annotation coordinates must be mapped to the correct crop, resolution, and frames before comparison.</p></article>
+  </section>
+
+  <section aria-labelledby="current"><h2 id="current">Current app baseline</h2>
+  <p>At the time of this review, <code>dist/background.mjs</code> uses a default grayscale difference threshold of 24, a minimum region area of 45 pixels, a maximum area of 2,500 pixels, and a minimum length of 10 pixels. <code>dist/pipeline.mjs</code> builds a background from up to 25 sampled frames. These are implementation observations, not recommendations from the papers.</p>
+  <p>The fixed pixel limits can reject fish as resolution or apparent fish size changes. This is a reason to investigate calibration, not proof of the cause of the round-tank failure. The app already has morphology, blob splitting, temporal recovery, and review controls; proposed work should build on and evaluate those features.</p></section>
+
+  <section aria-labelledby="next"><h2 id="next">Recommended next steps</h2>
+  <p>The following are engineering proposals informed by the research, not verified fixes:</p>
+  <ol>
+    <li><strong>Calibrate expected fish size.</strong> Let a representative fish selection establish a reasonable size range for the recording. Account for image scale rather than applying the same pixel limits everywhere.</li>
+    <li><strong>Expose detection diagnostics.</strong> Preview the foreground mask and rejected regions, distinguishing size rejection from insufficient contrast. This would make failures easier to diagnose.</li>
+    <li><strong>Build a representative evaluation set.</strong> Manually label rectangular-tank frames containing clear fish, wall reflections, low contrast, and overlaps. Keep separate clips for evaluation so adjustments are not judged only on the examples used to tune them.</li>
+    <li><strong>Measure detection quality separately from tracking.</strong> Record missed fish, extra detections, and position error using a consistent position definition. Matching the expected count is insufficient: a missed fish and a reflection can cancel out. Evaluate identity switches separately when individual tracking is required.</li>
+    <li><strong>Compare overlap handling with TRex.</strong> Test threshold-based separation inside merged regions against our current implementation. Preserve uncertainty when the image cannot support separate detections.</li>
+    <li><strong>Consider trained head detection if needed.</strong> Use representative failures to decide whether the additional labeling, model delivery, and browser inference work are justified.</li>
+  </ol>
+  <p>Prioritize representative rectangular-tank performance. Do not optimize specifically for tiny fish in the round-tank example unless the intended use changes.</p></section>
+</main></body>
+</html>

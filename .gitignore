@@ -31,3 +31,8 @@ experiments/background_results/
 *.mkv
 !tests/browser/fixtures/moving-fish.webm
 !tests/browser/fixtures/single-fish.webm
+# Curated, attributed browser-compatible test recordings.
+!dist/test-video-clips/*.mp4
+
+# Generated benchmark reports (fixtures and baseline are versioned).
+benchmarks/zef-small/results/
