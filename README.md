@@ -533,3 +533,28 @@ regions to seek two plausible bodies. Split centers remain uncertain estimates;
 reflections may still survive. Changing the option clears results and requires
 reanalysis. JSON settings record `thresholdOverlap` so runs can be compared.
 The usual detector and existing overlap handling apply when the option is off.
+
+### Experimental intervening-frame processing
+
+Advanced settings → **Experimental: use intervening video frames** is off by
+default. It runs the existing single-fish continuity, recovery, tracking and
+overlap evidence on presented native video frames between saved samples.
+It does not add a Kalman filter. Background estimation still uses the usual
+25 samples. Estimated positions remain uncertain and cannot renew observations.
+Established tracking evidence requires an elapsed observation span rather than
+just two rapidly processed frames.
+
+This mode uses browser video-frame callbacks and quarter-speed playback, pausing
+to process each image. It is substantially slower than sampled analysis. It
+requires video-frame callback support, detects missed presentation callbacks,
+and reports an error if frames are skipped instead of silently treating them as
+complete coverage. Stop analysis preserves completed saved samples.
+
+Review/output sample indices and scheduled timestamps remain at the selected
+interval. A sample uses the first decoded frame at or after its scheduled time;
+a sample after the final native frame uses the final image. JSON records the
+actual image time in `sourceTimestampMs`, also exported as `source_timestamp_ms`
+in CSVs; `processedVideoFrames` reports cumulative internal observations.
+Results review seeks to the actual image time. Speeds and occupancy remain
+calculated from the retained samples, not from every internal observation.
+JSON settings record `interveningFrames` for comparisons.

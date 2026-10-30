@@ -25,6 +25,7 @@
     <div class="table-wrap"><table><caption>Columns in export order</caption><thead><tr><th>Column</th><th>Meaning</th></tr></thead><tbody>
       <tr><td><code>frame_index</code></td><td>Zero-based sample index, not the source video's native frame number.</td></tr>
       <tr><td><code>timestamp_ms</code></td><td>Requested sample time in milliseconds from the start of the video.</td></tr>
+      <tr><td><code>source_timestamp_ms</code></td><td>Actual decoded image time when experimental intervening-frame processing is enabled. The scheduled sample time stays in timestamp_ms. Blank with ordinary sampled processing.</td></tr>
       <tr><td><code>rawPredictionCount</code></td><td>Automatic candidate count before final selection and manual corrections.</td></tr>
       <tr><td><code>fishCount</code></td><td>Number of current centers used for this frame's measurements.</td></tr>
       <tr><td><code>countDifference</code></td><td>Current count minus expected fish count in background mode. Blank when unavailable.</td></tr>

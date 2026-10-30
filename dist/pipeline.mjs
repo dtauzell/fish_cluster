@@ -28,7 +28,29 @@ export async function* analyzeVideo({ config, duration, source, isStopped = () =
   let previousFrame = null;
   let previousCandidates = null;
   let background = null;
-  const tracker = config.trackFish !== false ? createFishTracker(config.expectedFish) : null;
+  const tracker = config.trackFish !== false ? createFishTracker(config.expectedFish,
+    { minimumObservationSpanMs: config.interveningFrames ? Math.min(250, config.intervalMs) : 0 }) : null;
+  let previousOutputs = [];
+  let emittedSamples = 0;
+  let processedVideoFrames = 0;
+  async function* processingFrames() {
+    if (!config.interveningFrames) {
+      for (const [index, timestampMs] of times.entries()) {
+        if (isStopped()) return;
+        await source.seekTo(timestampMs / 1000);
+        yield { timestampMs, gray: source.readGray(crop), outputIndices: [index] };
+      }
+      return;
+    }
+    if (!source.nativeFrames) throw new Error('Intervening-frame processing is unavailable for this video source.');
+    let next = 0;
+    for await (const decoded of source.nativeFrames(crop, isStopped)) {
+      const outputIndices = [];
+      while (next < times.length && times[next] <= decoded.timestampMs + .001) outputIndices.push(next++);
+      yield { ...decoded, outputIndices };
+      if (next === times.length) return;
+    }
+  }
 
   // At each pixel, the median of these samples estimates the stationary tank.
   const sampleCount = Math.min(25, Math.max(1, Math.ceil(duration * 2)));
@@ -46,14 +68,16 @@ export async function* analyzeVideo({ config, duration, source, isStopped = () =
   if (config.suppressFlicker !== false && darkZones.some(Boolean)) variation = backgroundVariation(samples, crop.width, crop.height,
     { excludeForegroundRuns: config.expectedFish === 1 });
 
-  for (const [frameIndex, timestampMs] of times.entries()) {
+  for await (const decoded of processingFrames()) {
     if (isStopped()) return;
-    await source.seekTo(timestampMs / 1000);
+    const { timestampMs, outputIndices } = decoded;
+    processedVideoFrames++;
+    const frameIndex = outputIndices[0] ?? -1;
     let gray;
     let detections;
     let rawPredictionCount;
 
-    gray = source.readGray(crop);
+    gray = decoded.gray;
     // Only a complete, observed sample within 250 ms can support a merge.
     // Estimated/split centers are never fed back as fresh observations.
     const canReferencePrevious = previousFrame && timestampMs - previousFrame.timestampMs <= 250 &&
@@ -78,7 +102,7 @@ export async function* analyzeVideo({ config, duration, source, isStopped = () =
     rawPredictionCount = detections.length;
 
     // Score the same decoded frame used for detection, in crop coordinates.
-    if (detections.length) {
+    if (detections.length && outputIndices.length) {
       detections = detections.map(candidate => ({ ...candidate,
         ...candidateSharpness(gray, crop.width, crop.height, candidate, exclusions) }));
     }
@@ -99,7 +123,7 @@ export async function* analyzeVideo({ config, duration, source, isStopped = () =
     // its original candidates, before selection introduced uncertainty flags.
     // Frames already yielded remain shared objects, as with track reacquisition.
     if (config.expectedFish === 1 && previousFrame &&
-      frameIndex === previousFrame.frameIndex + 1 && timestampMs > previousFrame.timestampMs &&
+      timestampMs > previousFrame.timestampMs &&
       timestampMs - previousFrame.timestampMs <= 250 && previousCandidates?.length > 1 &&
       detections.length === 1 && selected.selectionConfident === true &&
       selected.rejectedDetections.length === 0) {
@@ -112,7 +136,8 @@ export async function* analyzeVideo({ config, duration, source, isStopped = () =
         delete previousFrame.selectionPrediction;
         Object.assign(previousFrame, resolved, { selectionReferenceTimestampMs: timestampMs,
           selectionBeforeLookback: originalSelection,
-          metrics: frameMetrics(resolved.detections, config, resolved.rejectedDetections.length) });
+          metrics: previousOutputs.length ? frameMetrics(resolved.detections, config, resolved.rejectedDetections.length) : null });
+        for (const output of previousOutputs) if (output !== previousFrame) Object.assign(output, resolved, { metrics: previousFrame.metrics, selectionReferenceTimestampMs: timestampMs, selectionBeforeLookback: originalSelection });
       }
     }
     selected.detections = tracker ? tracker.update(selected.detections, timestampMs)
@@ -120,18 +145,37 @@ export async function* analyzeVideo({ config, duration, source, isStopped = () =
         positionSource: point.splitFromBlob ? 'overlap-estimate' : 'observed',
         positionUncertain: Boolean(point.positionUncertain || point.splitFromBlob) }));
     const frame = { frameIndex, timestampMs, rawPredictionCount, ...selected,
-      metrics: frameMetrics(selected.detections, config, selected.rejectedDetections.length) };
+      metrics: outputIndices.length ? frameMetrics(selected.detections, config, selected.rejectedDetections.length) : null };
     previousFrame = frame;
     previousCandidates = detections;
-    const progress = 10 + (frameIndex + 1) / times.length * 90;
-    if (!framePassesCountFilter(frame, config)) {
-      yield { type: 'skipped', frame, progress, frameIndex, total: times.length, fishCount: frame.detections.length,
-        requiredFishCount: config.filterFrameCount };
-      await yieldToBrowser();
-      continue;
+    previousOutputs = [];
+    if (!outputIndices.length) {
+      yield { type: 'status', progress: 10 + timestampMs / (duration * 1000) * 90,
+        message: `Processing intervening frames · ${(timestampMs / 1000).toFixed(1)} seconds` };
     }
-    yield { type: 'frame', frame, total: times.length,
-      progress };
+    for (const index of outputIndices) {
+      const output = config.interveningFrames ? { ...frame, frameIndex: index,
+        timestampMs: times[index], sourceTimestampMs: timestampMs, processedVideoFrames } : frame;
+      previousOutputs.push(output);
+      emittedSamples++;
+      const progress = 10 + (index + 1) / times.length * 90;
+      if (!framePassesCountFilter(output, config)) {
+        yield { type: 'skipped', frame: output, progress, frameIndex: index, total: times.length,
+          fishCount: output.detections.length, requiredFishCount: config.filterFrameCount };
+      } else yield { type: 'frame', frame: output, total: times.length, progress };
+    }
     await yieldToBrowser();
+  }
+  // A requested sample can lie after the final native frame but before duration.
+  // Retain that final decoded image rather than silently dropping the sample.
+  if (config.interveningFrames && !isStopped() && previousFrame) {
+    for (let index = emittedSamples; index < times.length; index++) {
+      const output = { ...previousFrame, frameIndex: index, timestampMs: times[index],
+        sourceTimestampMs: previousFrame.timestampMs, processedVideoFrames,
+        metrics: frameMetrics(previousFrame.detections, config, previousFrame.rejectedDetections.length) };
+      yield { type: framePassesCountFilter(output, config) ? 'frame' : 'skipped', frame: output,
+        frameIndex: index, total: times.length, progress: 10 + (index + 1) / times.length * 90,
+        fishCount: output.detections.length, requiredFishCount: config.filterFrameCount };
+    }
   }
 }

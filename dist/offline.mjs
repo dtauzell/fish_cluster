@@ -5,15 +5,17 @@ import { watchForAppUpdates } from './update-check.mjs';
 const indicator = document.getElementById('offline-status');
 const updateBanner = document.getElementById('app-update-banner');
 let readyRegistration = null;
+let dismissedWorker = null;
 
 function show(message) {
   if (indicator) indicator.textContent = message;
 }
 
 function showReady() {
-  if (updateBanner) updateBanner.hidden = !readyRegistration?.waiting;
+  const dismissed = readyRegistration?.waiting === dismissedWorker;
+  if (updateBanner) updateBanner.hidden = !readyRegistration?.waiting || dismissed;
   if (readyRegistration?.waiting) {
-    show(updateBanner ? 'App update saved · use Load update to load it' : document.getElementById('force-refresh')
+    show(updateBanner && !dismissed ? 'App update saved · use Load update to load it' : document.getElementById('force-refresh')
       ? 'App update saved · use Force refresh below to load it'
       : 'App update saved · close all app tabs to use it');
     return;
@@ -79,6 +81,10 @@ preparation.then(async registration => {
 
 const refreshButton = document.getElementById('force-refresh');
 const updateButton = document.getElementById('load-app-update');
+document.getElementById('dismiss-app-update')?.addEventListener('click', () => {
+  dismissedWorker = readyRegistration?.waiting;
+  showReady();
+});
 function refreshStatus(text) {
   for (const id of ['refresh-status', 'update-banner-status']) {
     const message = document.getElementById(id);

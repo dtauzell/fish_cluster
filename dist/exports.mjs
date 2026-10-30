@@ -28,6 +28,7 @@ function detectionsRows(frames) {
     return {
       frame_index: frame.frameIndex,
       timestamp_ms: frame.timestampMs,
+    source_timestamp_ms: frame.sourceTimestampMs,
       detection_id: detection.detectionId,
       group_id: groupId + 1,
       group_size: frame.metrics.groupSizes[groupId],
@@ -55,13 +56,14 @@ function detectionsRows(frames) {
 }
 
 export function detectionsCsv(frames) {
-  return csv(detectionsRows(frames), ['frame_index', 'timestamp_ms', 'detection_id', 'group_id', 'group_size', 'class', 'confidence', 'x_px', 'y_px', 'box_width_px', 'box_height_px', 'blob_area_px', 'tank_side', 'split_from_blob', 'edge_recovered', 'sharpness', 'local_contrast', 'sharpness_pixel_count', 'sharpness_clipped', 'distance_from_center_px', 'split_reason', 'source_blob_area_px', 'split_reference_timestamp_ms', ...positionColumns]);
+  return csv(detectionsRows(frames), ['frame_index', 'timestamp_ms', 'source_timestamp_ms', 'detection_id', 'group_id', 'group_size', 'class', 'confidence', 'x_px', 'y_px', 'box_width_px', 'box_height_px', 'blob_area_px', 'tank_side', 'split_from_blob', 'edge_recovered', 'sharpness', 'local_contrast', 'sharpness_pixel_count', 'sharpness_clipped', 'distance_from_center_px', 'split_reason', 'source_blob_area_px', 'split_reference_timestamp_ms', ...positionColumns]);
 }
 
 function framesRows(frames) {
   return frames.map((frame, index) => ({
     frame_index: frame.frameIndex,
     timestamp_ms: frame.timestampMs,
+    source_timestamp_ms: frame.sourceTimestampMs,
     rawPredictionCount: frame.rawPredictionCount,
     rejectedCandidateCount: frame.rejectedDetections?.length ?? 0,
     splitCandidateCount: frame.detections.filter(point => point.splitFromBlob).length,
@@ -74,10 +76,10 @@ function framesRows(frames) {
 }
 
 export function framesCsv(frames) {
-  return csv(framesRows(frames), ['frame_index', 'timestamp_ms', 'rawPredictionCount', 'fishCount', 'countDifference', 'pairCount', 'meanPairDistancePx', 'meanPairDistanceInches', 'meanNearestDistancePx', 'meanNearestDistanceInches', 'closeFishFraction', 'clusterCount', 'isolatedCount', 'groupSizes', 'groupChanged', 'randomSpacingPercentile', 'randomSpacingUnavailableReason', 'rejectedCandidateCount', 'splitCandidateCount', 'uncertainPositionCount', 'manualPositionCount', 'manualCorrectionApplied', 'automaticFishCount', 'darkSideCount', 'lightSideCount', 'unmarkedSideCount']);
+  return csv(framesRows(frames), ['frame_index', 'timestamp_ms', 'source_timestamp_ms', 'rawPredictionCount', 'fishCount', 'countDifference', 'pairCount', 'meanPairDistancePx', 'meanPairDistanceInches', 'meanNearestDistancePx', 'meanNearestDistanceInches', 'closeFishFraction', 'clusterCount', 'isolatedCount', 'groupSizes', 'groupChanged', 'randomSpacingPercentile', 'randomSpacingUnavailableReason', 'rejectedCandidateCount', 'splitCandidateCount', 'uncertainPositionCount', 'manualPositionCount', 'manualCorrectionApplied', 'automaticFishCount', 'darkSideCount', 'lightSideCount', 'unmarkedSideCount']);
 }
 
-export const lightDarkFrameColumns = ['frame_index', 'timestamp_ms', 'fish_count', 'included_in_results',
+export const lightDarkFrameColumns = ['frame_index', 'timestamp_ms', 'source_timestamp_ms', 'fish_count', 'included_in_results',
   'side', 'zone_switch', 'interval_seconds', 'dark_time_seconds', 'light_time_seconds', 'unknown_time_seconds',
   'x_px', 'y_px', 'speed_px_per_second', 'speed_inches_per_second', 'position_source', 'position_uncertain', 'manual_correction_applied',
   'automatic_candidate_count', 'rejected_candidate_count', 'foreground_contrast', 'selection_method', 'selection_confident'];
@@ -92,7 +94,8 @@ export function lightDarkFramesCsv(frames, config) {
   return csv(frames.map((frame, index) => {
     const sample = report.samples[index], speed = speeds.get(frame.frameIndex);
     const point = frame.detections.length === 1 ? frame.detections[0] : null;
-    return { frame_index: frame.frameIndex, timestamp_ms: frame.timestampMs, fish_count: frame.detections.length,
+    return { frame_index: frame.frameIndex, timestamp_ms: frame.timestampMs,
+    source_timestamp_ms: frame.sourceTimestampMs, fish_count: frame.detections.length,
       included_in_results: framePassesCountFilter(frame, config), side: sample.side, zone_switch: sample.changed,
       interval_seconds: sample.intervalSeconds, dark_time_seconds: sample.darkTimeSeconds,
       light_time_seconds: sample.lightTimeSeconds, unknown_time_seconds: sample.unknownTimeSeconds,
@@ -114,6 +117,7 @@ function humanRows(frames, marksByFrame, reviewed, config) {
     const marks = marksByFrame.get(index) ?? [];
     const { within: inCrop, manual: metrics, automatic, matched } = compareFrame(frame, marks, config);
     const common = { frame_index: frame.frameIndex, frame_number: frame.frameIndex + 1, timestamp_ms: frame.timestampMs,
+    source_timestamp_ms: frame.sourceTimestampMs,
       included_in_results: framePassesCountFilter(frame, config),
       automatic_candidate_count: automaticCandidateCount(frame),
       reviewed: reviewed.has(index), manual_annotation_present: hasManualMarks,
@@ -135,7 +139,7 @@ function humanRows(frames, marksByFrame, reviewed, config) {
 }
 
 export function humanCsv(frames, marksByFrame, reviewed, config) {
-  return csv(humanRows(frames, marksByFrame, reviewed, config), ['frame_index', 'frame_number', 'timestamp_ms', 'reviewed', 'manual_annotation_present', 'manual_fish_count_in_crop', 'manual_fish_count_outside_crop', 'automatic_fish_count', 'matched_center_count', 'manual_cluster_count', 'automatic_cluster_count', 'manual_group_sizes', 'automatic_group_sizes', 'close_distance_inches', 'mark_number', 'x_px', 'y_px', 'inside_crop', 'included_in_analysis', 'manual_group_id', 'tank_side', 'manual_fish_count_in_analysis', 'manual_correction_applied', 'result_fish_count', 'included_in_results', 'automatic_candidate_count']);
+  return csv(humanRows(frames, marksByFrame, reviewed, config), ['frame_index', 'frame_number', 'timestamp_ms', 'source_timestamp_ms', 'reviewed', 'manual_annotation_present', 'manual_fish_count_in_crop', 'manual_fish_count_outside_crop', 'automatic_fish_count', 'matched_center_count', 'manual_cluster_count', 'automatic_cluster_count', 'manual_group_sizes', 'automatic_group_sizes', 'close_distance_inches', 'mark_number', 'x_px', 'y_px', 'inside_crop', 'included_in_analysis', 'manual_group_id', 'tank_side', 'manual_fish_count_in_analysis', 'manual_correction_applied', 'result_fish_count', 'included_in_results', 'automatic_candidate_count']);
 }
 
 
@@ -145,6 +149,7 @@ export function sharpnessCsv(frames, labelsByFrame) {
     frame_index: frame.frameIndex,
     frame_number: frame.frameIndex + 1,
     timestamp_ms: frame.timestampMs,
+    source_timestamp_ms: frame.sourceTimestampMs,
     detection_id: candidate.detectionId,
     x_px: candidate.x,
     y_px: candidate.y,
@@ -163,7 +168,7 @@ export function sharpnessCsv(frames, labelsByFrame) {
     edge_recovered: candidate.edgeRecovered ?? false,
     ...positionFields(candidate)
   })));
-  return csv(rows, ['frame_index', 'frame_number', 'timestamp_ms', 'detection_id', 'x_px', 'y_px',
+  return csv(rows, ['frame_index', 'frame_number', 'timestamp_ms', 'source_timestamp_ms', 'detection_id', 'x_px', 'y_px',
     'sharpness', 'local_contrast', 'sharpness_pixel_count', 'sharpness_clipped', 'human_label',
     'split_from_blob', 'edge_recovered', 'included_in_analysis', 'rejection_reason', 'distance_from_center_px', 'split_reason', 'source_blob_area_px', 'split_reference_timestamp_ms', ...positionColumns]);
 }

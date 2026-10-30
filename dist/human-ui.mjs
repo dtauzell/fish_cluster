@@ -360,7 +360,7 @@ export function createHumanReview({ state, video, humanCanvas, queuePreviewSeek,
     updateHumanDetails();
     onFrameSelected();
     const token = ++state.previewToken;
-    return queuePreviewSeek(token, state.reviewFrames[index].timestampMs, () => {
+    return queuePreviewSeek(token, state.reviewFrames[index].sourceTimestampMs ?? state.reviewFrames[index].timestampMs, () => {
       if ($('human-page').hidden) return;
       state.human.loading = false;
       drawHumanFrame();

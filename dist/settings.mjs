@@ -59,5 +59,5 @@ export function createSettings(values, selectedCrop, frameWidth, frameHeight, se
   if (testType !== 'light-dark' && values.filterExactCount && (!Number.isInteger(values.filterFrameCount) || values.filterFrameCount < 1)) {
     throw new Error('Required fish per frame must be a whole number of at least one.');
   }
-  return { ...common, thresholdOverlap: values.thresholdOverlap === true, preferCenter: values.preferCenter === true, trackFish: values.trackFish !== false, suppressFlicker: values.suppressFlicker !== false };
+  return { ...common, interveningFrames: values.interveningFrames === true, thresholdOverlap: values.thresholdOverlap === true, preferCenter: values.preferCenter === true, trackFish: values.trackFish !== false, suppressFlicker: values.suppressFlicker !== false };
 }

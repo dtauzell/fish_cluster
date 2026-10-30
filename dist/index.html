@@ -17,6 +17,7 @@
   <aside id="app-update-banner" class="app-update-banner" aria-label="App update" hidden>
     <div><div role="status"><strong>Update available</strong><p>A new version is ready. You can keep working and load it when you’re ready.</p></div><p id="update-banner-status" role="status"></p></div>
     <button id="load-app-update" class="primary" type="button">Load update</button>
+    <button id="dismiss-app-update" class="secondary" type="button">Not now</button>
   </aside>
   <div class="shell">
     <video id="source-video" class="source-video" playsinline preload="auto" muted aria-hidden="true"></video>
@@ -67,6 +68,8 @@
             <label class="center-option"><input id="track-fish" type="checkbox" checked> Track fish across nearby frames</label>
             <p class="fine-print">Use intervals of 250 ms or less. T numbers follow provisional paths; identities can swap during overlap. Dashed † centers are uncertain estimates. With the center rule below, recent paths can help separate an overlap for up to one second after a clear observation.</p>
             <p class="fine-print">With one fish expected, background detection keeps the strongest foreground contrast instead of weaker reflections. Similar candidates remain uncertain; review the pink × marks and correct the center when needed.</p>
+            <label class="center-option"><input id="intervening-frames" type="checkbox"> Experimental: use intervening video frames</label>
+            <p class="fine-print"><strong>VERY SLOW.</strong> Process video frames between samples for single-fish continuity and overlap evidence. Results and exports keep the selected sample interval. Positions without reliable image evidence remain uncertain. Analyze again after changing this option.</p>
             <label class="center-option"><input id="threshold-overlap" type="checkbox"> Experimental: separate overlapping fish by contrast</label>
             <p class="fine-print">For multiple fish, keep larger joined regions and try stronger contrast thresholds to separate touching fish. Split positions remain uncertain estimates. Reflections can still be detected. Analyze again after changing this option.</p>
             <label class="center-option"><input id="prefer-center" type="checkbox"> If there are extra candidates, keep those nearest the crop center</label>

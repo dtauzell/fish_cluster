@@ -93,5 +93,45 @@ export function createVideoSource(video) {
     });
   }
 
-  return { showFirstFrame, seekTo, seekToDrawableFrame, readGray, readPng };
+  async function* nativeFrames(crop, isStopped = () => false) {
+    if (typeof video.requestVideoFrameCallback !== 'function') throw new Error('This browser cannot process intervening video frames. Turn off the experimental option.');
+    const rate = video.playbackRate, muted = video.muted;
+    video.pause(); video.muted = true; video.playbackRate = .25;
+    let lastTime = 0, lastPresented = null;
+    try {
+      await seekToDrawableFrame(0);
+      yield { timestampMs: 0, gray: readGray(crop) };
+      while (!video.ended && !isStopped()) {
+        const next = await new Promise((resolve, reject) => {
+          let callback, timer;
+          const cleanup = () => { clearInterval(timer); video.cancelVideoFrameCallback(callback); video.removeEventListener('ended', ended); video.removeEventListener('error', failed); video.pause(); };
+          const ended = () => { cleanup(); resolve(null); };
+          const failed = () => { cleanup(); reject(new Error('Video decoding failed during intervening-frame processing.')); };
+          const start = performance.now();
+          const presented = (_, info) => {
+            if (info.mediaTime * 1000 <= lastTime + .001) { callback = video.requestVideoFrameCallback(presented); return; }
+            if (lastPresented != null && info.presentedFrames > lastPresented + 1) {
+              cleanup(); reject(new Error('The browser skipped video frames. Retry or turn off intervening-frame processing.')); return;
+            }
+            lastPresented = info.presentedFrames;
+            // Copy pixels in the presentation callback before resolving the promise.
+            const frame = { timestampMs: info.mediaTime * 1000, gray: readGray(crop) };
+            cleanup(); resolve(frame);
+          };
+          callback = video.requestVideoFrameCallback(presented);
+          video.addEventListener('ended', ended); video.addEventListener('error', failed);
+          timer = setInterval(() => {
+            if (isStopped()) { cleanup(); resolve(null); }
+            else if (performance.now() - start > 15000) { cleanup(); reject(new Error('Timed out waiting for a video frame.')); }
+          }, 100);
+          video.play().catch(error => { cleanup(); reject(error); });
+        });
+        if (!next) break;
+        lastTime = next.timestampMs;
+        yield next;
+      }
+    } finally { video.pause(); video.playbackRate = rate; video.muted = muted; }
+  }
+
+  return { showFirstFrame, seekTo, seekToDrawableFrame, readGray, readPng, nativeFrames };
 }

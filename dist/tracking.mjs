@@ -10,9 +10,11 @@ export const TRACKING_METHOD = { version: 2, maxSampleGapMs: 250, maxObservation
  * A carried position can never renew the one-second observation deadline.
  * No missing fish is created without a current foreground region to split.
  */
-export function createFishTracker(expectedFish) {
+export function createFishTracker(expectedFish, { minimumObservationSpanMs = 0 } = {}) {
   let tracks = [], nextId = 1, lastTimestamp = null;
   let lastUpdateSnapshot = null;
+
+  const established = track => track.observations >= 2 && track.observedAt - track.startedAt >= minimumObservationSpanMs;
 
   function expire(timestampMs) {
     if (lastTimestamp != null && (timestampMs <= lastTimestamp || timestampMs - lastTimestamp > TRACKING_METHOD.maxSampleGapMs)) tracks = [];
@@ -32,7 +34,7 @@ export function createFishTracker(expectedFish) {
     expire(timestampMs);
     if (expectedFish !== 1 || tracks.length !== 1) return null;
     const track = tracks[0];
-    if (track.observations < 2 || !track.motionReady || track.pending.length ||
+    if (!established(track) || !track.motionReady || track.pending.length ||
       timestampMs <= track.seenAt || timestampMs - track.seenAt > TRACKING_METHOD.maxSampleGapMs ||
       track.observedAt !== track.seenAt) return null;
     return { ...predict(track, timestampMs), referenceTimestampMs: track.observedAt };
@@ -41,7 +43,7 @@ export function createFishTracker(expectedFish) {
   /** Recent separately observed fish provide a size baseline when several pairs merge at once. */
   function sizeReference(timestampMs) {
     expire(timestampMs);
-    const observed = tracks.filter(track => track.observations >= 2 &&
+    const observed = tracks.filter(track => established(track) &&
       timestampMs - track.seenAt <= TRACKING_METHOD.maxSampleGapMs && track.area > 0);
     if (observed.length < 3) return null;
     const areas = observed.map(track => track.area).sort((a, b) => a - b);
@@ -55,7 +57,7 @@ export function createFishTracker(expectedFish) {
     expire(timestampMs);
     const groups = new Map();
     for (const track of tracks) {
-      if (track.observations < 2 || timestampMs - track.seenAt > TRACKING_METHOD.maxSampleGapMs) continue;
+      if (!established(track) || timestampMs - track.seenAt > TRACKING_METHOD.maxSampleGapMs) continue;
       const prediction = predict(track, timestampMs);
       const predicted = { x: prediction.x - crop.x, y: prediction.y - crop.y };
       let nearest = null, nearestDistance = Infinity;
@@ -137,7 +139,7 @@ export function createFishTracker(expectedFish) {
         assignment.splice(unused, 1);
       }
       const track = { id: nextId++, position: { x: point.x, y: point.y },
-        observed: { x: point.x, y: point.y }, observedAt: timestampMs, seenAt: timestampMs,
+        observed: { x: point.x, y: point.y }, observedAt: timestampMs, startedAt: timestampMs, seenAt: timestampMs,
         velocity: { x: 0, y: 0 }, observations: 1, motionReady: false, area: point.area ?? 0, pending: [] };
       tracks.push(track);
       assignment.push(index);

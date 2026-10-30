@@ -44,7 +44,13 @@ test(`${button} activates an already downloaded release while offline`, async ({
     page.once('dialog', dialog => dialog.accept());
   }
 
+  if (button === 'Force refresh') {
+    await banner.getByRole('button', { name: 'Not now', exact: true }).click();
+    await expect(banner).toBeHidden();
+    await expect(page.locator('#offline-status')).toContainText('Force refresh');
+  }
   await context.setOffline(true);
+  if (button === 'Force refresh') await expect(banner).toBeHidden();
   await page.getByRole('button', { name: button, exact: true }).click();
   await expect(page.locator('#app-version')).toContainText('Version bbbbbbbb');
   await expect(page.locator('#offline-status')).toHaveText('Offline · ready to analyze');
