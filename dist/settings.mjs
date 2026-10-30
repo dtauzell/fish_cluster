@@ -18,7 +18,7 @@ export function createSettings(values, selectedCrop, frameWidth, frameHeight, se
   if (exclusions.some(box => ![box.x, box.y, box.width, box.height].every(Number.isFinite) || box.width <= 0 || box.height <= 0)) {
     throw new Error('Reflection masks must be rectangles with positive dimensions.');
   }
-  if (!usableRectangles(crop, exclusions.filter(box => !box.polygon)).length) throw new Error('Reflection masks cover the entire crop. Leave room to detect fish.');
+  if (!usableRectangles(crop, exclusions.filter(box => !box.preferenceOnly && !box.polygon)).length) throw new Error('Reflection masks cover the entire crop. Leave room to detect fish.');
   const tankZones = selectedTankZones.map(copyShape);
   if (testType === 'light-dark' && !tankZones.some(zone => zone.side === 'dark')) throw new Error('Mark the dark tank region for the light-dark test.');
   if (tankZones.some(zone => !['dark', 'light'].includes(zone.side) ||

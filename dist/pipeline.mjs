@@ -1,5 +1,5 @@
 import { analysisTankSide, darkZoneMask } from './tank-zones.mjs';
-import { selectCentralCandidates, selectSingleFishCandidate, selectSingleFishFromNextFrame } from './candidate-selection.mjs';
+import { selectCentralCandidates, preferOutsideReflectionAreas, selectSingleFishCandidate, selectSingleFishFromNextFrame } from './candidate-selection.mjs';
 import { candidateSharpness } from './sharpness.mjs';
 import { insideAnalysisArea, localExclusions, analysisPixelMask } from './region.mjs';
 import { sampleTimes } from './analysis.mjs';
@@ -21,7 +21,7 @@ const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
 export async function* analyzeVideo({ config, duration, source, isStopped = () => false }) {
   const times = sampleTimes(duration, config.intervalMs);
   const { crop } = config;
-  const exclusions = localExclusions(crop, config.exclusions);
+  const exclusions = localExclusions(crop, (config.exclusions ?? []).filter(area => !area.preferenceOnly));
   const darkZones = darkZoneMask(crop, config.tankZones);
   const analysisMask = analysisPixelMask(crop, config.exclusions);
   let variation = null;
@@ -115,10 +115,13 @@ export async function* analyzeVideo({ config, duration, source, isStopped = () =
       previousFrame.selectionConfident !== false && !previousFrame.detections[0].positionUncertain &&
       previousFrame.detections[0].positionSource !== 'overlap-estimate'
       ? previousFrame.detections[0] : undefined;
+    const preferred = preferOutsideReflectionAreas(detections,
+      (config.exclusions ?? []).filter(area => area.preferenceOnly), config.expectedFish, crop, config.preferCenter);
     const selected = config.expectedFish === 1
-      ? selectSingleFishCandidate(detections, crop, { previousPoint: previousTrackPoint,
+      ? selectSingleFishCandidate(preferred.detections, crop, { previousPoint: previousTrackPoint,
         predictedPoint: previousTrackPoint ? tracker?.selectionPrediction(timestampMs) : undefined })
-      : selectCentralCandidates(detections, crop, config.preferCenter ? config.expectedFish : null);
+      : selectCentralCandidates(preferred.detections, crop, config.preferCenter ? config.expectedFish : null);
+    selected.rejectedDetections.push(...preferred.rejectedDetections);
     // A unique current observation can disambiguate the preceding sample. Use
     // its original candidates, before selection introduced uncertainty flags.
     // Frames already yielded remain shared objects, as with track reacquisition.
@@ -133,6 +136,7 @@ export async function* analyzeVideo({ config, duration, source, isStopped = () =
           confident: previousFrame.selectionConfident, detectionId: previousFrame.detections[0]?.detectionId };
         resolved.detections = tracker ? tracker.reviseLastUpdate(resolved.detections, previousFrame.timestampMs)
           : resolved.detections.map(point => ({ ...point, positionSource: 'observed' }));
+        resolved.rejectedDetections.push(...previousFrame.rejectedDetections.filter(point => point.rejectionReason === 'reflection-area-excess'));
         delete previousFrame.selectionPrediction;
         Object.assign(previousFrame, resolved, { selectionReferenceTimestampMs: timestampMs,
           selectionBeforeLookback: originalSelection,
@@ -147,7 +151,7 @@ export async function* analyzeVideo({ config, duration, source, isStopped = () =
     const frame = { frameIndex, timestampMs, rawPredictionCount, ...selected,
       metrics: outputIndices.length ? frameMetrics(selected.detections, config, selected.rejectedDetections.length) : null };
     previousFrame = frame;
-    previousCandidates = detections;
+    previousCandidates = preferred.detections;
     previousOutputs = [];
     if (!outputIndices.length) {
       yield { type: 'status', progress: 10 + timestampMs / (duration * 1000) * 90,

@@ -129,6 +129,7 @@ export function analyzeFrame(detections, thresholdPx) {
 // Compare the observed nearest-neighbor spacing with fish placed uniformly in the crop.
 // A fixed seed makes the comparison reproducible across redraws and exports.
 export function randomSpacingReference(count, crop, samples = 399, exclusions = []) {
+  exclusions = exclusions.filter(area => !area.preferenceOnly);
   if (count < 2 || !crop?.width || !crop?.height) return null;
   const origin = { ...crop, x: crop.x ?? 0, y: crop.y ?? 0 };
   // Polygon runs use uniform rejection from the bounding box. Keep the original

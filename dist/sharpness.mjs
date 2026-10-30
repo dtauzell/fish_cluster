@@ -34,7 +34,7 @@ export function candidateSharpness(gray, width, height, candidate, exclusions = 
     for (let x = startX; x <= endX; x++) {
       // Skip the whole stencil when any of its five pixels is masked. Do not
       // paint excluded pixels black: that would introduce artificial sharp edges.
-      const masked = exclusions.some(box => [
+      const masked = exclusions.some(box => !box.preferenceOnly && [
         { x, y }, { x: x - 1, y }, { x: x + 1, y }, { x, y: y - 1 }, { x, y: y + 1 }
       ].some(point => insideCrop(point, box)));
       if (masked) { clipped = true; continue; }

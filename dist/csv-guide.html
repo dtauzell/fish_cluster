@@ -53,7 +53,7 @@
     </tbody></table></div>
   </section>
   <section id="light-dark"><h2>Light/dark frames</h2>
-    <p>This export includes <strong>all analyzed samples</strong>, including excluded or uncertain observations. Mark the dark region; the remaining usable tank is light. Reflection masks are excluded. A reliable side requires exactly one observed or manually corrected center, no ambiguity, and a passing count filter.</p>
+    <p>This export includes <strong>all analyzed samples</strong>, including excluded or uncertain observations. Mark the dark region; the remaining usable tank is light. Reflection preference areas remain usable; detections there are deprioritized only when there are too many candidates. A reliable side requires exactly one observed or manually corrected center, no ambiguity, and a passing count filter.</p>
     <p>Time is estimated over the interval from the first analyzed sample to the last. Each row reports the interval ending at that row. Consecutive reliable positions on the same side assign the whole interval to that side. If the side changes, half goes to each side. Missing or uncertain positions, nonconsecutive samples, excessive time gaps, and unexplained track changes assign the whole interval to unknown. No time is extrapolated before or after the analyzed samples, including the unsampled video tail.</p>
     <div class="table-wrap"><table><caption>Columns in export order</caption><thead><tr><th>Column</th><th>Meaning</th></tr></thead><tbody>
       <tr><td><code>frame_index</code></td><td>Zero-based sample index, preserved even for excluded samples.</td></tr>

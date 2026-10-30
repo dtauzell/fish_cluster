@@ -138,6 +138,8 @@ export function drawExclusions(context, exclusions = [], view = { x: 0, y: 0 }) 
   context.strokeStyle = '#f4a7b9';
   context.lineWidth = 2;
   for (const box of exclusions) {
+    context.fillStyle = box.preferenceOnly ? 'rgba(246, 217, 121, 0.16)' : 'rgba(244, 100, 120, 0.24)';
+    context.strokeStyle = box.preferenceOnly ? '#f6d979' : '#f4a7b9';
     shapePath(context, box, view);
     context.fill();
     context.stroke();

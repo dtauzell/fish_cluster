@@ -280,7 +280,7 @@ canvas.addEventListener('click', event => {
       if (tool === 'crop') commitCrop(shape);
       else {
         if (shape.width < 4 || shape.height < 4) throw new Error('Select a larger area.');
-        if (tool === 'exclude') { state.exclusions.push(shape); updateMaskControls(); }
+        if (tool === 'exclude') { state.exclusions.push({ ...shape, preferenceOnly: true }); updateMaskControls(); }
         else { state.tankZones.push({ ...shape, side: tool }); updateZoneControls(); }
         clearResults();
         state.corners = [];
@@ -323,11 +323,11 @@ canvas.addEventListener('pointerup', event => {
     return;
   }
   if (exclude && box.width >= 4 && box.height >= 4) {
-    state.exclusions.push(box);
+    state.exclusions.push({ ...box, preferenceOnly: true });
     clearResults();
     updateMaskControls();
     drawFrame(null);
-    status('Reflection area masked. Analyze again to apply it to all frames.');
+    status('Reflection preference area marked. Analyze again to apply it to all frames.');
     return;
   }
   if (!exclude && box.width >= 30 && box.height >= 30) {
@@ -385,7 +385,7 @@ $('clear-crop').addEventListener('click', () => {
 
 function updateMaskControls() {
   const count = state.exclusions.length;
-  $('mask-count').textContent = count ? `${count} reflection mask${count === 1 ? '' : 's'}.` : 'No reflection masks.';
+  $('mask-count').textContent = count ? `${count} reflection area${count === 1 ? '' : 's'}.` : 'No reflection areas.';
   $('undo-mask').disabled = count === 0;
   $('clear-masks').disabled = count === 0;
 }
@@ -398,7 +398,7 @@ for (const id of ['undo-mask', 'clear-masks']) {
     clearResults();
     updateMaskControls();
     drawFrame(null);
-    status('Reflection masks changed. Analyze again to update results.');
+    status('Reflection areas changed. Analyze again to update results.');
   });
 }
 
@@ -440,7 +440,7 @@ function settings() {
     interveningFrames: $('intervening-frames').checked,
     thresholdOverlap: $('threshold-overlap').checked,
     suppressFlicker: $('suppress-flicker').checked
-  }, state.crop, video.videoWidth, video.videoHeight, state.exclusions, state.tankZones);
+  }, state.crop, video.videoWidth, video.videoHeight, state.exclusions.map(box => ({ ...box, preferenceOnly: true })), state.tankZones);
 }
 
 function displayDistance(inches, digits = 2) {
@@ -683,7 +683,7 @@ function resultCropEntries() {
   return [
     { name: 'Tank crop', shape: crop },
     ...(state.settings.tankZones ?? []).map((shape, index) => ({ name: `${shape.side ?? 'Tank'} region ${index + 1}`, shape })),
-    ...(state.settings.exclusions ?? []).map((shape, index) => ({ name: `Reflection mask ${index + 1}`, shape }))
+    ...(state.settings.exclusions ?? []).map((shape, index) => ({ name: `Reflection area ${index + 1}`, shape }))
   ];
 }
 
@@ -1018,7 +1018,7 @@ function updateTestControls() {
   if (lightDark) { $('expected-fish').value = 1; $('filter-frame-count').value = 1; $('human-show-nearest').checked = false; }
   $('csv-guide').href = `./csv-guide.html#${state.testType ?? 'shoaling'}`;
   $('setup-title').textContent = lightDark ? 'Set up light / dark test' : 'Set up shoaling test';
-  $('preview-tools').querySelector('summary').textContent = lightDark ? 'Tank area, light/dark sides, reflection masks & scale' : 'Tank area, reflection masks & scale';
+  $('preview-tools').querySelector('summary').textContent = lightDark ? 'Tank area, light/dark sides, reflection areas & scale' : 'Tank area, reflection areas & scale';
   for (const value of ['dark','light']) $('crop-tool').querySelector(`option[value="${value}"]`).hidden = !lightDark;
   for (const id of ['undo-zone','clear-zones','zone-count']) $(id).hidden = !lightDark;
 }
@@ -1050,7 +1050,7 @@ const experimentTools = createExperimentTools({
     if (setup.frameWidth !== video.videoWidth || setup.frameHeight !== video.videoHeight) throw new Error('Setup dimensions do not match this video.');
     if (setup.testType !== state.testType && !chooseTest(setup.testType)) throw new Error('Test change cancelled. Saved setup was not applied.');
     state.crop = setup.crop ? copyShape(setup.crop) : null;
-    state.exclusions = (setup.exclusions ?? []).map(copyShape); state.tankZones = (setup.tankZones ?? []).map(copyShape);
+    state.exclusions = (setup.exclusions ?? []).map(box => ({ ...copyShape(box), preferenceOnly: true })); state.tankZones = (setup.tankZones ?? []).map(copyShape);
     state.calibrationLine = null; state.drag = null; state.corners = []; state.focusTank = Boolean(state.crop);
     $('grid-pixels').value = setup.gridPixels; setCropInputs(state.crop ?? { x:0,y:0,width:video.videoWidth,height:video.videoHeight });
     $('clear-crop').disabled = !state.crop; $('crop-label').textContent = state.crop ? 'Saved tank crop applied.' : 'Using the full video frame.';

@@ -57,25 +57,26 @@ test('precise crop is applied to exported analysis settings', async ({ page }) =
   expect((await analyze(page)).settings.crop).toEqual(crop);
 });
 
-test('reflection masks can be drawn, undone and cleared', async ({ page }) => {
+test('reflection areas can be drawn, undone and cleared', async ({ page }) => {
   await loadVideo(page);
   await page.locator('#crop-tool').selectOption('exclude');
   const count = page.locator('#mask-count');
   await drawMask(page, [.1, .1], [.3, .3]);
-  await expect(count).toHaveText('1 reflection mask.');
+  await expect(count).toHaveText('1 reflection area.');
   await drawMask(page, [.6, .6], [.8, .8]);
-  await expect(count).toHaveText('2 reflection masks.');
+  await expect(count).toHaveText('2 reflection areas.');
   await page.locator('#undo-mask').click();
-  await expect(count).toHaveText('1 reflection mask.');
+  await expect(count).toHaveText('1 reflection area.');
   const settings = (await analyze(page)).settings;
   expect(settings.exclusions).toHaveLength(1);
+  expect(settings.exclusions[0].preferenceOnly).toBe(true);
   expect(settings.exclusions[0].x).toBeCloseTo(16, 0);
   expect(settings.exclusions[0].y).toBeCloseTo(10, 0);
   expect(settings.exclusions[0].width).toBeCloseTo(32, 0);
   expect(settings.exclusions[0].height).toBeCloseTo(20, 0);
   await page.getByRole('link', { name: 'Setup', exact: true }).click();
   await page.locator('#clear-masks').click();
-  await expect(count).toHaveText('No reflection masks.');
+  await expect(count).toHaveText('No reflection areas.');
   await expect(page.locator('#undo-mask')).toBeDisabled();
   await expect(page.locator('#clear-masks')).toBeDisabled();
 });
@@ -119,4 +120,15 @@ test('named setups persist, apply their geometry and scale, reject duplicates, a
   await page.getByRole('button', { name: /Shoaling/ }).click();
   await page.getByText('Saved tank setups', { exact: true }).click();
   await expect(setups.getByLabel('Saved setup').locator('option')).toHaveCount(0);
+});
+
+test('fish remain detectable inside a marked reflection preference area', async ({page})=>{
+ await loadVideo(page);
+ await page.locator('#crop-tool').selectOption('exclude');
+ await drawMask(page,[.01,.01],[.99,.99]);
+ const result=await analyze(page);
+ expect(result.settings.exclusions[0].preferenceOnly).toBe(true);
+ expect(result.frames[0].detections).toHaveLength(2);
+ expect(result.frames[0].detections.every(p=>p.inReflectionArea)).toBe(true);
+ expect(result.frames[0].rejectedDetections).toHaveLength(0);
 });

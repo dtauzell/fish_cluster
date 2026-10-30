@@ -229,12 +229,15 @@ frame, its `automatic_candidate_count`, and an `included_in_results` flag.
 Analysis CSVs contain included frames; the full JSON also saves `excludedFrames`.
 
 To include fish swimming above the tank floor, enlarge the crop to cover their
-swimming area. Under the preview, choose **Mask reflection area** from the drag
-tool and draw rectangles over reflections or fixtures. Red masks apply to every
-sampled frame; use **Undo last mask** or **Clear masks** to adjust them, then
-analyze again. Keep masks small: real fish inside them are also excluded. A mask
-cannot distinguish a fish from its reflection when they occupy the same image
-area. Masks appear in human review and are saved in the JSON settings.
+swimming area. Choose **Mark reflection area** and outline reflections or fixtures.
+Yellow reflection areas remain usable. If there are more candidates than expected,
+candidates outside these areas take priority, and marked candidates are removed
+only until the expected count is reached or no marked candidates remain. If all
+candidates are marked, the area provides no preference. The center rule can still
+resolve other extra candidates when enabled. Rejected candidates remain visible
+in Results and exports. Saved setups are applied as reflection preferences.
+JSON records `preferenceOnly: true` on these areas; CSVs record
+`in_reflection_area` and the `reflection-area-excess` rejection reason.
 
 For an angled tank, open **Tank area, light/dark sides, reflection masks & scale**,
 choose **Select tank crop** under **Area tool**, and set **Selection shape** to
@@ -255,7 +258,7 @@ reflection masks & scale**. Crop to the swimming area, then use the **Area tool*
 to **Mark dark region** and **Mark light region**, outlining each side with a
 rectangle or four corners. You can draw several areas; the last drawn wins at overlaps.
 **Undo last region** and **Clear light/dark regions** adjust these marks.
-Unlike reflection masks, these regions keep fish in the analysis. In dark regions,
+These regions and reflection preference areas keep fish in the analysis. In dark regions,
 background subtraction accepts both brighter and darker changes; light and
 unmarked areas retain the darker-fish rule. The median background remains local
 to each pixel. Analyze again after editing regions. Results show the region
@@ -296,8 +299,7 @@ neighborhood to tolerate small ridge shifts. A candidate needs a small core
 (at least five pixels and 8% of its area) that changes beyond that range. The
 whole candidate outline is retained when it passes, so fish can still cross a
 ridge. This does not change the dark/light side classification. Fixed bright
-objects are already part of the median background. Reflection masks remain an option for areas
-to exclude, but also exclude fish swimming through them.
+objects are already part of the median background. Reflection areas can deprioritize candidates when there are extras, while keeping fish swimming through them detectable.
 
 For single-fish recordings, learning also excludes sustained foreground visits
 from that brightness range. This keeps a fish that rests over embossed lettering
@@ -395,7 +397,7 @@ copying coordinates does not require applying a correction.
 Enable **Edit centers**, check or adjust every visible fish, then choose **Apply & stay** to update
 that frame's measurements and exports. Applying no marks explicitly sets its
 count to zero. **Restore automatic centers** undoes the correction. Manual marks
-outside the crop or inside reflection masks are not applied. Corrections affect
+outside the crop are not applied. Centers in reflection preference areas remain valid. Corrections affect
 only the selected frame and do not retrain or rerun the tracker. Original
 candidates remain available for comparison and in full JSON. Detection CSV
 identifies `observed`, `overlap-estimate`, and `manual` positions, their uncertainty,
@@ -415,7 +417,7 @@ the score; compare examples from the same recording before considering a cutoff.
 
 The in-app About view explains background subtraction, coordinate and inch measurements, grouping, and validation. Its navigation stays in the analyzer document, so returning preserves the selected video, results, frame, and human marks. A standalone [About page](dist/about.html) is also available by direct URL.
 
-Detection coordinates are pixel positions of foreground-region centers. A cluster is a connected group of at least two detections whose centers are linked by distances at or below the close distance in inches, converted using the entered grid calibration. Group numbers and colors apply within each frame only. The timeline marks changes in the sorted group sizes (for example, `3+2` to `4+1`), not changes in individual fish membership. The spacing percentile compares each frame's mean nearest-neighbor distance with 399 reproducible uniform random placements of the same detection count inside the selected crop outside reflection masks; it is a descriptive per-frame comparison, not a video-wide significance test. Average pair distance is calculated within each frame and averaged over frames with at least two detections. Distances are reported in approximate inches for background subtraction. Background mode can follow short, provisional fish paths; these are not verified individual identities.
+Detection coordinates are pixel positions of foreground-region centers. A cluster is a connected group of at least two detections whose centers are linked by distances at or below the close distance in inches, converted using the entered grid calibration. Group numbers and colors apply within each frame only. The timeline marks changes in the sorted group sizes (for example, `3+2` to `4+1`), not changes in individual fish membership. The spacing percentile compares each frame's mean nearest-neighbor distance with 399 reproducible uniform random placements of the same detection count inside the selected usable crop; it is a descriptive per-frame comparison, not a video-wide significance test. Average pair distance is calculated within each frame and averaged over frames with at least two detections. Distances are reported in approximate inches for background subtraction. Background mode can follow short, provisional fish paths; these are not verified individual identities.
 
 ## Developer
 

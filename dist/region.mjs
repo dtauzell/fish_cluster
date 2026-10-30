@@ -6,7 +6,7 @@ export function insideCrop(point, crop) {
 }
 
 export function insideAnalysisArea(point, crop, exclusions = []) {
-  return insideCrop(point, crop) && !exclusions.some(box => insideCrop(point, box));
+  return insideCrop(point, crop) && !exclusions.some(box => !box.preferenceOnly && insideCrop(point, box));
 }
 
 export function localExclusions(crop, exclusions = []) {
@@ -17,6 +17,7 @@ export function localExclusions(crop, exclusions = []) {
 /** Remove excluded pixels before cleanup, and again before finding connected regions. */
 export function maskExcludedPixels(mask, width, height, exclusions = []) {
   for (const box of exclusions) {
+    if (box.preferenceOnly) continue;
     const left = Math.max(0, Math.ceil(box.x));
     const right = Math.min(width, Math.floor(box.x + box.width) + 1);
     const top = Math.max(0, Math.ceil(box.y));
@@ -35,7 +36,7 @@ export function maskExcludedPixels(mask, width, height, exclusions = []) {
  * even when almost the entire crop is masked out.
  */
 export function usableRectangles(crop, exclusions = []) {
-  const clipped = exclusions.map(box => ({
+  const clipped = exclusions.filter(box => !box.preferenceOnly).map(box => ({
     left: Math.max(crop.x, box.x), right: Math.min(crop.x + crop.width, box.x + box.width),
     top: Math.max(crop.y, box.y), bottom: Math.min(crop.y + crop.height, box.y + box.height)
   })).filter(box => box.left < box.right && box.top < box.bottom);

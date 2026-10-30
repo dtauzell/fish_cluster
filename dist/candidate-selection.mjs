@@ -1,3 +1,4 @@
+import { insideCrop } from './region.mjs';
 /**
  * Optionally keep the N centers nearest the rectangular crop's center.
  * This is a geometric heuristic, not evidence that a candidate is a reflection.
@@ -133,4 +134,21 @@ export function hasAmbiguousRejectedCandidates(frame) {
     : frame.selectionMethod === BOUNDARY_SINGLE_FISH_SELECTION_METHOD ? ['wall-like-boundary-region', 'weaker-foreground-contrast'] : [];
   return !(reasons.length && frame.selectionConfident === true &&
     frame.rejectedDetections.every(point => reasons.includes(point.rejectionReason)));
+}
+
+/** Reflection areas are a preference only when excess candidates compete. */
+export function preferOutsideReflectionAreas(candidates, areas, expectedFish, crop, preferCenter = false) {
+  const measured = candidates.map(point => ({ ...point,
+    inReflectionArea: areas.some(area => insideCrop(point, area)),
+    distanceFromCenterPx: Math.hypot(point.x-crop.x-crop.width/2, point.y-crop.y-crop.height/2) }));
+  const outside = measured.filter(point => !point.inReflectionArea);
+  if (measured.length <= expectedFish || !outside.length) return { detections: measured, rejectedDetections: [] };
+  const marked = measured.filter(point => point.inReflectionArea);
+  if (preferCenter) marked.sort((a, b) =>
+    Math.hypot(a.x-crop.x-crop.width/2,a.y-crop.y-crop.height/2) - Math.hypot(b.x-crop.x-crop.width/2,b.y-crop.y-crop.height/2));
+  const remove = Math.min(marked.length, measured.length - expectedFish);
+  const rejected = new Set(marked.slice(marked.length - remove));
+  return { detections: measured.filter(point => !rejected.has(point)),
+    rejectedDetections: measured.filter(point => rejected.has(point)).map(point => ({ ...point,
+      rejectionReason: 'reflection-area-excess' })) };
 }

@@ -46,6 +46,7 @@ function detectionsRows(frames) {
       source_blob_area_px: detection.sourceBlobArea,
       edge_recovered: detection.edgeRecovered ?? false,
       distance_from_center_px: detection.distanceFromCenterPx,
+      in_reflection_area: detection.inReflectionArea ?? false,
       sharpness: detection.sharpness,
       local_contrast: detection.localContrast,
       sharpness_pixel_count: detection.sharpnessPixelCount,
@@ -56,7 +57,7 @@ function detectionsRows(frames) {
 }
 
 export function detectionsCsv(frames) {
-  return csv(detectionsRows(frames), ['frame_index', 'timestamp_ms', 'source_timestamp_ms', 'detection_id', 'group_id', 'group_size', 'class', 'confidence', 'x_px', 'y_px', 'box_width_px', 'box_height_px', 'blob_area_px', 'tank_side', 'split_from_blob', 'edge_recovered', 'sharpness', 'local_contrast', 'sharpness_pixel_count', 'sharpness_clipped', 'distance_from_center_px', 'split_reason', 'source_blob_area_px', 'split_reference_timestamp_ms', ...positionColumns]);
+  return csv(detectionsRows(frames), ['frame_index', 'timestamp_ms', 'source_timestamp_ms', 'detection_id', 'group_id', 'group_size', 'class', 'confidence', 'x_px', 'y_px', 'box_width_px', 'box_height_px', 'blob_area_px', 'tank_side', 'split_from_blob', 'edge_recovered', 'sharpness', 'local_contrast', 'sharpness_pixel_count', 'sharpness_clipped', 'distance_from_center_px', 'in_reflection_area', 'split_reason', 'source_blob_area_px', 'split_reference_timestamp_ms', ...positionColumns]);
 }
 
 function framesRows(frames) {
@@ -134,12 +135,13 @@ function humanRows(frames, marksByFrame, reviewed, config) {
     return marks.length ? marks.map((mark, markIndex) => ({ ...common, mark_number: markIndex + 1,
       x_px: mark.x.toFixed(2), y_px: mark.y.toFixed(2), tank_side: analysisTankSide(mark, config), inside_crop: insideCrop(mark, config.crop),
       included_in_analysis: insideAnalysisArea(mark, config.crop, config.exclusions),
+      in_reflection_area: (config.exclusions ?? []).some(area => area.preferenceOnly && insideCrop(mark, area)),
       manual_group_id: insideAnalysisArea(mark, config.crop, config.exclusions) ? metrics.groupIds[inCrop.indexOf(mark)] + 1 : null })) : [common];
   });
 }
 
 export function humanCsv(frames, marksByFrame, reviewed, config) {
-  return csv(humanRows(frames, marksByFrame, reviewed, config), ['frame_index', 'frame_number', 'timestamp_ms', 'source_timestamp_ms', 'reviewed', 'manual_annotation_present', 'manual_fish_count_in_crop', 'manual_fish_count_outside_crop', 'automatic_fish_count', 'matched_center_count', 'manual_cluster_count', 'automatic_cluster_count', 'manual_group_sizes', 'automatic_group_sizes', 'close_distance_inches', 'mark_number', 'x_px', 'y_px', 'inside_crop', 'included_in_analysis', 'manual_group_id', 'tank_side', 'manual_fish_count_in_analysis', 'manual_correction_applied', 'result_fish_count', 'included_in_results', 'automatic_candidate_count']);
+  return csv(humanRows(frames, marksByFrame, reviewed, config), ['frame_index', 'frame_number', 'timestamp_ms', 'source_timestamp_ms', 'reviewed', 'manual_annotation_present', 'manual_fish_count_in_crop', 'manual_fish_count_outside_crop', 'automatic_fish_count', 'matched_center_count', 'manual_cluster_count', 'automatic_cluster_count', 'manual_group_sizes', 'automatic_group_sizes', 'close_distance_inches', 'mark_number', 'x_px', 'y_px', 'inside_crop', 'included_in_analysis', 'in_reflection_area', 'manual_group_id', 'tank_side', 'manual_fish_count_in_analysis', 'manual_correction_applied', 'result_fish_count', 'included_in_results', 'automatic_candidate_count']);
 }
 
 
@@ -160,6 +162,7 @@ export function sharpnessCsv(frames, labelsByFrame) {
     included_in_analysis: !candidate.rejectionReason,
     rejection_reason: candidate.rejectionReason,
     distance_from_center_px: candidate.distanceFromCenterPx,
+    in_reflection_area: candidate.inReflectionArea ?? false,
     human_label: labelsByFrame.get(frame.frameIndex)?.get(candidate.detectionId) ?? '',
     split_from_blob: candidate.splitFromBlob ?? false,
     split_reason: candidate.splitReason,
@@ -170,7 +173,7 @@ export function sharpnessCsv(frames, labelsByFrame) {
   })));
   return csv(rows, ['frame_index', 'frame_number', 'timestamp_ms', 'source_timestamp_ms', 'detection_id', 'x_px', 'y_px',
     'sharpness', 'local_contrast', 'sharpness_pixel_count', 'sharpness_clipped', 'human_label',
-    'split_from_blob', 'edge_recovered', 'included_in_analysis', 'rejection_reason', 'distance_from_center_px', 'split_reason', 'source_blob_area_px', 'split_reference_timestamp_ms', ...positionColumns]);
+    'split_from_blob', 'edge_recovered', 'included_in_analysis', 'rejection_reason', 'distance_from_center_px', 'in_reflection_area', 'split_reason', 'source_blob_area_px', 'split_reference_timestamp_ms', ...positionColumns]);
 }
 
 export function exportedSharpnessLabels(labelsByFrame) {
