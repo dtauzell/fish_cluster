@@ -96,7 +96,7 @@ test('detection and frame exports preserve metrics and flag group-size changes',
   assert.equal(detectionRows[0].split_from_blob, 'false');
   const frameRows = records(framesCsv([frame, singles]));
   assert.equal(frameRows[0].groupSizes, '2');
-  assert.equal(frameRows[0].meanPairDistanceInches, String(10 / 30));
+  assert.equal(frameRows[0].meanPairDistanceCentimeters, String(10 / 30 * 2.54));
   assert.equal(frameRows[1].groupChanged, 'true');
   assert.equal(frameRows[1].groupSizes, '1+1');
 });

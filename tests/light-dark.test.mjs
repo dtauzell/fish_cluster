@@ -82,7 +82,7 @@ test('CSV keeps unknown and excluded samples and exposes interval and summary un
   assert.equal(text.split('\r\n').length, 4);
   assert.match(text, /"unknown"/);
   assert.match(text, /"false"/);
-  assert.match(text, /"speed_inches_per_second"/);
+  assert.match(text, /"speed_centimeters_per_second"/);
   assert.match(lightDarkSummaryCsv(lightDarkReport(frames, config)), /"unknownTimeSeconds"/);
 });
 

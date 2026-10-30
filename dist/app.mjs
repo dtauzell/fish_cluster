@@ -1,3 +1,4 @@
+import { centimetersJson } from './json-units.mjs';
 import { lightDarkReport } from './light-dark.mjs';
 import { createExperimentTools } from './experiment-ui.mjs';
 import { lightDarkFramesCsv, lightDarkSummaryCsv } from './exports.mjs';
@@ -1101,5 +1102,5 @@ function exportData(format) {
     frames: state.testType === 'light-dark' ? state.reviewFrames.map(({ metrics, ...frame }) => frame) : state.frames,
     excludedFrames: state.testType === 'light-dark' ? [] : state.reviewFrames.filter(frame => !framePassesCountFilter(frame, state.settings))
   };
-  return JSON.stringify(result, null, 2);
+  return JSON.stringify(centimetersJson(result), null, 2);
 }

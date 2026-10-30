@@ -18,7 +18,7 @@
 <body><main class="csv-guide">
   <a href="./index.html">Fish Cluster</a>
   <h1>Frames CSV column guide</h1>
-  <p>Each row describes one sampled video frame. A sample is not an independent fish or trial. Coordinates use the original video: X increases rightward and Y downward. Pixels and timestamps are independent of preview zoom. Blank numeric cells mean unavailable, not zero. Inches depend on your distance calibration.</p>
+  <p>Each row describes one sampled video frame. A sample is not an independent fish or trial. Coordinates use the original video: X increases rightward and Y downward. Pixels and timestamps are independent of preview zoom. Blank numeric cells mean unavailable, not zero. Centimeters depend on your distance calibration.</p>
   <nav aria-label="Column guides"><a href="#shoaling">Shoaling frames</a><a href="#light-dark">Light/dark frames</a><a href="#summaries">Light/dark and group summaries</a></nav>
   <section id="shoaling"><h2>Shoaling frames</h2>
     <p>The shoaling frames export contains samples included by the count filter, with applied manual corrections. It does not change when you switch the review view. Group IDs apply within one frame; they do not identify individual fish across time.</p>
@@ -30,9 +30,9 @@
       <tr><td><code>countDifference</code></td><td>Current count minus expected fish count in background mode. Blank when unavailable.</td></tr>
       <tr><td><code>pairCount</code></td><td>Number of unique pairs: n × (n − 1) / 2.</td></tr>
       <tr><td><code>meanPairDistancePx</code></td><td>Mean center-to-center distance across all unique pairs, in pixels; blank with fewer than two fish.</td></tr>
-      <tr><td><code>meanPairDistanceInches</code></td><td>The same mean pair distance, converted to approximate inches.</td></tr>
+      <tr><td><code>meanPairDistanceCentimeters</code></td><td>The same mean pair distance, converted to approximate centimeters.</td></tr>
       <tr><td><code>meanNearestDistancePx</code></td><td>Mean of each fish's distance to its nearest other fish, in pixels; blank with fewer than two fish.</td></tr>
-      <tr><td><code>meanNearestDistanceInches</code></td><td>The same nearest-neighbor mean in approximate inches.</td></tr>
+      <tr><td><code>meanNearestDistanceCentimeters</code></td><td>The same nearest-neighbor mean in approximate centimeters.</td></tr>
       <tr><td><code>closeFishFraction</code></td><td>Fraction (0–1) of fish with another fish within the selected link distance.</td></tr>
       <tr><td><code>clusterCount</code></td><td>Number of connected groups containing at least two fish. Chains of links form one group.</td></tr>
       <tr><td><code>isolatedCount</code></td><td>Number of single fish with no neighbor within the link distance.</td></tr>
@@ -68,7 +68,7 @@
       <tr><td><code>x_px</code></td><td>Current center's original-video X coordinate when exactly one center exists. Can be present even when side is unknown.</td></tr>
       <tr><td><code>y_px</code></td><td>Current center's original-video Y coordinate when exactly one center exists.</td></tr>
       <tr><td><code>speed_px_per_second</code></td><td>Straight-line displacement divided by time over the preceding valid interval. Blank for unavailable intervals or the first row.</td></tr>
-      <tr><td><code>speed_inches_per_second</code></td><td>The same scalar speed in approximate inches/second using the calibration.</td></tr>
+      <tr><td><code>speed_centimeters_per_second</code></td><td>The same scalar speed in approximate centimeters/second using the calibration.</td></tr>
       <tr><td><code>position_source</code></td><td>How the single center was obtained, such as observed, manual, or overlap-estimate. Blank without a single center.</td></tr>
       <tr><td><code>position_uncertain</code></td><td>Whether that center is flagged uncertain. Such positions do not contribute valid speed or zone intervals.</td></tr>
       <tr><td><code>manual_correction_applied</code></td><td>True when current results use an applied correction.</td></tr>
@@ -88,7 +88,7 @@
       <tr><td><code>observedDurationSeconds</code></td><td>Analyzed time span, including unknown time; not necessarily full video duration.</td></tr>
       <tr><td><code>zoneSwitchCount</code></td><td>Total observed adjacent-sample zone changes.</td></tr>
       <tr><td><code>averageSpeedPxPerSecond</code></td><td>Total measured displacement divided by total valid interval time. This is scalar speed, often called velocity in the interface; it is not net directional velocity.</td></tr>
-      <tr><td><code>averageSpeedInchesPerSecond</code></td><td>The same average in calibrated inches/second. Curved movement between samples is not measured.</td></tr>
+      <tr><td><code>averageSpeedCentimetersPerSecond</code></td><td>The same average in calibrated centimeters/second. Curved movement between samples is not measured.</td></tr>
       <tr><td><code>velocityDurationSeconds</code></td><td>Total duration contributing valid speed measurements.</td></tr>
       <tr><td><code>coverageFraction</code></td><td>(Dark time + light time) / analyzed duration, from 0 to 1. Blank if no elapsed interval exists.</td></tr>
     </tbody></table></div>

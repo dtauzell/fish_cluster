@@ -182,7 +182,7 @@ test('centimeter edits and slider changes agree with exports and reanalysis', as
   await page.locator('#threshold').press('Tab');
   await page.getByRole('link', { name: 'Results', exact: true }).click();
   const edited = await analysisJSON(page);
-  expect(edited.settings.thresholdInches).toBeCloseTo(4.2 / 2.54, 10);
+  expect(edited.settings.thresholdCentimeters).toBeCloseTo(4.2, 10);
   expect(edited.frames).toHaveLength(12);
   expect(edited.frames.every(frame => frame.metrics.clusterCount === 0)).toBe(true);
   const csv = await download(page, 'Export frames CSV ↓');
@@ -197,14 +197,14 @@ test('centimeter edits and slider changes agree with exports and reanalysis', as
   await slider.press('End');
   const inches = Number(await slider.inputValue());
   const slid = await analysisJSON(page);
-  expect(slid.settings.thresholdInches).toBe(inches);
+  expect(slid.settings.thresholdCentimeters).toBeCloseTo(inches * 2.54, 10);
   expect(slid.frames.every(frame => frame.metrics.clusterCount === 1)).toBe(true);
   await page.getByRole('link', { name: 'Setup', exact: true }).click();
   expect(Number(await page.locator('#threshold').inputValue())).toBeCloseTo(inches * 2.54, 10);
   await page.getByRole('button', { name: /Analyze video/ }).click();
   await expect(page).toHaveURL(/#results$/);
   const rerun = await analysisJSON(page);
-  expect(rerun.settings.thresholdInches).toBe(inches);
+  expect(rerun.settings.thresholdCentimeters).toBeCloseTo(inches * 2.54, 10);
   expect(rerun.frames.map(frame => frame.metrics.groupSizes)).toEqual(slid.frames.map(frame => frame.metrics.groupSizes));
 });
 

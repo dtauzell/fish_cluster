@@ -1,3 +1,4 @@
+import { centimetersCsv } from './csv-units.mjs';
 import { polygonBox } from './geometry.mjs';
 
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -80,9 +81,7 @@ export function summarizeGroups(results) {
 }
 export function recordsCsv(rows) {
   if (!rows.length) return '';
-  const columns = [...new Set(rows.flatMap(Object.keys))];
-  const cell = value => `"${String(value ?? '').replaceAll('"', '""')}"`;
-  return [columns.map(cell).join(','), ...rows.map(row => columns.map(key => cell(row[key])).join(','))].join('\r\n');
+  return centimetersCsv(rows);
 }
 export function createExperimentStorage(storage = globalThis.localStorage) {
   let readFailed = false;

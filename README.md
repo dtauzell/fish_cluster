@@ -512,3 +512,13 @@ npx wrangler pages deploy dist --project-name fish-cluster --branch preview
 ```
 
 These commands use Cloudflare's [Direct Upload workflow](https://developers.cloudflare.com/pages/get-started/direct-upload/) and [Wrangler Pages commands](https://developers.cloudflare.com/workers/wrangler/commands/pages/). Only `dist/` is uploaded, so the local `fish.mov` stays on your computer. The analyzer works offline once the app is saved.
+
+### Export measurement units
+
+CSV and full analysis JSON exports use centimeters for physical distances and
+centimeters per second for speeds, regardless of the selected display unit.
+JSON result keys use `Centimeters` in place of `Inches`, including nested frame
+metrics, velocity intervals, and `settings.thresholdCentimeters`. Pixel values
+stay in pixels. Calibration stays in inches: `pixelsPerInch` and `gridPixels`
+(pixels per half-inch square) retain their names and values. Export conversion
+does not alter the analysis or saved calibration.

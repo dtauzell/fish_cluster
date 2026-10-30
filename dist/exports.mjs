@@ -3,7 +3,7 @@ import { lightDarkReport } from './light-dark.mjs';
 import { frameCandidates } from './candidate-selection.mjs';
 import { insideAnalysisArea } from './region.mjs';
 // Plain-data export formatting. These functions have no browser or page-state dependencies.
-import { csv } from './analysis.mjs';
+import { centimetersCsv as csv } from './csv-units.mjs';
 import { groupSignature } from './measurements.mjs';
 import { compareFrame, insideCrop } from './review.mjs';
 import { framePassesCountFilter, automaticCandidateCount } from './frame-selection.mjs';
