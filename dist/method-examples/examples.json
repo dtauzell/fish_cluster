@@ -1,0 +1,366 @@
+{
+  "generatedBy": "node scripts/build-method-examples.mjs",
+  "sourceMovie": "fish.mov",
+  "examples": [
+    {
+      "name": "Separate fish",
+      "sourceTimeMs": 1600,
+      "crop": {
+        "x": 50,
+        "y": 240,
+        "width": 420,
+        "height": 290
+      },
+      "options": {
+        "expectedFish": 5,
+        "preferCenter": true,
+        "thresholdOverlap": true
+      },
+      "detections": [
+        {
+          "x": 113.07224334600761,
+          "y": 104.1596958174905,
+          "width": 25,
+          "height": 39,
+          "area": 263,
+          "foregroundContrast": 82.5,
+          "supportPixelCount": 262
+        },
+        {
+          "x": 90.49705882352941,
+          "y": 105.05588235294118,
+          "width": 42,
+          "height": 36,
+          "area": 340,
+          "foregroundContrast": 90.5,
+          "supportPixelCount": 336
+        },
+        {
+          "x": 159.31521739130434,
+          "y": 98.27989130434783,
+          "width": 55,
+          "height": 15,
+          "area": 368,
+          "foregroundContrast": 87,
+          "supportPixelCount": 368
+        },
+        {
+          "x": 139.828125,
+          "y": 169.1125,
+          "width": 17,
+          "height": 48,
+          "area": 320,
+          "foregroundContrast": 68,
+          "supportPixelCount": 320
+        },
+        {
+          "x": 140.296,
+          "y": 217.672,
+          "width": 27,
+          "height": 7,
+          "area": 125,
+          "foregroundContrast": 77,
+          "supportPixelCount": 125
+        }
+      ],
+      "fixture": "tests/fixtures/false-overlap/"
+    },
+    {
+      "name": "Overlap and reflection preference",
+      "sourceTimeMs": 116600,
+      "sequenceClock": "Pipeline times 0 and 200 ms correspond to source times 116400 and 116600 ms.",
+      "config": {
+        "crop": {
+          "x": 50,
+          "y": 200,
+          "width": 420,
+          "height": 330
+        },
+        "expectedFish": 5,
+        "preferCenter": true,
+        "intervalMs": 200,
+        "thresholdPx": 45.9,
+        "pixelsPerInch": 30.6,
+        "exclusions": [
+          {
+            "x": 390,
+            "y": 200,
+            "width": 80,
+            "height": 330,
+            "preferenceOnly": true
+          }
+        ]
+      },
+      "frame": {
+        "frameIndex": 1,
+        "timestampMs": 200,
+        "rawPredictionCount": 7,
+        "detections": [
+          {
+            "detectionId": 2,
+            "className": "fish candidate",
+            "confidence": 1,
+            "x": 348.44444444444446,
+            "y": 301.36752136752136,
+            "width": 40,
+            "height": 12,
+            "area": 234,
+            "foregroundContrast": 71,
+            "supportPixelCount": 234,
+            "sharpness": 273.33079427083334,
+            "localContrast": 29.933219491449076,
+            "sharpnessPixelCount": 960,
+            "sharpnessClipped": false,
+            "tankSide": "unmarked",
+            "inReflectionArea": false,
+            "distanceFromCenterPx": 108.95646878455301,
+            "positionSource": "observed",
+            "positionUncertain": false,
+            "trackId": 2,
+            "trackLastObservedTimestampMs": 200
+          },
+          {
+            "detectionId": 3,
+            "className": "fish candidate",
+            "confidence": 1,
+            "x": 333.7927272727273,
+            "y": 326.19272727272727,
+            "area": 275,
+            "width": 22,
+            "height": 30,
+            "splitFromBlob": true,
+            "sourceBlobArea": 400,
+            "splitReason": "previous-frame-overlap",
+            "splitReferenceTimestampMs": 0,
+            "sharpness": 351.4344844567559,
+            "localContrast": 33.024907870551615,
+            "sharpnessPixelCount": 1140,
+            "sharpnessClipped": false,
+            "tankSide": "unmarked",
+            "inReflectionArea": false,
+            "distanceFromCenterPx": 83.37488239797423,
+            "positionSource": "overlap-estimate",
+            "positionUncertain": true,
+            "trackId": 4,
+            "trackLastObservedTimestampMs": 0
+          },
+          {
+            "detectionId": 4,
+            "className": "fish candidate",
+            "confidence": 1,
+            "x": 315.872,
+            "y": 338.568,
+            "area": 125,
+            "width": 25,
+            "height": 19,
+            "splitFromBlob": true,
+            "sourceBlobArea": 400,
+            "splitReason": "previous-frame-overlap",
+            "splitReferenceTimestampMs": 0,
+            "sharpness": 415.7279869401081,
+            "localContrast": 31.110619174911694,
+            "sharpnessPixelCount": 891,
+            "sharpnessClipped": false,
+            "tankSide": "unmarked",
+            "inReflectionArea": false,
+            "distanceFromCenterPx": 61.808826295279246,
+            "positionSource": "overlap-estimate",
+            "positionUncertain": true,
+            "trackId": 5,
+            "trackLastObservedTimestampMs": 0
+          },
+          {
+            "detectionId": 5,
+            "className": "fish candidate",
+            "confidence": 1,
+            "x": 178.15463917525773,
+            "y": 335.59106529209623,
+            "width": 34,
+            "height": 36,
+            "area": 291,
+            "foregroundContrast": 78,
+            "supportPixelCount": 291,
+            "sharpness": 297.7310348381777,
+            "localContrast": 28.3695317182165,
+            "sharpnessPixelCount": 1848,
+            "sharpnessClipped": false,
+            "tankSide": "unmarked",
+            "inReflectionArea": false,
+            "distanceFromCenterPx": 86.96866406462733,
+            "positionSource": "observed",
+            "positionUncertain": false,
+            "trackId": 1,
+            "trackLastObservedTimestampMs": 200
+          },
+          {
+            "detectionId": 6,
+            "className": "fish candidate",
+            "confidence": 1,
+            "x": 361.0200573065903,
+            "y": 364.7449856733524,
+            "width": 33,
+            "height": 47,
+            "area": 349,
+            "foregroundContrast": 95,
+            "supportPixelCount": 349,
+            "sharpness": 389.0107277741997,
+            "localContrast": 33.62851515132702,
+            "sharpnessPixelCount": 2255,
+            "sharpnessClipped": false,
+            "tankSide": "unmarked",
+            "inReflectionArea": false,
+            "distanceFromCenterPx": 101.02037918426943,
+            "positionSource": "observed",
+            "positionUncertain": false,
+            "trackId": 3,
+            "trackLastObservedTimestampMs": 200
+          }
+        ],
+        "rejectedDetections": [
+          {
+            "detectionId": 1,
+            "className": "fish candidate",
+            "confidence": 1,
+            "x": 347.19444444444446,
+            "y": 213.52777777777777,
+            "width": 29,
+            "height": 6,
+            "area": 108,
+            "foregroundContrast": 26,
+            "supportPixelCount": 108,
+            "sharpness": 10.521936166723812,
+            "localContrast": 8.231313648559937,
+            "sharpnessPixelCount": 518,
+            "sharpnessClipped": false,
+            "tankSide": "unmarked",
+            "inReflectionArea": false,
+            "distanceFromCenterPx": 174.77615754705667,
+            "rejectionReason": "farther-from-crop-center"
+          },
+          {
+            "detectionId": 7,
+            "className": "fish candidate",
+            "confidence": 1,
+            "x": 413.9507042253521,
+            "y": 366.1302816901408,
+            "width": 15,
+            "height": 40,
+            "area": 284,
+            "foregroundContrast": 41,
+            "supportPixelCount": 282,
+            "sharpness": 31.920958536809493,
+            "localContrast": 16.124244362709792,
+            "sharpnessPixelCount": 1104,
+            "sharpnessClipped": false,
+            "tankSide": "unmarked",
+            "inReflectionArea": true,
+            "distanceFromCenterPx": 153.95485334402719,
+            "rejectionReason": "reflection-area-excess"
+          }
+        ],
+        "metrics": {
+          "fishCount": 5,
+          "pairCount": 10,
+          "meanPairDistancePx": 91.65894036414254,
+          "meanNearestDistancePx": 51.46606518519885,
+          "closeFishFraction": 0.6,
+          "clusterCount": 1,
+          "isolatedCount": 2,
+          "groupSizes": [
+            3,
+            1,
+            1
+          ],
+          "groupIds": [
+            0,
+            0,
+            0,
+            1,
+            2
+          ],
+          "darkSideCount": 0,
+          "lightSideCount": 0,
+          "unmarkedSideCount": 5,
+          "randomSpacingPercentile": null,
+          "randomSpacingUnavailableReason": "center-selection",
+          "uncertainPositionCount": 2,
+          "manualPositionCount": 0,
+          "meanPairDistanceInches": 2.995390207978514,
+          "meanNearestDistanceInches": 1.6818975550718578
+        }
+      },
+      "fixtures": [
+        "tests/fixtures/frame-583.pgm",
+        "tests/fixtures/frame-584.pgm"
+      ]
+    }
+  ],
+  "thresholdExample": {
+    "source": "https://vap.aau.dk/3d-zef/",
+    "sequence": "ZebraFish-03",
+    "sourceFrameNumber": 1501,
+    "sourceTimeMs": 25000,
+    "detailCrop": {
+      "x": 1600,
+      "y": 1180,
+      "width": 360,
+      "height": 300
+    },
+    "results": [
+      {
+        "thresholdOverlap": false,
+        "detections": [
+          {
+            "x": 1808.3243243243244,
+            "y": 1410.4864864864865,
+            "width": 16,
+            "height": 7,
+            "area": 74,
+            "foregroundContrast": 34,
+            "supportPixelCount": 74
+          }
+        ]
+      },
+      {
+        "thresholdOverlap": true,
+        "detections": [
+          {
+            "x": 1790.8172043010752,
+            "y": 1320.7114695340501,
+            "width": 53,
+            "height": 101,
+            "area": 1674,
+            "source": "threshold-split-estimate",
+            "splitFromBlob": true,
+            "sourceBlobArea": 3819,
+            "splitReason": "threshold-overlap",
+            "splitThreshold": 32,
+            "positionUncertain": true
+          },
+          {
+            "x": 1813.3466400532268,
+            "y": 1373.319361277445,
+            "width": 81,
+            "height": 78,
+            "area": 1503,
+            "source": "threshold-split-estimate",
+            "splitFromBlob": true,
+            "sourceBlobArea": 3819,
+            "splitReason": "threshold-overlap",
+            "splitThreshold": 32,
+            "positionUncertain": true
+          },
+          {
+            "x": 1808.3243243243244,
+            "y": 1410.4864864864865,
+            "width": 16,
+            "height": 7,
+            "area": 74,
+            "foregroundContrast": 34,
+            "supportPixelCount": 74
+          }
+        ]
+      }
+    ]
+  }
+}
