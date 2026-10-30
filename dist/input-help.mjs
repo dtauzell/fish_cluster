@@ -6,6 +6,7 @@ const helpText = {
   threshold: 'Maximum center-to-center distance, in the selected distance units, for linking two fish. Linked fish form groups, including chains of links.',
   'grid-pixels': 'Measure the width of one 0.5-inch grid square in the original video, in pixels. This converts pixel distances to approximate inches for background subtraction.',
   'expected-fish': 'Number of real fish in the tank. Background mode with one fish keeps the strongest foreground-contrast candidate; close choices remain uncertain. Larger counts guide overlap recovery and the optional crop-center rule.',
+  'threshold-overlap': 'Experimental multi-fish detection: retain larger blobs and try stronger contrast thresholds to separate overlapping fish. Split centers remain uncertain. Off by default; changing this option requires reanalysis.',
   'track-fish': 'Follow provisional fish paths across nearby samples. Identities may swap during overlap; dashed centers marked † are uncertain estimates.',
   'prefer-center': 'When candidates exceed the known fish count, keep those closest to the crop center. With one fish expected, foreground contrast takes precedence. Real fish near the edge may be excluded, so review the pink × marks.',
   'crop-tool': 'Choose whether selecting on the preview selects the tank crop, marks a light/dark region, adds a reflection mask, or draws a line for distance calibration. Masks exclude those areas from every analyzed frame.',

@@ -437,6 +437,7 @@ function settings() {
     expectedFish: state.testType === 'light-dark' ? 1 : Number($('expected-fish').value),
     preferCenter: $('prefer-center').checked,
     trackFish: $('track-fish').checked,
+    thresholdOverlap: $('threshold-overlap').checked,
     suppressFlicker: $('suppress-flicker').checked
   }, state.crop, video.videoWidth, video.videoHeight, state.exclusions, state.tankZones);
 }
@@ -493,6 +494,12 @@ $('filter-frame-count').addEventListener('change', () => {
   clearResults();
   status(`Analysis will keep frames with exactly ${$('filter-frame-count').value} detected fish.`);
 });
+$('threshold-overlap').addEventListener('change', () => {
+  if (state.running) return;
+  clearResults();
+  drawFrame(null);
+  status('Experimental overlap handling changed. Analyze again to apply it.');
+});
 $('suppress-flicker').addEventListener('change', () => {
   if (state.running) return;
   clearResults();
@@ -535,6 +542,7 @@ $('analyze').addEventListener('click', async () => {
   $('prefer-center').disabled = true;
   $('track-fish').disabled = true;
   $('suppress-flicker').disabled = true;
+  $('threshold-overlap').disabled = true;
   $('filter-exact-count').disabled = true;
   $('filter-frame-count').disabled = true;
   $('crop-fields').disabled = true;
@@ -591,6 +599,7 @@ $('analyze').addEventListener('click', async () => {
     $('prefer-center').disabled = false;
     $('track-fish').disabled = false;
     $('suppress-flicker').disabled = false;
+    $('threshold-overlap').disabled = false;
     $('filter-exact-count').disabled = false;
     $('filter-frame-count').disabled = !$('filter-exact-count').checked;
     $('crop-fields').disabled = false;

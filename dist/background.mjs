@@ -1,3 +1,4 @@
+import { thresholdSplit } from './threshold-splitting.mjs';
 import { connectedRegions } from './connected-regions.mjs';
 import { splitLargeBlobs } from './blob-splitting.mjs';
 import { maskExcludedPixels } from './region.mjs';
@@ -440,9 +441,11 @@ export function detectBackgroundFish(frame, background, width, height, options =
   const edgeX = options.edgeX ?? Math.round(width * 12 / 420);
   const edgeTop = options.edgeTop ?? options.edgeY ?? Math.round(height * 10 / 290);
   const edgeBottom = options.edgeBottom ?? options.edgeY ?? Math.round(height * 20 / 290);
+  const thresholdOverlap = options.expectedFish > 1 && options.thresholdOverlap === true;
+  const componentLimit = thresholdOverlap ? Math.max(maxArea, 20000) : maxArea;
   const mask = darkPixelMask(frame, background, width, height, threshold, options.exclusions, options.darkZones, options.analysisMask);
   excludeBorders(mask, width, height, edgeX, edgeTop, edgeBottom);
-  const blobs = connectedRegions(mask, width, height, { minArea, maxArea, minLength: 10 })
+  const blobs = connectedRegions(mask, width, height, { minArea, maxArea: componentLimit, minLength: 10 })
     .filter(blob => hasStableForegroundEvidence(blob, frame, background, threshold, options));
   // Look for supported faint fish inside the tank before relaxing its borders.
   // Otherwise a wall reflection can fill the count and block faint-fish recovery.
@@ -472,6 +475,20 @@ export function detectBackgroundFish(frame, background, width, height, options =
     frame, background, threshold, previousDetections: options.previousDetections,
     previousTimestampMs: options.previousTimestampMs, trackingSeeds,
     observedSizeReference: options.observedSizeReference });
+  if (thresholdOverlap) {
+    for (const blob of [...blobs]) {
+      if (!blob.pixels || blob.area <= maxArea) continue;
+      const split = thresholdSplit(blob, frame, background, width, {
+        start: threshold + 2, end: Math.max(128, threshold + 2), minArea, darkZones: options.darkZones
+      });
+      if (!split) continue;
+      blobs.splice(blobs.indexOf(blob), 1, ...split.parts.map(part => ({
+        ...part, splitFromBlob: true, sourceBlobArea: blob.area,
+        splitReason: 'threshold-overlap', splitThreshold: split.threshold,
+        positionUncertain: true
+      })));
+    }
+  }
   // Pixel membership is needed only during splitting, so omit it from the result.
   return blobs.map(({ pixels, ...blob }) => blob);
 }

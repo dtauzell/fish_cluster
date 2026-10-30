@@ -54,11 +54,17 @@ export function previousBodySeeds(blobs, previousDetections, frameWidth) {
     }
     if (!nearest || nearestDistance > 8) continue;
     if (!groups.has(nearest)) groups.set(nearest, []);
-    groups.get(nearest).push({ x: point.x, y: point.y });
+    groups.get(nearest).push({ x: point.x, y: point.y, area: point.area });
   }
   const seeds = new Map();
   for (const [blob, points] of groups) {
-    if (points.length === 2 && distance(points[0], points[1]) >= 10) seeds.set(blob, points);
+    if (points.length !== 2 || distance(points[0], points[1]) < 10) continue;
+    // Nearby fish can pass each other's previous positions without merging.
+    // Require the current region to retain most of their combined observed area;
+    // otherwise proximity alone can split one fish and displace a real candidate.
+    const haveAreas = points.every(point => Number.isFinite(point.area) && point.area > 0);
+    if (haveAreas && blob.area < .65 * (points[0].area + points[1].area)) continue;
+    seeds.set(blob, points.map(({ x, y }) => ({ x, y })));
   }
   return seeds;
 }

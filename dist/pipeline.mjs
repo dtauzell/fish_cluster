@@ -63,7 +63,7 @@ export async function* analyzeVideo({ config, duration, source, isStopped = () =
       ...point, x: point.x - crop.x, y: point.y - crop.y
     })) : [];
     const candidates = detectBackgroundFish(gray, background, crop.width, crop.height,
-      { expectedFish: config.expectedFish, preferCenter: config.preferCenter, exclusions, darkZones, analysisMask, backgroundVariation: variation, timestampMs,
+      { expectedFish: config.expectedFish, thresholdOverlap: config.thresholdOverlap === true, preferCenter: config.preferCenter, exclusions, darkZones, analysisMask, backgroundVariation: variation, timestampMs,
         ...(crop.polygon ? { edgeX: 0, edgeTop: 0, edgeBottom: 0 } : {}),
         previousDetections, previousTimestampMs: canReferencePrevious ? previousFrame.timestampMs : undefined,
         previousCandidates: (previousCandidates ?? []).map(point => ({ ...point,

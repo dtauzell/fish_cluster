@@ -522,3 +522,14 @@ metrics, velocity intervals, and `settings.thresholdCentimeters`. Pixel values
 stay in pixels. Calibration stays in inches: `pixelsPerInch` and `gridPixels`
 (pixels per half-inch square) retain their names and values. Export conversion
 does not alter the analysis or saved calibration.
+
+### Experimental overlap splitting
+
+Advanced settings → **Experimental: separate overlapping fish by contrast**
+enables the threshold/overlap method from `experiment/threshold-overlap-splitting`.
+It is off by default. With more than one fish expected, it retains larger joined
+regions (up to 20,000 pixels) and increases the contrast threshold inside oversized
+regions to seek two plausible bodies. Split centers remain uncertain estimates;
+reflections may still survive. Changing the option clears results and requires
+reanalysis. JSON settings record `thresholdOverlap` so runs can be compared.
+The usual detector and existing overlap handling apply when the option is off.
