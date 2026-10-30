@@ -733,7 +733,8 @@ function drawTimeline() {
   $('timeline').hidden = !indices.length;
   $('timeline').dataset.mode = sides ? 'side' : 'group';
   $('timeline-title').textContent = sides ? 'Light / dark changes' : 'Group changes';
-  $('side-timeline-details').hidden = !sides;
+  $('side-timeline-help').hidden = !sides;
+  if (!sides) $('side-timeline-help').open = false;
   canvas.setAttribute('aria-label', sides
     ? 'Fish side over video time: purple dark, cyan light, gray unknown; click to jump to an observed side change'
     : 'Timeline of changes in group sizes; click to jump to a change');

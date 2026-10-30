@@ -1288,3 +1288,57 @@ html:not([data-test-type]) #workspace,html:not([data-test-type]) #human-page { d
 #data-preview th { position: sticky; top: 0; z-index: 1; background: #17323c; font-weight: 700; }
 #data-preview tbody tr:nth-child(even) { background: #102832; }
 #data-preview tbody tr:hover { background: #1a3d45; }
+
+/* Share the frame filter with playback controls to preserve video height. */
+.results-workspace .human-review-panel .results-filter-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+}
+.results-filter-controls > label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.results-filter-controls input,
+.results-filter-controls select {
+  width: auto;
+  height: 32px;
+  margin-top: 0;
+}
+.results-filter-controls #human-expected-fish { width: 64px; }
+.results-filter-controls #human-frame-filter { max-width: 210px; }
+.results-filter-controls #human-filter-summary { margin: 0; }
+
+.results-workspace .timeline { position: relative; }
+.side-timeline-help { flex: none; }
+.side-timeline-help > summary {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #5d7880;
+  border-radius: 50%;
+  cursor: pointer;
+  font-weight: 700;
+  list-style: none;
+}
+.side-timeline-help > summary::-webkit-details-marker { display: none; }
+.side-timeline-help > summary:focus-visible { outline: 2px solid #8ce6ce; outline-offset: 3px; }
+.side-timeline-help #side-timeline-details {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(340px, calc(100vw - 48px));
+  margin: 0;
+  padding: 14px;
+  border: 1px solid #5d7880;
+  border-radius: 8px;
+  background: #102832;
+  box-shadow: 0 6px 20px #0006;
+}
